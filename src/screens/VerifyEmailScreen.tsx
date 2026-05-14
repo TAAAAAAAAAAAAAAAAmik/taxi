@@ -1,0 +1,183 @@
+import { useState } from 'react';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Mail, Send, ShieldCheck } from 'lucide-react-native';
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+
+import { RootStackParamList } from '../navigation/types';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'VerifyEmail'>;
+
+export function VerifyEmailScreen({ navigation, route }: Props) {
+  const { email, firstName, role } = route.params;
+  const [code, setCode] = useState('');
+  const canContinue = code.trim().length >= 4;
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+        <View style={styles.card}>
+          <View style={styles.iconWrap}>
+            <Mail color="#146C5D" size={30} strokeWidth={2.4} />
+          </View>
+          <Text style={styles.title}>Подтверждение почты</Text>
+          <Text style={styles.subtitle}>
+            Почту подтверждаем кодом или ссылкой. Пароль от почты пользователя по-прежнему не
+            нужен.
+          </Text>
+          <Text style={styles.target}>{email || 'Почта из анкеты'}</Text>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Код из письма</Text>
+            <TextInput
+              autoCapitalize="characters"
+              maxLength={8}
+              onChangeText={setCode}
+              placeholder="A1B2"
+              placeholderTextColor="#8A8F98"
+              style={styles.input}
+              value={code}
+            />
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={!canContinue}
+            onPress={() =>
+              navigation.replace('Dashboard', {
+                firstName,
+                role,
+              })
+            }
+            style={({ pressed }) => [
+              styles.primaryButton,
+              !canContinue && styles.primaryButtonMuted,
+              pressed && styles.pressed,
+            ]}
+          >
+            <ShieldCheck color="#FFFFFF" size={19} strokeWidth={2.4} />
+            <Text style={styles.primaryButtonText}>Открыть кабинет</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+          >
+            <Send color="#146C5D" size={18} strokeWidth={2.4} />
+            <Text style={styles.secondaryButtonText}>Отправить письмо повторно</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 16,
+    padding: 18,
+  },
+  field: {
+    gap: 8,
+  },
+  iconWrap: {
+    alignItems: 'center',
+    backgroundColor: '#E9F4F1',
+    borderRadius: 8,
+    height: 58,
+    justifyContent: 'center',
+    width: 58,
+  },
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#20242A',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 0,
+    minHeight: 56,
+    paddingHorizontal: 14,
+  },
+  label: {
+    color: '#20242A',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  page: {
+    backgroundColor: '#F4F7F5',
+    justifyContent: 'center',
+    minHeight: '100%',
+    padding: 16,
+  },
+  pressed: {
+    opacity: 0.76,
+  },
+  primaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#146C5D',
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: 16,
+  },
+  primaryButtonMuted: {
+    backgroundColor: '#89958F',
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  safeArea: {
+    backgroundColor: '#F4F7F5',
+    flex: 1,
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#146C5D',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 50,
+    paddingHorizontal: 16,
+  },
+  secondaryButtonText: {
+    color: '#146C5D',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  subtitle: {
+    color: '#59616C',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  target: {
+    color: '#146C5D',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  title: {
+    color: '#20242A',
+    fontSize: 28,
+    fontWeight: '900',
+    lineHeight: 34,
+  },
+});

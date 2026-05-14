@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Такси Партнер",
+    "slug": "taxi-partner-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "taxipartner",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ru.taxipartner.app",
+      "associatedDomains": [
+        "applinks:links.example.com"
+      ]
+    },
+    "android": {
+      "package": "ru.taxipartner.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "links.example.com",
+              "pathPrefix": "/invite"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "apiBaseUrl": "https://api.example.com",
+      "linksDomain": "links.example.com",
+      "legal": {
+        "termsUrl": "https://example.com/terms",
+        "privacyUrl": "https://example.com/privacy",
+        "personalDataConsentUrl": "https://example.com/personal-data-consent"
+      }
+    }
+  }
+}
