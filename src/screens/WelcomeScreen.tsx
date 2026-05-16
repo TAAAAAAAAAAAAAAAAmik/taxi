@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Car, LogIn, UserPlus } from 'lucide-react-native';
+import { Car, LockKeyhole, LogIn, UserPlus } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { RootStackParamList } from '../navigation/types';
@@ -23,8 +23,8 @@ export function WelcomeScreen({ navigation }: Props) {
         <View style={styles.hero}>
           <Text style={styles.title}>Добро пожаловать</Text>
           <Text style={styles.subtitle}>
-            Клиенты заказывают поездки, а водители работают по месячной подписке без автопарка и
-            комиссии с каждого заказа.
+            Клиенты заказывают поездки, а водители выбирают модель работы: 5000 ₽ в месяц без
+            комиссии или 12% с каждой выполненной поездки.
           </Text>
         </View>
 
@@ -46,6 +46,15 @@ export function WelcomeScreen({ navigation }: Props) {
             <LogIn color="#146C5D" size={20} strokeWidth={2.4} />
             <Text style={styles.secondaryButtonText}>Войти</Text>
           </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('AdminPanel')}
+            style={({ pressed }) => [styles.adminButton, pressed && styles.pressed]}
+          >
+            <LockKeyhole color="#20242A" size={20} strokeWidth={2.4} />
+            <Text style={styles.adminButtonText}>Админ-панель</Text>
+          </Pressable>
         </View>
 
         <View style={styles.infoGrid}>
@@ -55,11 +64,11 @@ export function WelcomeScreen({ navigation }: Props) {
           </View>
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>Водитель-партнер</Text>
-            <Text style={styles.infoText}>Месячный доступ, заказы без комиссии, выплаты и рейтинг.</Text>
+            <Text style={styles.infoText}>Месячный доступ или комиссия 12%, выплаты и рейтинг.</Text>
           </View>
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Модель сервиса</Text>
-            <Text style={styles.infoText}>Мы приводим трафик, водитель получает понятную экономику.</Text>
+            <Text style={styles.infoTitle}>Админ</Text>
+            <Text style={styles.infoText}>Вход только по личному паролю без логина и телефона.</Text>
           </View>
         </View>
       </ScrollView>
@@ -70,6 +79,23 @@ export function WelcomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   actions: {
     gap: 10,
+  },
+  adminButton: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAF9',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: 16,
+  },
+  adminButtonText: {
+    color: '#20242A',
+    fontSize: 15,
+    fontWeight: '900',
   },
   appMeta: {
     color: '#59616C',
