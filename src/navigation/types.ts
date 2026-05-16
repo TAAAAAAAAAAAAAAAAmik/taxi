@@ -13,6 +13,7 @@ export type OrderStatusSummary = {
 export type RootStackParamList = {
   Welcome: undefined;
   Login: undefined;
+  AdminPanel: undefined;
   Registration: undefined;
   VerifyPhone: {
     email?: string;
