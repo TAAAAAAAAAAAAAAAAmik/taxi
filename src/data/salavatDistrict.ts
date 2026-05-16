@@ -1,4 +1,10 @@
 import {
+  salavatDistrictHouses,
+  salavatDistrictHouseSourceSummary,
+  type SalavatHouseRecord,
+  type SalavatHouseSource,
+} from './salavatDistrictHouses';
+import {
   salavatDistrictSettlements,
   salavatDistrictStreetSourceSummary,
   salavatDistrictStreets,
@@ -6,7 +12,12 @@ import {
   type SalavatStreetSource,
 } from './salavatDistrictStreets';
 
-export { salavatDistrictSettlements, salavatDistrictStreetSourceSummary };
+export {
+  salavatDistrictHouses,
+  salavatDistrictHouseSourceSummary,
+  salavatDistrictSettlements,
+  salavatDistrictStreetSourceSummary,
+};
 
 export type SalavatAddressCategory =
   | 'address'
@@ -24,7 +35,7 @@ export type GeoPoint = {
   longitude: number;
 };
 
-export type SalavatAddressSource = SalavatStreetSource | 'manual';
+export type SalavatAddressSource = SalavatStreetSource | SalavatHouseSource | 'manual';
 
 export type SalavatAddressSuggestion = {
   id: string;
@@ -58,7 +69,7 @@ export const russiaRouteCoverage = {
 export const salavatDistrictInfo = {
   center: 'с. Малояз',
   region: 'Салаватский район, Республика Башкортостан',
-  serviceArea: `${salavatDistrictSettlements.length} населенных пунктов и ${salavatDistrictStreetSourceSummary.streets} улиц/дорог из открытого адресного слоя OSM. Ручные POI оставлены отдельным слоем.`,
+  serviceArea: `${salavatDistrictSettlements.length} населенных пунктов, ${salavatDistrictStreetSourceSummary.streets} улиц/дорог и ${salavatDistrictHouseSourceSummary.houses} точных домов из открытых адресных слоев. Ручные POI оставлены отдельным слоем.`,
 };
 
 const salavatBounds = {
@@ -215,10 +226,12 @@ const fixedDistrictPoints: SalavatAddressSuggestion[] = [
   },
 ];
 
+const generatedHouseSuggestions = salavatDistrictHouses.map(houseRecordToSuggestion);
 const generatedStreetSuggestions = salavatDistrictStreets.map(streetRecordToSuggestion);
 
 export const salavatAddressSuggestions: SalavatAddressSuggestion[] = [
   ...fixedDistrictPoints,
+  ...generatedHouseSuggestions,
   ...generatedStreetSuggestions,
 ];
 
@@ -332,7 +345,7 @@ export function getCoverageText(point?: GeoPoint) {
   }
 
   if (isInsideSalavatDistrict(point)) {
-    return 'Геолокация получена. Для района загружен детальный слой улиц; конкретный адрес показывается только после серверного reverse geocode.';
+    return 'Геолокация получена. Для района загружен детальный слой улиц и домов; конкретный адрес показывается после серверного reverse geocode или выбора подсказки.';
   }
 
   return 'Геолокация получена. Для полного покрытия РФ нужен серверный reverse geocoder из EXPO_PUBLIC_REVERSE_GEOCODE_URL, пользователь видит только адрес.';
@@ -345,6 +358,19 @@ export function isInsideSalavatDistrict(point: GeoPoint) {
     point.longitude >= salavatBounds.minLongitude &&
     point.longitude <= salavatBounds.maxLongitude
   );
+}
+
+function houseRecordToSuggestion(record: SalavatHouseRecord): SalavatAddressSuggestion {
+  return {
+    id: `house-${slug(record.settlement)}-${slug(record.street)}-${slug(record.house)}`,
+    title: `${record.street}, дом ${record.house}`,
+    subtitle: record.fullAddress,
+    settlement: record.settlement,
+    category: 'address',
+    aliases: record.aliases,
+    source: record.source,
+    coordinates: record.coordinates,
+  };
 }
 
 function streetRecordToSuggestion(record: SalavatStreetRecord): SalavatAddressSuggestion {
@@ -373,6 +399,18 @@ function createExactHouseSuggestion(query: string): SalavatAddressSuggestion | n
 
   if (streetQuery.length < 4) {
     return null;
+  }
+
+  const exactHouse = salavatDistrictHouses
+    .map((record) => ({
+      record,
+      score: getHouseRecordScore(record, streetQuery, house),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score)[0]?.record;
+
+  if (exactHouse) {
+    return houseRecordToSuggestion(exactHouse);
   }
 
   const bestRecord = salavatDistrictStreets
@@ -431,6 +469,32 @@ function getAddressScore(address: SalavatAddressSuggestion, query: string) {
     queryParts.every((part) => searchable.some((value) => value.includes(part)))
   ) {
     return 3;
+  }
+
+  return 0;
+}
+
+function getHouseRecordScore(record: SalavatHouseRecord, streetQuery: string, house: string) {
+  if (normalize(record.house) !== normalize(house)) {
+    return 0;
+  }
+
+  const searchable = [record.settlement, record.street, record.fullAddress, ...record.aliases].map(normalize);
+  const queryParts = streetQuery.split(' ').filter(Boolean);
+
+  if (searchable.some((value) => value === streetQuery)) {
+    return 8;
+  }
+
+  if (searchable.some((value) => value.includes(streetQuery))) {
+    return 7;
+  }
+
+  if (
+    queryParts.length > 1 &&
+    queryParts.every((part) => searchable.some((value) => value.includes(part)))
+  ) {
+    return 6;
   }
 
   return 0;
