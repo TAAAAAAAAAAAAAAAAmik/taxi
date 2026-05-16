@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useContext, useMemo, useState } from 'react';
 
 import { AccountRole } from '../data/registration';
-import { driverSubscriptionPlan } from '../data/subscription';
+import { DriverBillingMode, driverAccessPlans } from '../data/subscription';
 import { OrderStatusSummary } from '../navigation/types';
 
 export type SavedPlace = {
@@ -15,6 +15,7 @@ export type SavedPlace = {
 
 export type DriverSubscription = {
   status: 'inactive' | 'active';
+  billingMode: DriverBillingMode;
   planName: string;
   monthlyPrice: number;
   ordersCommission: number;
@@ -99,17 +100,30 @@ type AppStateValue = {
     title?: string;
   }) => void;
   updateOrderStatus: (orderId: string, status: string) => void;
-  activateDriverSubscription: () => void;
+  activateDriverSubscription: (billingMode?: DriverBillingMode) => void;
 };
 
 const AppStateContext = createContext<AppStateValue | undefined>(undefined);
 
-const initialDriverSubscription: DriverSubscription = {
-  monthlyPrice: driverSubscriptionPlan.monthlyPrice,
-  ordersCommission: driverSubscriptionPlan.commissionPercent,
-  planName: driverSubscriptionPlan.name,
-  status: 'inactive',
-};
+function createDriverAccessState(billingMode: DriverBillingMode, status: DriverSubscription['status']) {
+  const plan = driverAccessPlans[billingMode];
+  const expiresAt = plan.accessDays ? new Date() : undefined;
+
+  if (expiresAt) {
+    expiresAt.setDate(expiresAt.getDate() + plan.accessDays);
+  }
+
+  return {
+    billingMode,
+    expiresAt: expiresAt?.toISOString(),
+    monthlyPrice: plan.monthlyPrice,
+    ordersCommission: plan.commissionPercent,
+    planName: plan.name,
+    status,
+  };
+}
+
+const initialDriverSubscription: DriverSubscription = createDriverAccessState('monthly', 'inactive');
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<AppOrder[]>([]);
@@ -121,15 +135,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppStateValue>(
     () => ({
-      activateDriverSubscription: () => {
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + driverSubscriptionPlan.accessDays);
-
-        setDriverSubscription({
-          ...initialDriverSubscription,
-          expiresAt: expiresAt.toISOString(),
-          status: 'active',
-        });
+      activateDriverSubscription: (billingMode = 'monthly') => {
+        setDriverSubscription(createDriverAccessState(billingMode, 'active'));
       },
       addOrder: (order, role) => {
         setOrders((current) => {
