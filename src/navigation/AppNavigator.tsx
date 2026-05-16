@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { AdminPanelScreen } from '../screens/AdminPanelScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { OrderFlowScreen } from '../screens/OrderFlowScreen';
@@ -30,6 +31,7 @@ export function AppNavigator() {
       >
         <Stack.Screen component={WelcomeScreen} name="Welcome" />
         <Stack.Screen component={LoginScreen} name="Login" />
+        <Stack.Screen component={AdminPanelScreen} name="AdminPanel" />
         <Stack.Screen component={RegistrationScreen} name="Registration" />
         <Stack.Screen component={VerifyPhoneScreen} name="VerifyPhone" />
         <Stack.Screen component={VerifyEmailScreen} name="VerifyEmail" />
