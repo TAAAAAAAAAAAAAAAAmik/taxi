@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
@@ -51,7 +51,16 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
   const config = orderFlowConfig[role];
   const isWide = width >= 840;
-  const { addOrder, driverSubscription, savedHomeAddress } = useAppState();
+  const {
+    addOrder,
+    driverSubscription,
+    orders,
+    refreshServerData,
+    savedHomeAddress,
+    serverMessage,
+    serverStatus,
+    updateOrderStatus,
+  } = useAppState();
 
   const [values, setValues] = useState<Record<string, string>>(() =>
     createInitialOrderValues(role),
@@ -63,6 +72,8 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const [activeAddressFieldId, setActiveAddressFieldId] = useState<string | null>(null);
   const [locationPoint, setLocationPoint] = useState<GeoPoint | undefined>();
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFeedOrderId, setSelectedFeedOrderId] = useState<string | null>(null);
 
   const selectedTariff = useMemo(
     () => config.tariffs.find((tariff) => tariff.id === selectedTariffId) ?? config.tariffs[0],
@@ -76,6 +87,36 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const total = selectedTariff.price + optionsTotal;
   const canConfirm = Boolean(values.pickup?.trim()) && Boolean(values.destination?.trim());
   const usesRegionalAddressBook = role !== 'driver';
+  const availableDriverOrders = useMemo(
+    () =>
+      role === 'driver'
+        ? orders.filter(
+            (order) =>
+              order.role === 'client' &&
+              !order.driver &&
+              ['created', 'searching'].includes(order.status),
+          )
+        : [],
+    [orders, role],
+  );
+  const selectedFeedOrder =
+    availableDriverOrders.find((order) => order.id === selectedFeedOrderId) ?? availableDriverOrders[0];
+
+  useEffect(() => {
+    if (role !== 'driver' || !selectedFeedOrder) {
+      return;
+    }
+
+    setValues((current) => ({
+      ...current,
+      clientComment: selectedFeedOrder.options.join(', ') || 'Комментарий не указан',
+      destination: selectedFeedOrder.destination,
+      pickup: selectedFeedOrder.pickup,
+      pickupDistance: 'Открытый заказ из backend',
+    }));
+    setSelectedTariffId(config.tariffs[0].id);
+    setPaymentMethod(selectedFeedOrder.paymentMethod);
+  }, [config.tariffs, role, selectedFeedOrder, selectedFeedOrderId]);
 
   const updateValue = (id: string, nextValue: string) => {
     setConfirmed(false);
@@ -110,6 +151,10 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     setActiveAddressFieldId(null);
   };
 
+  const selectDriverFeedOrder = (orderId: string) => {
+    setSelectedFeedOrderId(orderId);
+  };
+
   const requestLocationRoutes = async () => {
     setLocationMessage('Запрашиваем геолокацию...');
     const result = await requestUserLocation();
@@ -137,7 +182,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     setLocationMessage(result.message);
   };
 
-  const handlePrimaryAction = () => {
+  const handlePrimaryAction = async () => {
     if (role === 'driver' && driverSubscription.status !== 'active') {
       navigation.navigate('Subscription', { firstName, role });
       return;
@@ -145,6 +190,28 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
     if (!canConfirm) {
       setConfirmed(true);
+      return;
+    }
+
+    if (role === 'driver' && selectedFeedOrder) {
+      setIsSubmitting(true);
+
+      try {
+        await updateOrderStatus(selectedFeedOrder.id, 'accepted');
+        const acceptedOrder = {
+          ...selectedFeedOrder,
+          status: 'accepted',
+        };
+        setConfirmed(true);
+        navigation.navigate('OrderStatus', {
+          firstName,
+          order: acceptedOrder,
+          role,
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+
       return;
     }
 
@@ -158,13 +225,19 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       total,
     };
 
-    addOrder(order, role);
-    setConfirmed(true);
-    navigation.navigate('OrderStatus', {
-      firstName,
-      order,
-      role,
-    });
+    setIsSubmitting(true);
+
+    try {
+      const createdOrder = await addOrder(order, role, firstName);
+      setConfirmed(true);
+      navigation.navigate('OrderStatus', {
+        firstName,
+        order: createdOrder,
+        role,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -259,18 +332,56 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   ))}
                 </View>
               ) : (
-                <View style={styles.suggestions}>
-                  {config.suggestions.map((suggestion) => (
+                <>
+                  <View style={styles.regionBox}>
+                    <Text style={styles.regionTitle}>Открытые заказы</Text>
+                    <Text style={styles.regionText}>
+                      {availableDriverOrders.length > 0
+                        ? `Доступно заявок: ${availableDriverOrders.length}. Выберите заказ и нажмите принятие.`
+                        : 'Открытых заявок нет. Обновите backend или примите заказ вручную для демо.'}
+                    </Text>
                     <Pressable
                       accessibilityRole="button"
-                      key={suggestion}
-                      onPress={() => applySuggestion(suggestion)}
-                      style={({ pressed }) => [styles.suggestionChip, pressed && styles.pressed]}
+                      onPress={refreshServerData}
+                      style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
                     >
-                      <Text style={styles.suggestionText}>{suggestion}</Text>
+                      <Route color="#146C5D" size={17} strokeWidth={2.4} />
+                      <Text style={styles.locationButtonText}>Обновить ленту</Text>
                     </Pressable>
-                  ))}
-                </View>
+                    {availableDriverOrders.slice(0, 4).map((order) => (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: order.id === selectedFeedOrder?.id }}
+                        key={order.id}
+                        onPress={() => selectDriverFeedOrder(order.id)}
+                        style={({ pressed }) => [
+                          styles.homeAddressButton,
+                          order.id === selectedFeedOrder?.id && styles.tariffCardActive,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={styles.homeAddressTitle}>
+                          {order.id} · {order.total} ₽ · {order.tariff}
+                        </Text>
+                        <Text style={styles.homeAddressText}>
+                          {order.pickup} → {order.destination}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <View style={styles.suggestions}>
+                    {config.suggestions.map((suggestion) => (
+                      <Pressable
+                        accessibilityRole="button"
+                        key={suggestion}
+                        onPress={() => applySuggestion(suggestion)}
+                        style={({ pressed }) => [styles.suggestionChip, pressed && styles.pressed]}
+                      >
+                        <Text style={styles.suggestionText}>{suggestion}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
               )}
               <View style={styles.fields}>
                 {config.fields.map((field) => (
@@ -409,6 +520,18 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 </View>
               </View>
 
+              <View
+                style={[
+                  styles.resultBox,
+                  serverStatus === 'connected' && styles.resultBoxSuccess,
+                ]}
+              >
+                <Text style={styles.resultTitle}>
+                  {serverStatus === 'connected' ? 'Backend подключен' : 'Локальный режим'}
+                </Text>
+                <Text style={styles.resultText}>{serverMessage}</Text>
+              </View>
+
               {confirmed ? (
                 <View style={[styles.resultBox, canConfirm && styles.resultBoxSuccess]}>
                   <Text style={styles.resultTitle}>
@@ -429,7 +552,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
                 >
                   <Navigation color="#FFFFFF" size={18} strokeWidth={2.4} />
-                  <Text style={styles.primaryButtonText}>{config.primaryAction}</Text>
+                  <Text style={styles.primaryButtonText}>
+                    {isSubmitting ? 'Отправляем...' : config.primaryAction}
+                  </Text>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"

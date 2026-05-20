@@ -13,6 +13,7 @@ import {
 
 import { AccountRole, roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
+import { useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -24,15 +25,28 @@ const roleIcons = {
 };
 
 export function LoginScreen({ navigation }: Props) {
+  const { loginAccount, serverMessage, serverStatus } = useAppState();
   const [role, setRole] = useState<AccountRole>('client');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const canContinue = identifier.trim().length > 2 && password.length >= 4;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const canContinue = identifier.trim().length > 2 && password.length >= 4 && !isSubmitting;
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    setIsSubmitting(true);
+    setErrorText(null);
+    const user = await loginAccount(identifier, password, role);
+    setIsSubmitting(false);
+
+    if (!user) {
+      setErrorText('Не удалось войти. Проверьте роль, телефон/почту и пароль.');
+      return;
+    }
+
     navigation.replace('Dashboard', {
-      firstName: identifier.includes('@') ? undefined : identifier.trim(),
-      role,
+      firstName: user.firstName || undefined,
+      role: user.role as AccountRole,
     });
   };
 
@@ -42,7 +56,10 @@ export function LoginScreen({ navigation }: Props) {
         <View style={styles.header}>
           <Text style={styles.title}>Вход</Text>
           <Text style={styles.subtitle}>
-            Пока сервер авторизации не подключен, экран ведет в кабинет выбранной роли.
+            Вход идет через MVP backend. Роль должна совпадать с аккаунтом.
+          </Text>
+          <Text style={styles.serverText}>
+            {serverStatus === 'connected' ? 'Backend подключен' : serverMessage}
           </Text>
         </View>
 
@@ -110,8 +127,10 @@ export function LoginScreen({ navigation }: Props) {
             ]}
           >
             <LogIn color="#FFFFFF" size={19} strokeWidth={2.4} />
-            <Text style={styles.primaryButtonText}>Войти</Text>
+            <Text style={styles.primaryButtonText}>{isSubmitting ? 'Проверяем...' : 'Войти'}</Text>
           </Pressable>
+
+          {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
 
           <Pressable
             accessibilityRole="button"
@@ -129,6 +148,12 @@ export function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   field: {
     gap: 8,
+  },
+  errorText: {
+    color: '#B42318',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   form: {
     backgroundColor: '#FFFFFF',
@@ -238,6 +263,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: '#20242A',
     fontSize: 18,
+    fontWeight: '900',
+  },
+  serverText: {
+    color: '#146C5D',
+    fontSize: 13,
     fontWeight: '900',
   },
   subtitle: {

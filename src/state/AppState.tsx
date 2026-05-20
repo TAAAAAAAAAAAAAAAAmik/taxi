@@ -1,8 +1,22 @@
-import { ReactNode, createContext, useContext, useMemo, useState } from 'react';
+import { ReactNode, createContext, useContext, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { AccountRole } from '../data/registration';
 import { DriverBillingMode, driverAccessPlans } from '../data/subscription';
 import { OrderStatusSummary } from '../navigation/types';
+import {
+  AuthUser,
+  assignOrder as assignOrderApi,
+  createOrder as createOrderApi,
+  fetchApiHealth,
+  fetchDrivers,
+  fetchOrders,
+  loginAccount as loginAccountApi,
+  loginAdmin as loginAdminApi,
+  registerAccount as registerAccountApi,
+  RegisterAccountPayload,
+  updateDriverStatus as updateDriverStatusApi,
+  updateOrderStatus as updateOrderStatusApi,
+} from '../services/apiClient';
 
 export type SavedPlace = {
   id: 'home';
@@ -22,12 +36,22 @@ export type DriverSubscription = {
   expiresAt?: string;
 };
 
+export type ApiConnectionState = 'checking' | 'connected' | 'offline';
+
 export type OrderParticipant = {
   id: string;
   name: string;
+  phone?: string;
   vehicle?: string;
   rating?: number;
   plate?: string;
+};
+
+export type DriverProfile = OrderParticipant & {
+  billingMode: DriverBillingMode;
+  status: 'pending' | 'approved' | 'blocked';
+  subscriptionStatus: DriverSubscription['status'];
+  updatedAt?: string;
 };
 
 export type TripReceipt = {
@@ -61,6 +85,9 @@ export type AppOrder = OrderStatusSummary & {
   role: AccountRole;
   status: string;
   createdAt: string;
+  updatedAt?: string;
+  clientName?: string;
+  clientPhone?: string;
   driver?: OrderParticipant;
   receipt?: TripReceipt;
   review?: TripReview;
@@ -85,11 +112,20 @@ export type SupportThread = {
 
 type AppStateValue = {
   orders: AppOrder[];
+  drivers: DriverProfile[];
+  currentUser?: AuthUser;
   driverSubscription: DriverSubscription;
   favoriteDrivers: FavoriteDriver[];
   savedHomeAddress?: SavedPlace;
   supportThreads: SupportThread[];
-  addOrder: (order: OrderStatusSummary, role: AccountRole) => void;
+  serverStatus: ApiConnectionState;
+  serverMessage: string;
+  addOrder: (order: OrderStatusSummary, role: AccountRole, clientName?: string) => Promise<AppOrder>;
+  assignOrderToDriver: (orderId: string, driverId: string) => Promise<void>;
+  loginAccount: (identifier: string, password: string, role: AccountRole) => Promise<AuthUser | null>;
+  loginAdmin: (password: string) => Promise<boolean>;
+  registerAccount: (payload: RegisterAccountPayload) => Promise<AuthUser | null>;
+  refreshServerData: () => Promise<void>;
   addFavoriteDriver: (driver: FavoriteDriver) => void;
   addOrderReview: (orderId: string, review: Omit<TripReview, 'createdAt' | 'routeSignature'>) => void;
   saveHomeAddress: (place: Omit<SavedPlace, 'id' | 'title' | 'updatedAt'>) => void;
@@ -99,7 +135,8 @@ type AppStateValue = {
     text: string;
     title?: string;
   }) => void;
-  updateOrderStatus: (orderId: string, status: string) => void;
+  updateDriverReviewStatus: (driverId: string, status: DriverProfile['status']) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: string) => Promise<void>;
   activateDriverSubscription: (billingMode?: DriverBillingMode) => void;
 };
 
@@ -107,10 +144,11 @@ const AppStateContext = createContext<AppStateValue | undefined>(undefined);
 
 function createDriverAccessState(billingMode: DriverBillingMode, status: DriverSubscription['status']) {
   const plan = driverAccessPlans[billingMode];
-  const expiresAt = plan.accessDays ? new Date() : undefined;
+  const accessDays = plan.accessDays ?? 0;
+  const expiresAt = accessDays ? new Date() : undefined;
 
   if (expiresAt) {
-    expiresAt.setDate(expiresAt.getDate() + plan.accessDays);
+    expiresAt.setDate(expiresAt.getDate() + accessDays);
   }
 
   return {
@@ -127,29 +165,89 @@ const initialDriverSubscription: DriverSubscription = createDriverAccessState('m
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<AppOrder[]>([]);
+  const [drivers, setDrivers] = useState<DriverProfile[]>(initialDrivers);
+  const [currentUser, setCurrentUser] = useState<AuthUser | undefined>();
   const [favoriteDrivers, setFavoriteDrivers] = useState<FavoriteDriver[]>([]);
   const [savedHomeAddress, setSavedHomeAddress] = useState<SavedPlace | undefined>();
   const [supportThreads, setSupportThreads] = useState<SupportThread[]>([]);
   const [driverSubscription, setDriverSubscription] =
     useState<DriverSubscription>(initialDriverSubscription);
+  const [serverStatus, setServerStatus] = useState<ApiConnectionState>('checking');
+  const [serverMessage, setServerMessage] = useState('Проверяем MVP backend...');
+
+  const refreshServerData = useCallback(async () => {
+    try {
+      const [health, serverOrders, serverDrivers] = await Promise.all([
+        fetchApiHealth(),
+        fetchOrders(),
+        fetchDrivers(),
+      ]);
+
+      setOrders(serverOrders);
+      setDrivers(serverDrivers);
+      setServerStatus('connected');
+      setServerMessage(`Backend подключен: ${health.service}`);
+    } catch {
+      setServerStatus('offline');
+      setServerMessage('Backend не отвечает. Приложение работает локально, данные не сохранятся.');
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshServerData();
+  }, [refreshServerData]);
 
   const value = useMemo<AppStateValue>(
     () => ({
       activateDriverSubscription: (billingMode = 'monthly') => {
         setDriverSubscription(createDriverAccessState(billingMode, 'active'));
       },
-      addOrder: (order, role) => {
-        setOrders((current) => {
-          const nextOrder: AppOrder = {
-            ...order,
-            createdAt: new Date().toISOString(),
-            driver: role === 'client' ? defaultDriver : undefined,
-            role,
-            status: role === 'client' ? 'searching' : role === 'driver' ? 'accepted' : 'created',
-          };
+      addOrder: async (order, role, clientName) => {
+        const localOrder = createLocalOrder(order, role, clientName);
 
-          return [nextOrder, ...current.filter((item) => item.id !== order.id)];
-        });
+        try {
+          const serverOrder = await createOrderApi({ ...order, role, clientName });
+
+          setOrders((current) => [serverOrder, ...current.filter((item) => item.id !== serverOrder.id)]);
+          setServerStatus('connected');
+          setServerMessage('Заказ сохранен на backend.');
+          return serverOrder;
+        } catch {
+          setServerStatus('offline');
+          setServerMessage('Backend не отвечает. Заказ сохранен только локально.');
+          setOrders((current) => [localOrder, ...current.filter((item) => item.id !== localOrder.id)]);
+          return localOrder;
+        }
+      },
+      assignOrderToDriver: async (orderId, driverId) => {
+        const driver = drivers.find((item) => item.id === driverId);
+
+        if (!driver) {
+          return;
+        }
+
+        try {
+          const serverOrder = await assignOrderApi(orderId, driverId);
+          setOrders((current) =>
+            current.map((order) => (order.id === serverOrder.id ? serverOrder : order)),
+          );
+          setServerStatus('connected');
+          setServerMessage('Водитель назначен на backend.');
+        } catch {
+          setServerStatus('offline');
+          setServerMessage('Backend не отвечает. Назначение сохранено только локально.');
+          setOrders((current) =>
+            current.map((order) =>
+              order.id === orderId
+                ? {
+                    ...order,
+                    driver,
+                    status: 'assigned',
+                  }
+                : order,
+            ),
+          );
+        }
       },
       addFavoriteDriver: (driver) => {
         setFavoriteDrivers((current) => [
@@ -173,9 +271,54 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           ),
         );
       },
+      currentUser,
       driverSubscription,
+      drivers,
       favoriteDrivers,
+      loginAccount: async (identifier, password, role) => {
+        try {
+          const result = await loginAccountApi(identifier, password, role);
+          setCurrentUser(result.user);
+          setServerStatus('connected');
+          setServerMessage('Вход выполнен через backend.');
+          await refreshServerData();
+          return result.user;
+        } catch (error) {
+          setServerStatus('offline');
+          setServerMessage(error instanceof Error ? error.message : 'Не удалось войти.');
+          return null;
+        }
+      },
+      loginAdmin: async (password) => {
+        try {
+          const result = await loginAdminApi(password);
+          setCurrentUser(result.user);
+          setServerStatus('connected');
+          setServerMessage('Админ подтвержден на backend.');
+          await refreshServerData();
+          return true;
+        } catch (error) {
+          setServerStatus('offline');
+          setServerMessage(error instanceof Error ? error.message : 'Админ-пароль не подошел.');
+          return false;
+        }
+      },
       orders,
+      registerAccount: async (payload) => {
+        try {
+          const result = await registerAccountApi(payload);
+          setCurrentUser(result.user);
+          setServerStatus('connected');
+          setServerMessage('Аккаунт создан на backend.');
+          await refreshServerData();
+          return result.user;
+        } catch (error) {
+          setServerStatus('offline');
+          setServerMessage(error instanceof Error ? error.message : 'Не удалось создать аккаунт.');
+          return null;
+        }
+      },
+      refreshServerData,
       saveHomeAddress: (place) => {
         setSavedHomeAddress({
           ...place,
@@ -185,6 +328,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       },
       savedHomeAddress,
+      serverMessage,
+      serverStatus,
       sendSupportMessage: ({ category, role, text, title }) => {
         const now = new Date().toISOString();
         const normalizedCategory = category.trim() || 'Общий вопрос';
@@ -240,7 +385,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       },
       supportThreads,
-      updateOrderStatus: (orderId, status) => {
+      updateDriverReviewStatus: async (driverId, status) => {
+        try {
+          const serverDriver = await updateDriverStatusApi(driverId, status);
+          setDrivers((current) =>
+            current.map((driver) => (driver.id === serverDriver.id ? serverDriver : driver)),
+          );
+          setServerStatus('connected');
+          setServerMessage('Статус водителя сохранен на backend.');
+        } catch {
+          setServerStatus('offline');
+          setServerMessage('Backend не отвечает. Статус водителя сохранен только локально.');
+          setDrivers((current) =>
+            current.map((driver) => (driver.id === driverId ? { ...driver, status } : driver)),
+          );
+        }
+      },
+      updateOrderStatus: async (orderId, status) => {
         setOrders((current) =>
           current.map((order) =>
             order.id === orderId
@@ -255,9 +416,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               : order,
           ),
         );
+
+        try {
+          const serverOrder = await updateOrderStatusApi(orderId, status);
+          setOrders((current) =>
+            current.map((order) => (order.id === serverOrder.id ? serverOrder : order)),
+          );
+          setServerStatus('connected');
+          setServerMessage('Статус заказа сохранен на backend.');
+        } catch {
+          setServerStatus('offline');
+          setServerMessage('Backend не отвечает. Статус заказа сохранен только локально.');
+        }
       },
     }),
-    [driverSubscription, favoriteDrivers, orders, savedHomeAddress, supportThreads],
+    [
+      driverSubscription,
+      drivers,
+      currentUser,
+      favoriteDrivers,
+      orders,
+      refreshServerData,
+      savedHomeAddress,
+      serverMessage,
+      serverStatus,
+      supportThreads,
+    ],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
@@ -276,10 +460,36 @@ export function useAppState() {
 const defaultDriver: OrderParticipant = {
   id: 'driver-alexey-solaris',
   name: 'Алексей',
+  phone: '+7 917 000-42-11',
   plate: 'А123ВС 96',
   rating: 4.92,
   vehicle: 'Hyundai Solaris',
 };
+
+const initialDrivers: DriverProfile[] = [
+  {
+    ...defaultDriver,
+    billingMode: 'commission',
+    status: 'approved',
+    subscriptionStatus: 'active',
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+function createLocalOrder(
+  order: OrderStatusSummary,
+  role: AccountRole,
+  clientName?: string,
+): AppOrder {
+  return {
+    ...order,
+    clientName,
+    createdAt: new Date().toISOString(),
+    driver: role === 'client' ? undefined : defaultDriver,
+    role,
+    status: role === 'client' ? 'searching' : role === 'driver' ? 'accepted' : 'created',
+  };
+}
 
 function createReceipt(order: OrderStatusSummary): TripReceipt {
   return {

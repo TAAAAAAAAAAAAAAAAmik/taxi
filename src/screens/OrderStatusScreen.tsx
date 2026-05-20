@@ -32,6 +32,7 @@ import { orderStatusConfig } from '../data/orderStatus';
 import { roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { useAppState } from '../state/AppState';
+import type { OrderParticipant } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OrderStatus'>;
 
@@ -60,11 +61,28 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const activeStep = config.steps[activeStepIndex];
   const isCompleted = activeStepIndex === config.steps.length - 1;
   const currentOrder = orders.find((item) => item.id === order.id);
-  const driver = currentOrder?.driver ?? {
+  const routeDriver = (order as typeof order & { driver?: OrderParticipant }).driver;
+  const driver = currentOrder?.driver ?? routeDriver ?? {
     id: 'driver-alexey-solaris',
     name: config.participantName,
     vehicle: config.participantMeta,
   };
+  const contactPhone =
+    role === 'client'
+      ? driver.phone ?? config.contactPhone
+      : currentOrder?.clientPhone ?? config.contactPhone;
+  const participantName =
+    role === 'client'
+      ? driver.vehicle
+        ? `${driver.name}, ${driver.vehicle}`
+        : driver.name
+      : currentOrder?.clientName || config.participantName;
+  const participantMeta =
+    role === 'client'
+      ? [driver.rating ? `Рейтинг ${driver.rating}` : null, driver.plate ? `госномер ${driver.plate}` : null]
+          .filter(Boolean)
+          .join(' · ') || config.participantMeta
+      : config.participantMeta;
   const existingReview = currentOrder?.review;
   const progress = useMemo(
     () => Math.round(((activeStepIndex + 1) / config.steps.length) * 100),
@@ -81,13 +99,13 @@ export function OrderStatusScreen({ navigation, route }: Props) {
 
   const chooseContact = async (mode: 'call' | 'chat') => {
     if (mode === 'call') {
-      await Linking.openURL(`tel:${config.contactPhone.replace(/\s/g, '')}`);
+      await Linking.openURL(`tel:${contactPhone.replace(/\s/g, '')}`);
     }
 
     setContactResult(
       mode === 'chat'
         ? 'Открыт черновик чата внутри приложения. Сервер сообщений подключим следующим этапом.'
-        : `Звонок будет отправлен на номер ${config.contactPhone}.`,
+        : `Звонок будет отправлен на номер ${contactPhone}.`,
     );
   };
 
@@ -380,8 +398,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                   <UserRound color="#146C5D" size={22} strokeWidth={2.4} />
                 </View>
                 <View style={styles.participantCopy}>
-                  <Text style={styles.participantName}>{config.participantName}</Text>
-                  <Text style={styles.participantMeta}>{config.participantMeta}</Text>
+                  <Text style={styles.participantName}>{participantName}</Text>
+                  <Text style={styles.participantMeta}>{participantMeta}</Text>
                 </View>
               </View>
               <View style={styles.miniActions}>
@@ -414,7 +432,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                     <Phone color="#146C5D" size={17} strokeWidth={2.4} />
                     <Text style={styles.contactButtonText}>{config.callActionLabel}</Text>
                   </Pressable>
-                  <Text style={styles.contactPhone}>Мобильный номер: {config.contactPhone}</Text>
+                  <Text style={styles.contactPhone}>Мобильный номер: {contactPhone}</Text>
                   {contactResult ? <Text style={styles.contactResult}>{contactResult}</Text> : null}
                 </View>
               ) : null}

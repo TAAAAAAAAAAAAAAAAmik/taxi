@@ -39,6 +39,7 @@ import {
   createConsentState,
   validateRegistration,
 } from '../utils/validation';
+import { useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Registration'>;
 
@@ -53,10 +54,13 @@ const sectionOrder = ['account', 'identity', 'legal', 'vehicle', 'business', 'pa
 
 export function RegistrationScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
+  const { registerAccount, serverMessage } = useAppState();
   const [role, setRole] = useState<AccountRole>('client');
   const [values, setValues] = useState<FormValues>({});
   const [consents, setConsents] = useState<ConsentValues>(() => createConsentState());
   const [submitted, setSubmitted] = useState(false);
+  const [isSavingApplication, setIsSavingApplication] = useState(false);
+  const [serverNotice, setServerNotice] = useState<string | null>(null);
 
   const fields = useMemo(() => getFieldsForRole(role), [role]);
   const validationErrors = useMemo(
@@ -85,11 +89,38 @@ export function RegistrationScreen({ navigation }: Props) {
     setConsents((current) => ({ ...current, [id]: !current[id] }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) {
       setSubmitted(true);
       return;
     }
+
+    setIsSavingApplication(true);
+
+    const user = await registerAccount({
+      carBrand: values.carBrand,
+      carModel: values.carModel,
+      carPlate: values.carPlate,
+      email: values.email,
+      firstName: values.firstName,
+      lastName: values.lastName,
+      password: values.appPassword ?? '',
+      phone: values.phone,
+      role,
+    });
+
+    setIsSavingApplication(false);
+
+    if (!user) {
+      setServerNotice(serverMessage || 'Backend не создал аккаунт. Проверьте данные или сервер.');
+      return;
+    }
+
+    setServerNotice(
+      role === 'driver'
+        ? 'Аккаунт и заявка водителя созданы на backend со статусом проверки.'
+        : 'Аккаунт клиента создан на backend.',
+    );
 
     navigation.navigate('VerifyPhone', {
       email: values.email,
@@ -228,6 +259,12 @@ export function RegistrationScreen({ navigation }: Props) {
               </InfoPanel>
             ) : null}
 
+            {serverNotice ? (
+              <InfoPanel Icon={ShieldCheck} title="Статус заявки">
+                <Text style={styles.panelText}>{serverNotice}</Text>
+              </InfoPanel>
+            ) : null}
+
             <View style={styles.actionRow}>
               <Pressable
                 accessibilityRole="button"
@@ -238,7 +275,9 @@ export function RegistrationScreen({ navigation }: Props) {
                   pressed && styles.pressedButton,
                 ]}
               >
-                <Text style={styles.submitText}>Продолжить к подтверждению</Text>
+                <Text style={styles.submitText}>
+                  {isSavingApplication ? 'Отправляем заявку...' : 'Продолжить к подтверждению'}
+                </Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
