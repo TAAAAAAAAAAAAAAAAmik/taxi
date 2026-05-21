@@ -9,15 +9,38 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 
 export function DashboardScreen({ navigation, route }: Props) {
   const { firstName, role } = route.params;
-  const { drivers } = useAppState();
-  const availableCarsCount = drivers.filter((driver) => driver.status === 'approved').length;
+  const { currentUser, drivers, updateDriverAvailability } = useAppState();
+  const availableCarsCount = drivers.filter(
+    (driver) => driver.status === 'approved' && driver.isOnline,
+  ).length;
+  const currentDriver =
+    role === 'driver' && currentUser
+      ? drivers.find((driver) => driver.userId === currentUser.id)
+      : undefined;
+  const canToggleLine = currentDriver?.status === 'approved';
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <PostRegistrationMenu
         availableCarsCount={availableCarsCount}
+        driverLine={
+          role === 'driver'
+            ? {
+                canToggle: canToggleLine,
+                isOnline: Boolean(currentDriver?.isOnline),
+                status: currentDriver?.status ?? 'pending',
+              }
+            : undefined
+        }
         firstName={firstName}
         onBackToRegistration={() => navigation.navigate('Registration')}
+        onToggleDriverLine={() => {
+          if (!currentDriver || !canToggleLine) {
+            return;
+          }
+
+          updateDriverAvailability(currentDriver.id, !currentDriver.isOnline);
+        }}
         onOpenOrderFlow={() => navigation.navigate('OrderFlow', { firstName, role })}
         onOpenOrderHistory={() => navigation.navigate('OrderHistory', { firstName, role })}
         onOpenSavedPlace={() => navigation.navigate('SavedPlace', { firstName, role })}

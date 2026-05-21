@@ -17,6 +17,7 @@ const seedDrivers = [
     vehicle: 'Hyundai Solaris',
     plate: 'А123ВС 102',
     status: 'approved',
+    isOnline: true,
     billingMode: 'commission',
     subscriptionStatus: 'active',
     updatedAt: new Date().toISOString(),
@@ -29,6 +30,7 @@ const seedDrivers = [
     vehicle: 'Renault Logan',
     plate: 'В456КМ 102',
     status: 'pending',
+    isOnline: false,
     billingMode: 'commission',
     subscriptionStatus: 'inactive',
     updatedAt: new Date().toISOString(),
@@ -55,7 +57,10 @@ async function readDb() {
     return {
       ...defaultDb,
       ...parsed,
-      drivers: Array.isArray(parsed.drivers) && parsed.drivers.length > 0 ? parsed.drivers : seedDrivers,
+      drivers:
+        Array.isArray(parsed.drivers) && parsed.drivers.length > 0
+          ? parsed.drivers.map(normalizeDriver)
+          : seedDrivers.map(normalizeDriver),
       orders: Array.isArray(parsed.orders) ? parsed.orders : [],
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
       supportThreads: Array.isArray(parsed.supportThreads) ? parsed.supportThreads : [],
@@ -207,11 +212,19 @@ function makeDriverFromUser(user, payload) {
     vehicle: [payload.carBrand, payload.carModel].filter(Boolean).join(' '),
     plate: String(payload.carPlate || ''),
     status: 'pending',
+    isOnline: false,
     billingMode: 'commission',
     subscriptionStatus: 'inactive',
     vehicleDocumentsReady: String(payload.vehicleDocumentsReady || ''),
     userId: user.id,
     updatedAt: new Date().toISOString(),
+  };
+}
+
+function normalizeDriver(driver) {
+  return {
+    ...driver,
+    isOnline: Boolean(driver.isOnline ?? driver.status === 'approved'),
   };
 }
 
@@ -372,6 +385,33 @@ async function handleRequest(request, response) {
       driver.status = ['pending', 'approved', 'blocked'].includes(payload.status)
         ? payload.status
         : driver.status;
+      if (driver.status !== 'approved') {
+        driver.isOnline = false;
+      }
+      driver.updatedAt = new Date().toISOString();
+      await writeDb(db);
+      sendJson(response, 200, { driver });
+      return;
+    }
+
+    if (request.method === 'PATCH' && pathParts[0] === 'drivers' && pathParts[2] === 'availability') {
+      const payload = await readBody(request);
+      const driver = db.drivers.find((item) => item.id === pathParts[1]);
+
+      if (!driver) {
+        sendJson(response, 404, { error: 'Driver not found' });
+        return;
+      }
+
+      if (driver.status !== 'approved') {
+        driver.isOnline = false;
+        driver.updatedAt = new Date().toISOString();
+        await writeDb(db);
+        sendJson(response, 403, { error: 'Driver must be approved before going online', driver });
+        return;
+      }
+
+      driver.isOnline = Boolean(payload.isOnline);
       driver.updatedAt = new Date().toISOString();
       await writeDb(db);
       sendJson(response, 200, { driver });

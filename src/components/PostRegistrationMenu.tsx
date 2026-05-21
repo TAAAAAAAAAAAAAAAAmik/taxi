@@ -39,7 +39,13 @@ type PostRegistrationMenuProps = {
   role: AccountRole;
   firstName?: string;
   availableCarsCount?: number;
+  driverLine?: {
+    canToggle: boolean;
+    isOnline: boolean;
+    status: string;
+  };
   onBackToRegistration: () => void;
+  onToggleDriverLine?: () => void;
   onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
   onOpenSavedPlace: () => void;
@@ -65,8 +71,10 @@ const iconMap: Record<MenuIconName, ComponentType<LucideProps>> = {
 
 export function PostRegistrationMenu({
   availableCarsCount = 0,
+  driverLine,
   firstName,
   onBackToRegistration,
+  onToggleDriverLine,
   onOpenOrderHistory,
   onOpenOrderFlow,
   onOpenSavedPlace,
@@ -196,6 +204,63 @@ export function PostRegistrationMenu({
                 <Text style={styles.availableCarsLabel}>Доступно машин</Text>
                 <Text style={styles.availableCarsValue}>{availableCarsCount}</Text>
                 <Text style={styles.availableCarsHint}>Нажмите, чтобы заказать поездку</Text>
+              </View>
+            </Pressable>
+          ) : null}
+
+          {role === 'driver' ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={!driverLine?.canToggle}
+              onPress={onToggleDriverLine}
+              style={({ pressed }) => [
+                styles.driverLineButton,
+                driverLine?.isOnline && styles.driverLineButtonOnline,
+                !driverLine?.canToggle && styles.driverLineButtonDisabled,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.driverLineIcon,
+                  driverLine?.isOnline && styles.driverLineIconOnline,
+                ]}
+              >
+                <Car
+                  color={driverLine?.isOnline ? '#146C5D' : '#FFFFFF'}
+                  size={26}
+                  strokeWidth={2.5}
+                />
+              </View>
+              <View style={styles.driverLineCopy}>
+                <Text
+                  style={[
+                    styles.driverLineLabel,
+                    driverLine?.isOnline && styles.driverLineTextOnline,
+                  ]}
+                >
+                  Статус линии
+                </Text>
+                <Text
+                  style={[
+                    styles.driverLineValue,
+                    driverLine?.isOnline && styles.driverLineTextOnline,
+                  ]}
+                >
+                  {driverLine?.isOnline ? 'На линии' : 'Не на линии'}
+                </Text>
+                <Text
+                  style={[
+                    styles.driverLineHint,
+                    driverLine?.isOnline && styles.driverLineTextOnline,
+                  ]}
+                >
+                  {driverLine?.canToggle
+                    ? driverLine.isOnline
+                      ? 'Нажмите, чтобы уйти с линии'
+                      : 'Нажмите, чтобы выйти на линию'
+                    : `Доступ: ${driverLine?.status ?? 'нужен допуск'}`}
+                </Text>
               </View>
             </Pressable>
           ) : null}
@@ -491,6 +556,62 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 14,
     padding: 16,
+  },
+  driverLineButton: {
+    alignItems: 'center',
+    backgroundColor: '#20242A',
+    borderColor: '#20242A',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    minHeight: 104,
+    padding: 16,
+  },
+  driverLineButtonDisabled: {
+    backgroundColor: '#7A828C',
+    borderColor: '#7A828C',
+  },
+  driverLineButtonOnline: {
+    backgroundColor: '#E9F4F1',
+    borderColor: '#146C5D',
+  },
+  driverLineCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  driverLineHint: {
+    color: '#DDE5E2',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  driverLineIcon: {
+    alignItems: 'center',
+    backgroundColor: '#146C5D',
+    borderRadius: 8,
+    height: 54,
+    justifyContent: 'center',
+    width: 54,
+  },
+  driverLineIconOnline: {
+    backgroundColor: '#FFFFFF',
+  },
+  driverLineLabel: {
+    color: '#DDE5E2',
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  driverLineTextOnline: {
+    color: '#0B4C42',
+  },
+  driverLineValue: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '900',
+    lineHeight: 34,
   },
   heroCopy: {
     flex: 1,

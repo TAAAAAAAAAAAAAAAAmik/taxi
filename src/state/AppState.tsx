@@ -14,6 +14,7 @@ import {
   loginAdmin as loginAdminApi,
   registerAccount as registerAccountApi,
   RegisterAccountPayload,
+  updateDriverAvailability as updateDriverAvailabilityApi,
   updateDriverStatus as updateDriverStatusApi,
   updateOrderStatus as updateOrderStatusApi,
 } from '../services/apiClient';
@@ -49,6 +50,7 @@ export type OrderParticipant = {
 
 export type DriverProfile = OrderParticipant & {
   billingMode: DriverBillingMode;
+  isOnline?: boolean;
   status: 'pending' | 'approved' | 'blocked';
   subscriptionStatus: DriverSubscription['status'];
   userId?: string;
@@ -136,6 +138,7 @@ type AppStateValue = {
     text: string;
     title?: string;
   }) => void;
+  updateDriverAvailability: (driverId: string, isOnline: boolean) => Promise<void>;
   updateDriverReviewStatus: (driverId: string, status: DriverProfile['status']) => Promise<void>;
   updateOrderStatus: (orderId: string, status: string) => Promise<void>;
   activateDriverSubscription: (billingMode?: DriverBillingMode) => void;
@@ -386,6 +389,30 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       },
       supportThreads,
+      updateDriverAvailability: async (driverId, isOnline) => {
+        const driver = drivers.find((item) => item.id === driverId);
+
+        if (!driver || driver.status !== 'approved') {
+          setServerMessage('Сначала администратор должен одобрить водителя.');
+          return;
+        }
+
+        setDrivers((current) =>
+          current.map((item) => (item.id === driverId ? { ...item, isOnline } : item)),
+        );
+
+        try {
+          const serverDriver = await updateDriverAvailabilityApi(driverId, isOnline);
+          setDrivers((current) =>
+            current.map((item) => (item.id === serverDriver.id ? serverDriver : item)),
+          );
+          setServerStatus('connected');
+          setServerMessage(isOnline ? 'Водитель вышел на линию.' : 'Водитель ушел с линии.');
+        } catch {
+          setServerStatus('offline');
+          setServerMessage('Backend не отвечает. Статус линии сохранен только локально.');
+        }
+      },
       updateDriverReviewStatus: async (driverId, status) => {
         try {
           const serverDriver = await updateDriverStatusApi(driverId, status);
@@ -471,6 +498,7 @@ const initialDrivers: DriverProfile[] = [
   {
     ...defaultDriver,
     billingMode: 'commission',
+    isOnline: true,
     status: 'approved',
     subscriptionStatus: 'active',
     updatedAt: new Date().toISOString(),

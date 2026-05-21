@@ -163,6 +163,18 @@ export async function updateDriverStatus(driverId: string, status: DriverProfile
   return response.driver;
 }
 
+export async function updateDriverAvailability(driverId: string, isOnline: boolean) {
+  const response = await request<{ driver: DriverProfile }>(
+    `/drivers/${encodeURIComponent(driverId)}/availability`,
+    {
+      body: JSON.stringify({ isOnline }),
+      method: 'PATCH',
+    },
+  );
+
+  return response.driver;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
