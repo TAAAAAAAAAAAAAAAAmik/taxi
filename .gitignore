@@ -26,6 +26,10 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 expo-web*.log
+backend*.log
+
+# local MVP database
+.data/
 
 # macOS
 .DS_Store

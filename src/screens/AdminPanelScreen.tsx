@@ -27,15 +27,31 @@ export function AdminPanelScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
-  const { driverSubscription, orders, supportThreads } = useAppState();
-  const adminPassword = getPublicEnv('EXPO_PUBLIC_ADMIN_PASSWORD') || 'admin-demo-5000';
+  const {
+    assignOrderToDriver,
+    driverSubscription,
+    drivers,
+    orders,
+    loginAdmin,
+    refreshServerData,
+    serverMessage,
+    serverStatus,
+    supportThreads,
+    updateDriverReviewStatus,
+  } = useAppState();
+  const approvedDrivers = drivers.filter((driver) => driver.status === 'approved');
 
   const stats = useMemo(
     () => [
       {
-        label: 'Заказы в демо',
+        label: 'Заказы',
         value: String(orders.length),
-        helper: 'Локальные заказы в текущей сессии приложения',
+        helper: serverStatus === 'connected' ? 'Загружены с MVP backend' : 'Локальная сессия приложения',
+      },
+      {
+        label: 'Водители',
+        value: String(drivers.length),
+        helper: `${approvedDrivers.length} одобрено для заказов`,
       },
       {
         label: 'Обращения поддержки',
@@ -56,13 +72,13 @@ export function AdminPanelScreen({ navigation }: Props) {
             : 'Запустите импорт домов из OpenStreetMap/GAR',
       },
     ],
-    [orders.length, supportThreads.length],
+    [approvedDrivers.length, drivers.length, orders.length, serverStatus, supportThreads.length],
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setSubmitted(true);
 
-    if (password === adminPassword) {
+    if (await loginAdmin(password)) {
       setUnlocked(true);
     }
   };
@@ -123,8 +139,8 @@ export function AdminPanelScreen({ navigation }: Props) {
             </Pressable>
 
             <Text style={styles.helperText}>
-              Для демо используется пароль по умолчанию. Перед реальным запуском задайте
-              EXPO_PUBLIC_ADMIN_PASSWORD и перенесите проверку на сервер.
+              Пароль проверяется на MVP backend. Для локального запуска по умолчанию:
+              admin-demo-5000. Перед пилотом задайте MVP_ADMIN_PASSWORD.
             </Text>
           </View>
         ) : (
@@ -134,6 +150,24 @@ export function AdminPanelScreen({ navigation }: Props) {
               <Text style={styles.subtitle}>
                 Быстрый контроль MVP: заказы, поддержка, адресный слой и модель оплаты водителей.
               </Text>
+            </View>
+
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
+                <ShieldCheck color="#146C5D" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Backend</Text>
+              </View>
+              <Text style={styles.sectionText}>
+                Статус: {serverStatus === 'connected' ? 'подключен' : 'локальный режим'}.
+              </Text>
+              <Text style={styles.sectionTextMuted}>{serverMessage}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={refreshServerData}
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.secondaryButtonText}>Обновить данные</Text>
+              </Pressable>
             </View>
 
             <View style={styles.statsGrid}>
@@ -161,6 +195,44 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
+                <ShieldCheck color="#146C5D" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Водители</Text>
+              </View>
+              {drivers.map((driver) => (
+                <View key={driver.id} style={styles.orderRow}>
+                  <Text style={styles.orderTitle}>
+                    {driver.name} · {driver.vehicle || 'авто не указано'}
+                  </Text>
+                  <Text style={styles.orderText}>
+                    {driver.phone || 'телефон не указан'} · {driver.plate || 'номер не указан'} · статус:{' '}
+                    {driver.status}
+                  </Text>
+                  <View style={styles.rowActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => updateDriverReviewStatus(driver.id, 'approved')}
+                      style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.smallButtonText}>Одобрить</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => updateDriverReviewStatus(driver.id, 'blocked')}
+                      style={({ pressed }) => [
+                        styles.smallButton,
+                        styles.dangerButton,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.dangerButtonText}>Блок</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
                 <MapPinned color="#146C5D" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Адресный слой</Text>
               </View>
@@ -180,8 +252,29 @@ export function AdminPanelScreen({ navigation }: Props) {
               {orders.length > 0 ? (
                 orders.slice(0, 5).map((order) => (
                   <View key={order.id} style={styles.orderRow}>
-                    <Text style={styles.orderTitle}>{order.id} · {order.total} ₽</Text>
-                    <Text style={styles.orderText}>{order.pickup} → {order.destination}</Text>
+                    <Text style={styles.orderTitle}>
+                      {order.id} · {order.total} ₽ · {order.status}
+                    </Text>
+                    <Text style={styles.orderText}>
+                      {order.pickup} → {order.destination}
+                    </Text>
+                    <Text style={styles.orderText}>
+                      Водитель: {order.driver ? `${order.driver.name}, ${order.driver.vehicle}` : 'не назначен'}
+                    </Text>
+                    {!order.driver && approvedDrivers.length > 0 ? (
+                      <View style={styles.rowActions}>
+                        {approvedDrivers.slice(0, 2).map((driver) => (
+                          <Pressable
+                            accessibilityRole="button"
+                            key={driver.id}
+                            onPress={() => assignOrderToDriver(order.id, driver.id)}
+                            style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                          >
+                            <Text style={styles.smallButtonText}>Назначить {driver.name}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : null}
                   </View>
                 ))
               ) : (
@@ -209,17 +302,18 @@ function PlanRow({ title, value }: PlanRowProps) {
   );
 }
 
-function getPublicEnv(key: string) {
-  const env = globalThis as typeof globalThis & {
-    process?: { env?: Record<string, string | undefined> };
-  };
-
-  return env.process?.env?.[key];
-}
-
 const styles = StyleSheet.create({
   adminLayout: {
     gap: 14,
+  },
+  dangerButton: {
+    backgroundColor: '#FFF1F0',
+    borderColor: '#D92D20',
+  },
+  dangerButtonText: {
+    color: '#B42318',
+    fontSize: 12,
+    fontWeight: '900',
   },
   backButton: {
     alignItems: 'center',
@@ -349,6 +443,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
+  rowActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   safeArea: {
     backgroundColor: '#F4F7F5',
     flex: 1,
@@ -379,6 +478,36 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: '#20242A',
     fontSize: 17,
+    fontWeight: '900',
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#146C5D',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 12,
+  },
+  secondaryButtonText: {
+    color: '#146C5D',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  smallButton: {
+    alignItems: 'center',
+    backgroundColor: '#E9F4F1',
+    borderColor: '#146C5D',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 10,
+  },
+  smallButtonText: {
+    color: '#146C5D',
+    fontSize: 12,
     fontWeight: '900',
   },
   statCard: {
