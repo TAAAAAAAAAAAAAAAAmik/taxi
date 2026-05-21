@@ -3,15 +3,19 @@ import { SafeAreaView, StyleSheet } from 'react-native';
 
 import { PostRegistrationMenu } from '../components/PostRegistrationMenu';
 import { RootStackParamList } from '../navigation/types';
+import { useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 
 export function DashboardScreen({ navigation, route }: Props) {
   const { firstName, role } = route.params;
+  const { drivers } = useAppState();
+  const availableCarsCount = drivers.filter((driver) => driver.status === 'approved').length;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <PostRegistrationMenu
+        availableCarsCount={availableCarsCount}
         firstName={firstName}
         onBackToRegistration={() => navigation.navigate('Registration')}
         onOpenOrderFlow={() => navigation.navigate('OrderFlow', { firstName, role })}

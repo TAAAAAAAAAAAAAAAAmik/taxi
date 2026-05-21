@@ -38,6 +38,7 @@ import { SectionPage, SectionRow, sectionPages } from '../data/sectionPages';
 type PostRegistrationMenuProps = {
   role: AccountRole;
   firstName?: string;
+  availableCarsCount?: number;
   onBackToRegistration: () => void;
   onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
@@ -63,6 +64,7 @@ const iconMap: Record<MenuIconName, ComponentType<LucideProps>> = {
 };
 
 export function PostRegistrationMenu({
+  availableCarsCount = 0,
   firstName,
   onBackToRegistration,
   onOpenOrderHistory,
@@ -179,6 +181,24 @@ export function PostRegistrationMenu({
               <Text style={styles.profileStatus}>{config.statusTitle}</Text>
             </View>
           </View>
+
+          {role === 'client' ? (
+            <Pressable
+              accessibilityLabel={`Доступно машин: ${availableCarsCount}`}
+              accessibilityRole="button"
+              onPress={onOpenOrderFlow}
+              style={({ pressed }) => [styles.availableCarsButton, pressed && styles.pressed]}
+            >
+              <View style={styles.availableCarsIcon}>
+                <Car color="#FFFFFF" size={28} strokeWidth={2.5} />
+              </View>
+              <View style={styles.availableCarsCopy}>
+                <Text style={styles.availableCarsLabel}>Доступно машин</Text>
+                <Text style={styles.availableCarsValue}>{availableCarsCount}</Text>
+                <Text style={styles.availableCarsHint}>Нажмите, чтобы заказать поездку</Text>
+              </View>
+            </Pressable>
+          ) : null}
 
           <View style={styles.menuList}>
             {config.menuItems.map((item) => (
@@ -393,6 +413,48 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '900',
+  },
+  availableCarsButton: {
+    alignItems: 'center',
+    backgroundColor: '#146C5D',
+    borderColor: '#0B4C42',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    minHeight: 112,
+    padding: 16,
+  },
+  availableCarsCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  availableCarsHint: {
+    color: '#DCEFEB',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  availableCarsIcon: {
+    alignItems: 'center',
+    backgroundColor: '#0B4C42',
+    borderRadius: 8,
+    height: 58,
+    justifyContent: 'center',
+    width: 58,
+  },
+  availableCarsLabel: {
+    color: '#DCEFEB',
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  availableCarsValue: {
+    color: '#FFFFFF',
+    fontSize: 42,
+    fontWeight: '900',
+    lineHeight: 46,
   },
   badge: {
     backgroundColor: '#FFF3E5',
