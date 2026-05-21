@@ -107,6 +107,7 @@ export function RegistrationScreen({ navigation }: Props) {
       password: values.appPassword ?? '',
       phone: values.phone,
       role,
+      vehicleDocumentsReady: values.vehicleDocumentsReady,
     });
 
     setIsSavingApplication(false);

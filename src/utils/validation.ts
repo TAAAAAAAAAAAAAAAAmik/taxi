@@ -76,13 +76,8 @@ function validateDriverLegalFields(values: FormValues, errors: string[]) {
   }
 
   requireAffirmation(
-    values.osagoTaxiUse,
-    'Подтвердите, что ОСАГО покрывает использование автомобиля в качестве такси.',
-    errors,
-  );
-  requireAffirmation(
-    values.waybillReadiness,
-    'Подтвердите оформление путевого листа перед сменой.',
+    values.vehicleDocumentsReady,
+    'Подтвердите готовность предоставить документы автомобиля.',
     errors,
   );
   requireAffirmation(

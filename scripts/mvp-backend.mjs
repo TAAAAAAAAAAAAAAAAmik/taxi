@@ -209,6 +209,7 @@ function makeDriverFromUser(user, payload) {
     status: 'pending',
     billingMode: 'commission',
     subscriptionStatus: 'inactive',
+    vehicleDocumentsReady: String(payload.vehicleDocumentsReady || ''),
     userId: user.id,
     updatedAt: new Date().toISOString(),
   };

@@ -51,6 +51,7 @@ export type DriverProfile = OrderParticipant & {
   billingMode: DriverBillingMode;
   status: 'pending' | 'approved' | 'blocked';
   subscriptionStatus: DriverSubscription['status'];
+  userId?: string;
   updatedAt?: string;
 };
 

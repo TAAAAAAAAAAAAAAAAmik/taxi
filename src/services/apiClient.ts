@@ -46,6 +46,7 @@ export type RegisterAccountPayload = {
   carBrand?: string;
   carModel?: string;
   carPlate?: string;
+  vehicleDocumentsReady?: string;
 };
 
 export type CreateOrderPayload = OrderStatusSummary & {

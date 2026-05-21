@@ -53,7 +53,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const isWide = width >= 840;
   const {
     addOrder,
+    currentUser,
     driverSubscription,
+    drivers,
     orders,
     refreshServerData,
     savedHomeAddress,
@@ -87,9 +89,18 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const total = selectedTariff.price + optionsTotal;
   const canConfirm = Boolean(values.pickup?.trim()) && Boolean(values.destination?.trim());
   const usesRegionalAddressBook = role !== 'driver';
+  const currentDriver = useMemo(
+    () =>
+      role === 'driver' && currentUser
+        ? drivers.find((driver) => driver.userId === currentUser.id)
+        : undefined,
+    [currentUser, drivers, role],
+  );
+  const driverNeedsApproval =
+    role === 'driver' && currentUser && currentDriver?.status !== 'approved';
   const availableDriverOrders = useMemo(
     () =>
-      role === 'driver'
+      role === 'driver' && !driverNeedsApproval
         ? orders.filter(
             (order) =>
               order.role === 'client' &&
@@ -97,7 +108,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               ['created', 'searching'].includes(order.status),
           )
         : [],
-    [orders, role],
+    [driverNeedsApproval, orders, role],
   );
   const selectedFeedOrder =
     availableDriverOrders.find((order) => order.id === selectedFeedOrderId) ?? availableDriverOrders[0];
@@ -183,6 +194,11 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   };
 
   const handlePrimaryAction = async () => {
+    if (driverNeedsApproval) {
+      setConfirmed(true);
+      return;
+    }
+
     if (role === 'driver' && driverSubscription.status !== 'active') {
       navigation.navigate('Subscription', { firstName, role });
       return;
@@ -336,10 +352,15 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   <View style={styles.regionBox}>
                     <Text style={styles.regionTitle}>Открытые заказы</Text>
                     <Text style={styles.regionText}>
-                      {availableDriverOrders.length > 0
+                      {driverNeedsApproval
+                        ? 'Заявка водителя создана. Администратор должен проверить автомобиль и открыть доступ.'
+                        : availableDriverOrders.length > 0
                         ? `Доступно заявок: ${availableDriverOrders.length}. Выберите заказ и нажмите принятие.`
                         : 'Открытых заявок нет. Обновите backend или примите заказ вручную для демо.'}
                     </Text>
+                    {currentDriver ? (
+                      <Text style={styles.regionMeta}>Статус допуска: {currentDriver.status}</Text>
+                    ) : null}
                     <Pressable
                       accessibilityRole="button"
                       onPress={refreshServerData}
@@ -535,10 +556,12 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               {confirmed ? (
                 <View style={[styles.resultBox, canConfirm && styles.resultBoxSuccess]}>
                   <Text style={styles.resultTitle}>
-                    {canConfirm ? 'Готово к отправке' : 'Нужен маршрут'}
+                    {driverNeedsApproval ? 'Нужен допуск' : canConfirm ? 'Готово к отправке' : 'Нужен маршрут'}
                   </Text>
                   <Text style={styles.resultText}>
-                    {canConfirm
+                    {driverNeedsApproval
+                      ? 'Реальные заказы откроются после ручного одобрения администратора.'
+                      : canConfirm
                       ? 'Следующий шаг - отправка на сервер и создание заказа.'
                       : 'Заполните точку подачи и назначение, чтобы оформить заказ.'}
                   </Text>
