@@ -28,6 +28,7 @@ export type MenuActionTarget =
   | 'homeAddress'
   | 'none'
   | 'order'
+  | 'referral'
   | 'registration'
   | 'subscription'
   | 'supportChat';
@@ -86,6 +87,13 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         icon: 'credit-card',
       },
       {
+        id: 'referrals',
+        title: 'Пригласить',
+        subtitle: 'Код, ссылка и бонусы за друзей',
+        icon: 'users',
+        badge: 'Бонусы',
+      },
+      {
         id: 'support',
         title: 'Поддержка',
         subtitle: 'Вопросы по поездкам и профилю',
@@ -117,6 +125,14 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         title: 'Обращение',
         subtitle: 'Связь с поддержкой по поездке.',
         icon: 'headphones',
+        target: 'supportChat',
+      },
+      {
+        id: 'referral',
+        title: 'Пригласить',
+        subtitle: 'Код, ссылка и бонусы за клиентов и водителей.',
+        icon: 'users',
+        target: 'referral',
       },
     ],
     metrics: [

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Building2, Car, LogIn, UserRound } from 'lucide-react-native';
+import { Building2, Car, LockKeyhole, LogIn, UserRound } from 'lucide-react-native';
 import {
   Pressable,
   SafeAreaView,
@@ -24,6 +24,26 @@ const roleIcons = {
   fleet: Building2,
 };
 
+const demoAccounts: Array<{
+  identifier: string;
+  label: string;
+  password: string;
+  role: AccountRole;
+}> = [
+  {
+    identifier: 'demo-client@example.test',
+    label: 'Клиент',
+    password: 'password123',
+    role: 'client',
+  },
+  {
+    identifier: 'demo-driver@example.test',
+    label: 'Водитель',
+    password: 'password123',
+    role: 'driver',
+  },
+];
+
 export function LoginScreen({ navigation }: Props) {
   const { loginAccount, serverMessage, serverStatus } = useAppState();
   const [role, setRole] = useState<AccountRole>('client');
@@ -33,10 +53,14 @@ export function LoginScreen({ navigation }: Props) {
   const [errorText, setErrorText] = useState<string | null>(null);
   const canContinue = identifier.trim().length > 2 && password.length >= 4 && !isSubmitting;
 
-  const handleLogin = async () => {
+  const submitLogin = async (
+    nextIdentifier: string,
+    nextPassword: string,
+    nextRole: AccountRole,
+  ) => {
     setIsSubmitting(true);
     setErrorText(null);
-    const user = await loginAccount(identifier, password, role);
+    const user = await loginAccount(nextIdentifier, nextPassword, nextRole);
     setIsSubmitting(false);
 
     if (!user) {
@@ -48,6 +72,17 @@ export function LoginScreen({ navigation }: Props) {
       firstName: user.firstName || undefined,
       role: user.role as AccountRole,
     });
+  };
+
+  const handleLogin = async () => {
+    await submitLogin(identifier, password, role);
+  };
+
+  const handleDemoLogin = async (account: (typeof demoAccounts)[number]) => {
+    setRole(account.role);
+    setIdentifier(account.identifier);
+    setPassword(account.password);
+    await submitLogin(account.identifier, account.password, account.role);
   };
 
   return (
@@ -86,6 +121,30 @@ export function LoginScreen({ navigation }: Props) {
                   <Text style={[styles.roleButtonText, active && styles.roleButtonTextActive]}>
                     {roleCopy[item].title}
                   </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.sectionTitle}>Демо-вход</Text>
+          <View style={styles.demoGrid}>
+            {demoAccounts.map((account) => {
+              const Icon = roleIcons[account.role];
+
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isSubmitting}
+                  key={account.role}
+                  onPress={() => handleDemoLogin(account)}
+                  style={({ pressed }) => [
+                    styles.demoButton,
+                    isSubmitting && styles.demoButtonMuted,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Icon color="#146C5D" size={18} strokeWidth={2.4} />
+                  <Text style={styles.demoButtonText}>{account.label}</Text>
                 </Pressable>
               );
             })}
@@ -139,6 +198,15 @@ export function LoginScreen({ navigation }: Props) {
           >
             <Text style={styles.linkButtonText}>Создать новый аккаунт</Text>
           </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('AdminPanel')}
+            style={({ pressed }) => [styles.adminButton, pressed && styles.pressed]}
+          >
+            <LockKeyhole color="#20242A" size={18} strokeWidth={2.4} />
+            <Text style={styles.adminButtonText}>Админ-панель</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -146,6 +214,23 @@ export function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  adminButton: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAF9',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 16,
+  },
+  adminButtonText: {
+    color: '#20242A',
+    fontSize: 14,
+    fontWeight: '900',
+  },
   field: {
     gap: 8,
   },
@@ -154,6 +239,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
+  },
+  demoButton: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAF9',
+    borderColor: '#146C5D',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 150,
+    paddingHorizontal: 12,
+  },
+  demoButtonMuted: {
+    opacity: 0.55,
+  },
+  demoButtonText: {
+    color: '#146C5D',
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  demoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   form: {
     backgroundColor: '#FFFFFF',

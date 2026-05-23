@@ -46,6 +46,15 @@ import { useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OrderFlow'>;
 
+type RouteEstimate = {
+  confidence: 'draft' | 'estimated' | 'preset';
+  distanceKm: number;
+  distancePrice: number;
+  durationMin: number;
+  note: string;
+  total: number;
+};
+
 export function OrderFlowScreen({ navigation, route }: Props) {
   const { firstName, role } = route.params;
   const { width } = useWindowDimensions();
@@ -53,6 +62,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const isWide = width >= 840;
   const {
     addOrder,
+    assignOrderToDriver,
     currentUser,
     driverSubscription,
     drivers,
@@ -61,7 +71,6 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     savedHomeAddress,
     serverMessage,
     serverStatus,
-    updateOrderStatus,
   } = useAppState();
 
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -86,9 +95,17 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     [config.options, selectedOptions],
   );
   const optionsTotal = selectedOptionItems.reduce((sum, option) => sum + option.price, 0);
-  const total = selectedTariff.price + optionsTotal;
   const canConfirm = Boolean(values.pickup?.trim()) && Boolean(values.destination?.trim());
   const usesRegionalAddressBook = role !== 'driver';
+  const availableCarsCount = drivers.filter(
+    (driver) =>
+      driver.status === 'approved' &&
+      driver.isOnline &&
+      driver.subscriptionStatus === 'active' &&
+      driver.canReceiveOrders,
+  ).length;
+  const availableCarsState =
+    availableCarsCount === 0 ? 'none' : availableCarsCount <= 2 ? 'low' : 'ready';
   const currentDriver = useMemo(
     () =>
       role === 'driver' && currentUser
@@ -98,9 +115,11 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   );
   const driverNeedsApproval =
     role === 'driver' && currentUser && currentDriver?.status !== 'approved';
+  const driverCannotReceiveOrders =
+    role === 'driver' && currentUser && !currentDriver?.canReceiveOrders;
   const availableDriverOrders = useMemo(
     () =>
-      role === 'driver' && !driverNeedsApproval
+      role === 'driver' && !driverCannotReceiveOrders
         ? orders.filter(
             (order) =>
               order.role === 'client' &&
@@ -108,10 +127,22 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               ['created', 'searching'].includes(order.status),
           )
         : [],
-    [driverNeedsApproval, orders, role],
+    [driverCannotReceiveOrders, orders, role],
   );
   const selectedFeedOrder =
     availableDriverOrders.find((order) => order.id === selectedFeedOrderId) ?? availableDriverOrders[0];
+  const routeEstimate = useMemo(
+    () =>
+      buildRouteEstimate({
+        destination: values.destination ?? '',
+        optionsTotal,
+        pickup: values.pickup ?? '',
+        role,
+        tariff: selectedTariff,
+      }),
+    [optionsTotal, role, selectedTariff, values.destination, values.pickup],
+  );
+  const total = role === 'driver' && selectedFeedOrder ? selectedFeedOrder.total : routeEstimate.total;
 
   useEffect(() => {
     if (role !== 'driver' || !selectedFeedOrder) {
@@ -199,7 +230,11 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (role === 'driver' && driverSubscription.status !== 'active') {
+    if (
+      role === 'driver' &&
+      driverSubscription.status !== 'active' &&
+      currentDriver?.subscriptionStatus !== 'active'
+    ) {
       navigation.navigate('Subscription', { firstName, role });
       return;
     }
@@ -209,19 +244,26 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       return;
     }
 
+    if (driverCannotReceiveOrders) {
+      setConfirmed(true);
+      return;
+    }
+
     if (role === 'driver' && selectedFeedOrder) {
       setIsSubmitting(true);
 
       try {
-        await updateOrderStatus(selectedFeedOrder.id, 'accepted');
-        const acceptedOrder = {
-          ...selectedFeedOrder,
-          status: 'accepted',
-        };
+        const assignedOrder = currentDriver
+          ? await assignOrderToDriver(selectedFeedOrder.id, currentDriver.id, 'accepted')
+          : null;
+        if (!assignedOrder) {
+          setConfirmed(true);
+          return;
+        }
         setConfirmed(true);
         navigation.navigate('OrderStatus', {
           firstName,
-          order: acceptedOrder,
+          order: assignedOrder,
           role,
         });
       } finally {
@@ -342,6 +384,30 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 </View>
               ) : null}
               {usesRegionalAddressBook ? (
+                <View
+                  style={[
+                    styles.searchCarsBox,
+                    availableCarsState === 'none' && styles.searchCarsBoxEmpty,
+                    availableCarsState === 'ready' && styles.searchCarsBoxReady,
+                  ]}
+                >
+                  <View style={styles.searchCarsTop}>
+                    <Car color="#146C5D" size={20} strokeWidth={2.4} />
+                    <Text style={styles.searchCarsTitle}>Поиск машины</Text>
+                  </View>
+                  <Text style={styles.searchCarsValue}>
+                    {availableCarsCount} {formatCarsWord(availableCarsCount)} доступно
+                  </Text>
+                  <Text style={styles.searchCarsText}>
+                    {availableCarsState === 'none'
+                      ? 'Сейчас в зоне нет активных водителей. Заказ можно создать, админ и водители увидят его после выхода на смену.'
+                      : availableCarsState === 'low'
+                      ? 'Машин мало, поэтому время принятия может быть выше. Показываем доступных водителей в зоне Салаватского района.'
+                      : 'Есть активные водители в зоне Салаватского района. Точное “рядом” включим после координат водителей.'}
+                  </Text>
+                </View>
+              ) : null}
+              {usesRegionalAddressBook ? (
                 <View style={styles.routePresetGrid}>
                   {salavatPopularRoutes.map((route) => (
                     <RoutePresetCard key={route.id} onPress={() => applyRoutePreset(route)} route={route} />
@@ -354,6 +420,8 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                     <Text style={styles.regionText}>
                       {driverNeedsApproval
                         ? 'Заявка водителя создана. Администратор должен проверить автомобиль и открыть доступ.'
+                        : driverCannotReceiveOrders
+                        ? 'Доступ к заказам закрыт. Нужны документы, договор, разрешение авто, реестр и налоговый профиль.'
                         : availableDriverOrders.length > 0
                         ? `Доступно заявок: ${availableDriverOrders.length}. Выберите заказ и нажмите принятие.`
                         : 'Открытых заявок нет. Обновите backend или примите заказ вручную для демо.'}
@@ -484,7 +552,16 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 icon={<ShieldCheck color="#146C5D" size={20} strokeWidth={2.4} />}
                 title={config.summaryTitle}
               />
+              <RouteEstimatePreview
+                destination={values.destination}
+                estimate={routeEstimate}
+                pickup={values.pickup}
+              />
               <View style={styles.summaryRows}>
+                <SummaryRow
+                  label="Маршрут"
+                  value={`${formatDistance(routeEstimate.distanceKm)} · ${routeEstimate.durationMin} мин`}
+                />
                 <SummaryRow label="Тариф" value={selectedTariff.title} />
                 <SummaryRow label="Подача" value={selectedTariff.eta} />
                 <SummaryRow label="Опции" value={`${optionsTotal} ₽`} />
@@ -607,6 +684,163 @@ function createInitialOrderValues(role: AccountRole): Record<string, string> {
   return {};
 }
 
+function formatCarsWord(count: number) {
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+
+  if (lastDigit === 1 && lastTwoDigits !== 11) {
+    return 'машина';
+  }
+
+  if ([2, 3, 4].includes(lastDigit) && ![12, 13, 14].includes(lastTwoDigits)) {
+    return 'машины';
+  }
+
+  return 'машин';
+}
+
+function buildRouteEstimate({
+  destination,
+  optionsTotal,
+  pickup,
+  role,
+  tariff,
+}: {
+  destination: string;
+  optionsTotal: number;
+  pickup: string;
+  role: AccountRole;
+  tariff: OrderTariff;
+}): RouteEstimate {
+  const hasRoute = Boolean(pickup.trim()) && Boolean(destination.trim());
+
+  if (!hasRoute) {
+    return {
+      confidence: 'draft',
+      distanceKm: 0,
+      distancePrice: 0,
+      durationMin: 0,
+      note: 'укажите маршрут',
+      total: tariff.price + optionsTotal,
+    };
+  }
+
+  const preset = findMatchingRoutePreset(pickup, destination);
+  const distanceKm = preset?.estimatedDistanceKm ?? estimateDistanceKm(pickup, destination);
+  const durationMin =
+    preset?.estimatedTime ? parseRouteTime(preset.estimatedTime) : estimateDurationMin(distanceKm);
+  const rate = getFareRate(tariff.id, role);
+  const distancePrice = roundToTen(distanceKm * rate.perKm + durationMin * rate.perMin);
+  const calculatedTotal = rate.base + distancePrice + optionsTotal;
+  const total = roundToTen(Math.max(tariff.price + optionsTotal, calculatedTotal));
+
+  return {
+    confidence: preset ? 'preset' : 'estimated',
+    distanceKm,
+    distancePrice,
+    durationMin,
+    note: preset ? 'популярный маршрут' : 'предварительная оценка',
+    total,
+  };
+}
+
+function findMatchingRoutePreset(pickup: string, destination: string) {
+  const normalizedPickup = normalizeRouteText(pickup);
+  const normalizedDestination = normalizeRouteText(destination);
+
+  return salavatPopularRoutes.find(
+    (route) =>
+      addressLooksSame(normalizedPickup, normalizeRouteText(route.pickup)) &&
+      addressLooksSame(normalizedDestination, normalizeRouteText(route.destination)),
+  );
+}
+
+function normalizeRouteText(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^a-zа-я0-9]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function addressLooksSame(left: string, right: string) {
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+function estimateDistanceKm(pickup: string, destination: string) {
+  const pickupPoint = getRouteAnchor(pickup);
+  const destinationPoint = getRouteAnchor(destination);
+
+  if (!pickupPoint || !destinationPoint) {
+    return pickupPoint || destinationPoint ? 14 : 9;
+  }
+
+  const distance = Math.abs(pickupPoint.kmFromMaloyaz - destinationPoint.kmFromMaloyaz);
+  return Math.max(distance, 3.2);
+}
+
+function getRouteAnchor(address: string) {
+  const normalizedAddress = normalizeRouteText(address);
+  const anchors = [
+    { keys: ['малояз', 'црб', 'центральная районная больница'], kmFromMaloyaz: 0 },
+    { keys: ['янгантау', 'санаторий'], kmFromMaloyaz: 17.5 },
+    { keys: ['кургазак', 'комсомол'], kmFromMaloyaz: 19.5 },
+    { keys: ['мурсалимкино'], kmFromMaloyaz: 31 },
+    { keys: ['аркаулово'], kmFromMaloyaz: 22 },
+    { keys: ['лаклы'], kmFromMaloyaz: 34 },
+    { keys: ['идрисово'], kmFromMaloyaz: 24 },
+  ];
+
+  return anchors.find((anchor) => anchor.keys.some((key) => normalizedAddress.includes(key)));
+}
+
+function parseRouteTime(value: string) {
+  const numbers = value.match(/\d+/g)?.map(Number) ?? [];
+
+  if (numbers.length >= 2) {
+    return Math.round((numbers[0] + numbers[1]) / 2);
+  }
+
+  return numbers[0] ?? 12;
+}
+
+function estimateDurationMin(distanceKm: number) {
+  return Math.max(8, Math.round(distanceKm * 1.35 + 6));
+}
+
+function getFareRate(tariffId: string, role: AccountRole) {
+  if (role === 'driver') {
+    return { base: 0, perKm: 22, perMin: 4 };
+  }
+
+  if (['business', 'airport'].includes(tariffId)) {
+    return { base: 260, perKm: 42, perMin: 8 };
+  }
+
+  if (['comfort', 'current'].includes(tariffId)) {
+    return { base: 160, perKm: 30, perMin: 5 };
+  }
+
+  return { base: 120, perKm: 24, perMin: 4 };
+}
+
+function roundToTen(value: number) {
+  return Math.round(value / 10) * 10;
+}
+
+function formatDistance(distanceKm: number) {
+  if (!distanceKm) {
+    return '0 км';
+  }
+
+  return `${distanceKm.toLocaleString('ru-RU', {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: distanceKm % 1 === 0 ? 0 : 1,
+  })} км`;
+}
+
 type SectionHeaderProps = {
   icon: ReactNode;
   title: string;
@@ -617,6 +851,59 @@ function SectionHeader({ icon, title }: SectionHeaderProps) {
     <View style={styles.sectionHeader}>
       {icon}
       <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
+type RouteEstimatePreviewProps = {
+  destination?: string;
+  estimate: RouteEstimate;
+  pickup?: string;
+};
+
+function RouteEstimatePreview({ destination, estimate, pickup }: RouteEstimatePreviewProps) {
+  const confidenceText =
+    estimate.confidence === 'preset'
+      ? 'Популярный маршрут'
+      : estimate.confidence === 'estimated'
+      ? 'MVP-оценка'
+      : 'Черновик';
+
+  return (
+    <View style={styles.routeEstimateBox}>
+      <View style={styles.routeEstimateHeader}>
+        <Route color="#146C5D" size={18} strokeWidth={2.4} />
+        <Text style={styles.routeEstimateTitle}>{confidenceText}</Text>
+      </View>
+      <View style={styles.routeEstimateBody}>
+        <View style={styles.routeTrack}>
+          <View style={styles.routeTrackDot} />
+          <View style={styles.routeTrackLine} />
+          <View style={[styles.routeTrackDot, styles.routeTrackDotFinish]} />
+        </View>
+        <View style={styles.routePoints}>
+          <Text numberOfLines={1} style={styles.routePointTitle}>
+            {pickup?.trim() || 'Точка подачи'}
+          </Text>
+          <Text numberOfLines={1} style={styles.routePointText}>
+            {destination?.trim() || 'Куда едем'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.routeMetrics}>
+        <View style={styles.routeMetric}>
+          <Text style={styles.routeMetricValue}>{formatDistance(estimate.distanceKm)}</Text>
+          <Text style={styles.routeMetricLabel}>Расстояние</Text>
+        </View>
+        <View style={styles.routeMetric}>
+          <Text style={styles.routeMetricValue}>{estimate.durationMin} мин</Text>
+          <Text style={styles.routeMetricLabel}>В пути</Text>
+        </View>
+        <View style={styles.routeMetric}>
+          <Text style={styles.routeMetricValue}>{estimate.distancePrice} ₽</Text>
+          <Text style={styles.routeMetricLabel}>{estimate.note}</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -691,12 +978,14 @@ function RoutePresetCard({ onPress, route }: RoutePresetCardProps) {
     >
       <View style={styles.routePresetTop}>
         <Route color="#146C5D" size={18} strokeWidth={2.4} />
-        <Text style={styles.routePresetTitle}>{route.title}</Text>
-      </View>
-      <Text style={styles.routePresetSubtitle}>{route.subtitle}</Text>
-      <Text style={styles.routePresetMeta}>{route.estimatedTime}</Text>
-    </Pressable>
-  );
+      <Text style={styles.routePresetTitle}>{route.title}</Text>
+    </View>
+    <Text style={styles.routePresetSubtitle}>{route.subtitle}</Text>
+    <Text style={styles.routePresetMeta}>
+      {formatDistance(route.estimatedDistanceKm)} · {route.estimatedTime}
+    </Text>
+  </Pressable>
+);
 }
 
 type TariffCardProps = {
@@ -1071,6 +1360,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
+  searchCarsBox: {
+    backgroundColor: '#FFF3E5',
+    borderColor: '#F3C38A',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+    padding: 12,
+  },
+  searchCarsBoxEmpty: {
+    backgroundColor: '#FFF1F0',
+    borderColor: '#F4A6A0',
+  },
+  searchCarsBoxReady: {
+    backgroundColor: '#EAF6EA',
+    borderColor: '#B9DDBB',
+  },
+  searchCarsText: {
+    color: '#59616C',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  searchCarsTitle: {
+    color: '#20242A',
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  searchCarsTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  searchCarsValue: {
+    color: '#146C5D',
+    fontSize: 22,
+    fontWeight: '900',
+  },
   regionBox: {
     backgroundColor: '#EEF5F3',
     borderColor: '#C5DDD7',
@@ -1114,6 +1440,63 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
+  routeEstimateBody: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  routeEstimateBox: {
+    backgroundColor: '#F8FAF9',
+    borderRadius: 8,
+    gap: 12,
+    padding: 12,
+  },
+  routeEstimateHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  routeEstimateTitle: {
+    color: '#146C5D',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  routeMetric: {
+    flex: 1,
+    gap: 3,
+    minWidth: 80,
+  },
+  routeMetricLabel: {
+    color: '#59616C',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  routeMetricValue: {
+    color: '#20242A',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  routeMetrics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  routePointText: {
+    color: '#59616C',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  routePointTitle: {
+    color: '#20242A',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
+  routePoints: {
+    flex: 1,
+    gap: 7,
+    minWidth: 0,
+  },
   routePresetCard: {
     backgroundColor: '#F8FAF9',
     borderColor: '#D8DEE6',
@@ -1149,6 +1532,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
+  },
+  routeTrack: {
+    alignItems: 'center',
+    width: 16,
+  },
+  routeTrackDot: {
+    backgroundColor: '#146C5D',
+    borderRadius: 5,
+    height: 10,
+    width: 10,
+  },
+  routeTrackDotFinish: {
+    backgroundColor: '#B7791F',
+  },
+  routeTrackLine: {
+    backgroundColor: '#C5DDD7',
+    flex: 1,
+    marginVertical: 3,
+    width: 2,
   },
   safeArea: {
     backgroundColor: '#F4F7F5',

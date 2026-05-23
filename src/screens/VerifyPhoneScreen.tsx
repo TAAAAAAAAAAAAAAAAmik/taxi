@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MessageSquareText, Phone, ShieldCheck } from 'lucide-react-native';
 import {
@@ -12,13 +12,61 @@ import {
 } from 'react-native';
 
 import { RootStackParamList } from '../navigation/types';
+import { useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VerifyPhone'>;
 
 export function VerifyPhoneScreen({ navigation, route }: Props) {
   const { email, firstName, phone, role } = route.params;
+  const { requestVerificationCode, serverMessage, verifyContactCode } = useAppState();
   const [code, setCode] = useState('');
-  const canContinue = code.trim().length >= 4;
+  const [demoCode, setDemoCode] = useState('');
+  const [notice, setNotice] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const canContinue = code.trim().length >= 4 && !isVerifying;
+
+  const sendCode = async () => {
+    if (!phone) {
+      setNotice('В анкете нет телефона для подтверждения.');
+      return;
+    }
+
+    setIsSending(true);
+    setNotice('');
+    const result = await requestVerificationCode('phone', phone);
+    setIsSending(false);
+
+    if (!result) {
+      setNotice(serverMessage || 'Backend не создал код подтверждения.');
+      return;
+    }
+
+    setDemoCode(result.code);
+    setNotice(`MVP-код создан и действует до ${formatTime(result.expiresAt)}.`);
+  };
+
+  useEffect(() => {
+    void sendCode();
+  }, []);
+
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    setNotice('');
+    const user = await verifyContactCode('phone', code, phone);
+    setIsVerifying(false);
+
+    if (!user) {
+      setNotice(serverMessage || 'Код телефона не подошел.');
+      return;
+    }
+
+    navigation.navigate('VerifyEmail', {
+      email,
+      firstName,
+      role,
+    });
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -29,10 +77,12 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
           </View>
           <Text style={styles.title}>Подтверждение телефона</Text>
           <Text style={styles.subtitle}>
-            Введите код из SMS или мессенджера. Сейчас это заготовка экрана, позже код будет
-            приходить через API.
+            Введите код из SMS или мессенджера. В MVP backend создает код и показывает его здесь
+            для ручной проверки пилотного сценария.
           </Text>
           <Text style={styles.target}>{phone || 'Телефон из анкеты'}</Text>
+          {demoCode ? <Text style={styles.demoCode}>MVP-код: {demoCode}</Text> : null}
+          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
           <View style={styles.field}>
             <Text style={styles.label}>Код подтверждения</Text>
@@ -50,13 +100,7 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
           <Pressable
             accessibilityRole="button"
             disabled={!canContinue}
-            onPress={() =>
-              navigation.navigate('VerifyEmail', {
-                email,
-                firstName,
-                role,
-              })
-            }
+            onPress={handleVerify}
             style={({ pressed }) => [
               styles.primaryButton,
               !canContinue && styles.primaryButtonMuted,
@@ -64,15 +108,21 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
             ]}
           >
             <ShieldCheck color="#FFFFFF" size={19} strokeWidth={2.4} />
-            <Text style={styles.primaryButtonText}>Подтвердить телефон</Text>
+            <Text style={styles.primaryButtonText}>
+              {isVerifying ? 'Проверяем...' : 'Подтвердить телефон'}
+            </Text>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
+            disabled={isSending}
+            onPress={sendCode}
             style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
           >
             <MessageSquareText color="#146C5D" size={18} strokeWidth={2.4} />
-            <Text style={styles.secondaryButtonText}>Отправить код повторно</Text>
+            <Text style={styles.secondaryButtonText}>
+              {isSending ? 'Отправляем...' : 'Отправить код повторно'}
+            </Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -88,6 +138,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 16,
     padding: 18,
+  },
+  demoCode: {
+    backgroundColor: '#E9F4F1',
+    borderRadius: 8,
+    color: '#146C5D',
+    fontSize: 18,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   field: {
     gap: 8,
@@ -116,6 +176,12 @@ const styles = StyleSheet.create({
     color: '#20242A',
     fontSize: 14,
     fontWeight: '900',
+  },
+  notice: {
+    color: '#59616C',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   page: {
     backgroundColor: '#F4F7F5',
@@ -182,3 +248,10 @@ const styles = StyleSheet.create({
     lineHeight: 34,
   },
 });
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

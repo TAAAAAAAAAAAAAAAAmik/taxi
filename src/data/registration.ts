@@ -113,6 +113,15 @@ const commonFields: RegistrationField[] = [
     textContentType: 'telephoneNumber',
     helper: 'Телефон подтверждается одноразовым кодом.',
   },
+  {
+    id: 'referralCode',
+    label: 'Реферальный код',
+    placeholder: 'Например, TP12345',
+    section: 'account',
+    required: false,
+    textContentType: 'none',
+    helper: 'Если вас пригласили, код закрепит бонусы за вами и пригласившим.',
+  },
 ];
 
 const driverFields: RegistrationField[] = [

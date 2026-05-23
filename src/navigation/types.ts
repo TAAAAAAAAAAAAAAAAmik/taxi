@@ -14,7 +14,12 @@ export type RootStackParamList = {
   Welcome: undefined;
   Login: undefined;
   AdminPanel: undefined;
-  Registration: undefined;
+  Registration:
+    | {
+        referralCode?: string;
+        role?: AccountRole;
+      }
+    | undefined;
   VerifyPhone: {
     email?: string;
     role: AccountRole;
@@ -55,5 +60,9 @@ export type RootStackParamList = {
     role: AccountRole;
     firstName?: string;
     category?: string;
+  };
+  Referral: {
+    role: AccountRole;
+    firstName?: string;
   };
 };

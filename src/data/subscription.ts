@@ -1,5 +1,55 @@
 export type DriverBillingMode = 'monthly' | 'commission';
 
+export type DriverSubscriptionPaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+
+export type DriverPaymentProviderMode = 'demo' | 'live' | 'manual';
+
+export type DriverPaymentProvider = {
+  name: string;
+  mode: DriverPaymentProviderMode;
+  shopId?: string;
+};
+
+export type DriverSubscriptionReceipt = {
+  id: string;
+  paymentId: string;
+  driverId: string;
+  issuedAt: string;
+  total: number;
+  currency: 'RUB';
+  fiscalStatus: 'demo' | 'provider' | 'manual';
+  fiscalNumber: string;
+  paymentStatus: DriverSubscriptionPaymentStatus;
+  items: Array<{
+    amount: number;
+    label: string;
+  }>;
+};
+
+export type DriverSubscriptionPayment = {
+  id: string;
+  driverId: string;
+  driverName?: string;
+  billingMode: DriverBillingMode;
+  planName: string;
+  amount: number;
+  currency: 'RUB';
+  paymentMethod: string;
+  provider: DriverPaymentProvider;
+  providerPaymentId?: string;
+  confirmationUrl?: string;
+  status: DriverSubscriptionPaymentStatus;
+  accessStartsAt?: string;
+  accessExpiresAt?: string;
+  paidAt?: string;
+  refundedAt?: string;
+  refundReason?: string;
+  receipt?: DriverSubscriptionReceipt;
+  refundReceipt?: DriverSubscriptionReceipt;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const driverAccessPlans: Record<
   DriverBillingMode,
   {
@@ -25,7 +75,7 @@ export const driverAccessPlans: Record<
     id: 'monthly',
     monthlyPrice: 5000,
     name: 'Месячный доступ к заказам',
-    primaryAction: 'Выбрать 5000 ₽ в месяц',
+    primaryAction: 'Оплатить 5000 ₽ за 30 дней',
     shortName: '5000 ₽/мес',
   },
   commission: {
@@ -37,7 +87,7 @@ export const driverAccessPlans: Record<
     id: 'commission',
     monthlyPrice: 0,
     name: 'Комиссия с поездок',
-    primaryAction: 'Выбрать 12% с поездки',
+    primaryAction: 'Подключить 12% с поездки',
     shortName: '12%/поездка',
   },
 };
@@ -56,8 +106,8 @@ export const driverSubscriptionRules = [
   'Доступ к заказам открывается только после проверки документов',
   'Сервис не становится работодателем водителя',
   'Заказы распределяются по спросу, рейтингу, географии и доступности',
-  'Выбранную модель оплаты можно менять по правилам сервиса перед новым расчетным периодом',
-  'Отмена, безопасность и спорные поездки остаются под правилами сервиса',
+  'Выбранную модель оплаты можно менять перед новым расчетным периодом',
+  'Возвраты, безопасность и спорные поездки остаются под правилами сервиса',
 ];
 
 export const driverSubscriptionEconomics = [

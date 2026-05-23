@@ -4,7 +4,7 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'rea
 
 import { roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
-import { AppOrder, useAppState } from '../state/AppState';
+import { AppOrder, PaymentStatus, useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OrderHistory'>;
 
@@ -18,13 +18,30 @@ const statusLabels: Record<string, string> = {
   created: 'Создан',
   in_progress: 'В поездке',
   searching: 'Поиск',
+  started: 'В поездке',
   to_pickup: 'Едет к клиенту',
+};
+
+const paymentStatusLabels: Record<PaymentStatus, string> = {
+  authorized: 'оплата авторизована',
+  failed: 'оплата не прошла',
+  paid: 'оплачено',
+  pending: 'ожидает оплаты',
+  refunded: 'возврат',
 };
 
 export function OrderHistoryScreen({ navigation, route }: Props) {
   const { firstName, role } = route.params;
-  const { addFavoriteDriver, favoriteDrivers, orders } = useAppState();
-  const visibleOrders = orders.filter((order) => order.role === role);
+  const { addFavoriteDriver, currentUser, drivers, favoriteDrivers, orders } = useAppState();
+  const currentDriver =
+    role === 'driver' && currentUser
+      ? drivers.find((driver) => driver.userId === currentUser.id)
+      : undefined;
+  const visibleOrders = orders.filter((order) =>
+    role === 'driver'
+      ? order.role === role || order.driver?.id === currentDriver?.id
+      : order.role === role,
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -165,6 +182,9 @@ function OrderCard({
         </View>
         <Text style={styles.total}>{order.total} ₽</Text>
       </View>
+      <Text style={styles.paymentLine}>
+        {paymentStatusLabels[order.paymentStatus ?? 'pending']} · {order.paymentMethod}
+      </Text>
 
       {isCompleted ? (
         <View style={styles.afterTripBox}>
@@ -175,7 +195,7 @@ function OrderCard({
                 Чек {order.receipt?.id ?? `RC-${order.id.replace(/\D/g, '')}`}
               </Text>
               <Text style={styles.afterTripText}>
-                {order.paymentMethod} · {order.total} ₽ ·{' '}
+                {order.paymentMethod} · {order.total} ₽ · {order.paymentStatus === 'paid' ? 'оплачено' : 'ожидает оплаты'} ·{' '}
                 {order.receipt ? 'сформирован' : 'будет выгружен с сервера'}
               </Text>
             </View>
@@ -366,6 +386,11 @@ const styles = StyleSheet.create({
   orderId: {
     color: '#20242A',
     fontSize: 16,
+    fontWeight: '900',
+  },
+  paymentLine: {
+    color: '#146C5D',
+    fontSize: 12,
     fontWeight: '900',
   },
   page: {

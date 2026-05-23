@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   AlertCircle,
@@ -39,6 +39,7 @@ import {
   createConsentState,
   validateRegistration,
 } from '../utils/validation';
+import { validateReferralCode } from '../services/apiClient';
 import { useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Registration'>;
@@ -52,11 +53,21 @@ const roleIcons = {
 const orderedRoles: AccountRole[] = ['client', 'driver'];
 const sectionOrder = ['account', 'identity', 'legal', 'vehicle', 'business', 'payments'] as const;
 
-export function RegistrationScreen({ navigation }: Props) {
+export function RegistrationScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
   const { registerAccount, serverMessage } = useAppState();
-  const [role, setRole] = useState<AccountRole>('client');
-  const [values, setValues] = useState<FormValues>({});
+  const referralCodeFromLink = normalizeReferralCodeParam(route.params?.referralCode);
+  const roleFromLink = normalizeRoleParam(route.params?.role);
+  const [role, setRole] = useState<AccountRole>(roleFromLink);
+  const [values, setValues] = useState<FormValues>(() => {
+    const initialValues: FormValues = {};
+
+    if (referralCodeFromLink) {
+      initialValues.referralCode = referralCodeFromLink;
+    }
+
+    return initialValues;
+  });
   const [consents, setConsents] = useState<ConsentValues>(() => createConsentState());
   const [submitted, setSubmitted] = useState(false);
   const [isSavingApplication, setIsSavingApplication] = useState(false);
@@ -70,6 +81,22 @@ export function RegistrationScreen({ navigation }: Props) {
   const canSubmit = validationErrors.length === 0;
   const isWide = width >= 720;
 
+  useEffect(() => {
+    if (!referralCodeFromLink) {
+      return;
+    }
+
+    setValues((current) =>
+      current.referralCode === referralCodeFromLink
+        ? current
+        : { ...current, referralCode: referralCodeFromLink },
+    );
+  }, [referralCodeFromLink]);
+
+  useEffect(() => {
+    setRole(roleFromLink);
+  }, [roleFromLink]);
+
   const fieldsBySection = useMemo(() => {
     return sectionOrder
       .map((section) => ({
@@ -81,6 +108,7 @@ export function RegistrationScreen({ navigation }: Props) {
 
   const updateValue = (id: string, nextValue: string) => {
     setSubmitted(false);
+    setServerNotice(null);
     setValues((current) => ({ ...current, [id]: nextValue }));
   };
 
@@ -96,6 +124,31 @@ export function RegistrationScreen({ navigation }: Props) {
     }
 
     setIsSavingApplication(true);
+    setServerNotice(null);
+
+    const normalizedReferralCode = normalizeReferralCodeParam(values.referralCode);
+
+    if (normalizedReferralCode) {
+      try {
+        const referralValidation = await validateReferralCode(
+          normalizedReferralCode,
+          values.email,
+          values.phone,
+        );
+
+        if (!referralValidation.valid) {
+          setIsSavingApplication(false);
+          setServerNotice(referralValidation.error || 'Реферальный код не найден.');
+          return;
+        }
+
+        setValues((current) => ({ ...current, referralCode: referralValidation.code }));
+      } catch {
+        setIsSavingApplication(false);
+        setServerNotice('Не удалось проверить реферальный код. Проверьте backend и попробуйте еще раз.');
+        return;
+      }
+    }
 
     const user = await registerAccount({
       carBrand: values.carBrand,
@@ -106,6 +159,7 @@ export function RegistrationScreen({ navigation }: Props) {
       lastName: values.lastName,
       password: values.appPassword ?? '',
       phone: values.phone,
+      referralCode: normalizedReferralCode,
       role,
       vehicleDocumentsReady: values.vehicleDocumentsReady,
     });
@@ -189,9 +243,13 @@ export function RegistrationScreen({ navigation }: Props) {
             </InfoPanel>
 
             <InfoPanel Icon={LinkIcon} title="Инвайт-ссылка">
-              <Text style={styles.panelText}>https://links.example.com/invite/{role}</Text>
+              <Text style={styles.panelText}>
+                {referralCodeFromLink
+                  ? `Код из приглашения: ${referralCodeFromLink}`
+                  : 'https://links.example.com/invite/{code}'}
+              </Text>
               <Text style={styles.panelTextMuted}>
-                Позже этот домен подключается к Universal Links и Android App Links.
+                Ссылка открывает регистрацию и автоматически подставляет реферальный код.
               </Text>
             </InfoPanel>
           </View>
@@ -293,6 +351,17 @@ export function RegistrationScreen({ navigation }: Props) {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function normalizeReferralCodeParam(value?: string) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-ZА-Я0-9]/g, '');
+}
+
+function normalizeRoleParam(value?: AccountRole) {
+  return value === 'driver' ? 'driver' : 'client';
 }
 
 const styles = StyleSheet.create({

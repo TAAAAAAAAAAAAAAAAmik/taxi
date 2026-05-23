@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, LockKeyhole, ShieldCheck, MapPinned, ReceiptText, Wallet } from 'lucide-react-native';
+import { ArrowLeft, Gift, LockKeyhole, ShieldCheck, MapPinned, ReceiptText, Wallet } from 'lucide-react-native';
 import {
   Pressable,
   SafeAreaView,
@@ -23,23 +23,28 @@ import { useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminPanel'>;
 
+const demoAdminPassword = 'admin-demo-5000';
+
 export function AdminPanelScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const {
+    adminReferralDashboard,
     assignOrderToDriver,
     driverSubscription,
     drivers,
     orders,
     loginAdmin,
+    refreshAdminReferralDashboard,
     refreshServerData,
     serverMessage,
     serverStatus,
     supportThreads,
+    updateDriverComplianceStatus,
     updateDriverReviewStatus,
   } = useAppState();
-  const approvedDrivers = drivers.filter((driver) => driver.status === 'approved');
+  const approvedDrivers = drivers.filter((driver) => driver.canReceiveOrders);
 
   const stats = useMemo(
     () => [
@@ -71,16 +76,40 @@ export function AdminPanelScreen({ navigation }: Props) {
             ? 'Загружены из открытого адресного слоя'
             : 'Запустите импорт домов из OpenStreetMap/GAR',
       },
+      {
+        label: 'Рефералы',
+        value: String(adminReferralDashboard?.summary.referrals ?? 0),
+        helper: `${adminReferralDashboard?.summary.rewarded ?? 0} начислено, ${
+          adminReferralDashboard?.summary.walletTotal ?? 0
+        } ₽ бонусами`,
+      },
     ],
-    [approvedDrivers.length, drivers.length, orders.length, serverStatus, supportThreads.length],
+    [
+      adminReferralDashboard?.summary.referrals,
+      adminReferralDashboard?.summary.rewarded,
+      adminReferralDashboard?.summary.walletTotal,
+      approvedDrivers.length,
+      drivers.length,
+      orders.length,
+      serverStatus,
+      supportThreads.length,
+    ],
   );
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (nextPassword?: string) => {
+    const passwordToSubmit = typeof nextPassword === 'string' ? nextPassword : password;
+
     setSubmitted(true);
 
-    if (await loginAdmin(password)) {
+    if (await loginAdmin(passwordToSubmit)) {
       setUnlocked(true);
     }
+  };
+
+  const handleDemoSubmit = async () => {
+    setPassword(demoAdminPassword);
+    setSubmitted(false);
+    await handleSubmit(demoAdminPassword);
   };
 
   return (
@@ -117,7 +146,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                   setPassword(value);
                   setSubmitted(false);
                 }}
-                onSubmitEditing={handleSubmit}
+                onSubmitEditing={() => handleSubmit()}
                 placeholder="Введите личный пароль"
                 placeholderTextColor="#8A8F98"
                 secureTextEntry
@@ -131,11 +160,20 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <Pressable
               accessibilityRole="button"
-              onPress={handleSubmit}
+              onPress={() => handleSubmit()}
               style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
             >
               <ShieldCheck color="#FFFFFF" size={18} strokeWidth={2.4} />
               <Text style={styles.primaryButtonText}>Войти в админ-панель</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleDemoSubmit}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            >
+              <LockKeyhole color="#146C5D" size={18} strokeWidth={2.4} />
+              <Text style={styles.secondaryButtonText}>Демо-админ</Text>
             </Pressable>
 
             <Text style={styles.helperText}>
@@ -195,6 +233,49 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
+                <Gift color="#146C5D" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Рефералы</Text>
+              </View>
+              <Text style={styles.sectionText}>
+                Всего: {adminReferralDashboard?.summary.referrals ?? 0}. Регистрация:{' '}
+                {adminReferralDashboard?.summary.registered ?? 0}. В процессе:{' '}
+                {adminReferralDashboard?.summary.qualified ?? 0}. Начислено:{' '}
+                {adminReferralDashboard?.summary.rewarded ?? 0}.
+              </Text>
+              <Text style={styles.sectionTextMuted}>
+                Бонусных операций: {adminReferralDashboard?.summary.walletEntries ?? 0}. Сумма:{' '}
+                {adminReferralDashboard?.summary.walletTotal ?? 0} ₽.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={refreshAdminReferralDashboard}
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.secondaryButtonText}>Обновить рефералы</Text>
+              </Pressable>
+              {adminReferralDashboard?.referrals.length ? (
+                adminReferralDashboard.referrals.slice(0, 8).map((referral) => (
+                  <View key={referral.id} style={styles.orderRow}>
+                    <Text style={styles.orderTitle}>
+                      {referral.inviterName} → {referral.inviteeName}
+                    </Text>
+                    <Text style={styles.orderText}>
+                      {referral.inviteeRole === 'driver' ? 'Водитель' : 'Клиент'} · {referral.status} ·{' '}
+                      {referral.rewardAmount} ₽
+                    </Text>
+                    <Text style={styles.orderText}>
+                      Прогресс: {referral.progress?.completedOrders ?? 0}/
+                      {referral.progress?.requiredOrders ?? 0} поездок · код {referral.code}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.sectionTextMuted}>Реферальных приглашений пока нет.</Text>
+              )}
+            </View>
+
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
                 <ShieldCheck color="#146C5D" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Водители</Text>
               </View>
@@ -207,6 +288,16 @@ export function AdminPanelScreen({ navigation }: Props) {
                     {driver.phone || 'телефон не указан'} · {driver.plate || 'номер не указан'} · статус:{' '}
                     {driver.status}
                   </Text>
+                  <Text style={styles.orderText}>
+                    Допуск к заказам: {driver.canReceiveOrders ? 'открыт' : 'закрыт'}.
+                  </Text>
+                  <View style={styles.complianceGrid}>
+                    <CompliancePill label="Документы" value={driver.documentsStatus} readyValue="approved" />
+                    <CompliancePill label="Договор" value={driver.contractStatus} readyValue="signed" />
+                    <CompliancePill label="Разрешение авто" value={driver.vehiclePermitStatus} readyValue="approved" />
+                    <CompliancePill label="Реестр" value={driver.registryStatus} readyValue="active" />
+                    <CompliancePill label="Налоги" value={driver.taxProfileStatus} readyValue="approved" />
+                  </View>
                   <View style={styles.rowActions}>
                     <Pressable
                       accessibilityRole="button"
@@ -225,6 +316,36 @@ export function AdminPanelScreen({ navigation }: Props) {
                       ]}
                     >
                       <Text style={styles.dangerButtonText}>Блок</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() =>
+                        updateDriverComplianceStatus(driver.id, {
+                          contractStatus: 'signed',
+                          documentsStatus: 'approved',
+                          registryStatus: 'active',
+                          taxProfileStatus: 'approved',
+                          vehiclePermitStatus: 'approved',
+                        })
+                      }
+                      style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.smallButtonText}>Открыть допуск</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() =>
+                        updateDriverComplianceStatus(driver.id, {
+                          documentsStatus: 'rejected',
+                        })
+                      }
+                      style={({ pressed }) => [
+                        styles.smallButton,
+                        styles.dangerButton,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.dangerButtonText}>Отклонить документы</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -302,9 +423,66 @@ function PlanRow({ title, value }: PlanRowProps) {
   );
 }
 
+function CompliancePill({
+  label,
+  readyValue,
+  value,
+}: {
+  label: string;
+  readyValue: string;
+  value?: string;
+}) {
+  const isReady = value === readyValue;
+
+  return (
+    <View style={[styles.compliancePill, isReady && styles.compliancePillReady]}>
+      <Text style={[styles.complianceLabel, isReady && styles.complianceLabelReady]}>{label}</Text>
+      <Text style={[styles.complianceValue, isReady && styles.complianceValueReady]}>
+        {isReady ? 'ок' : value || 'pending'}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   adminLayout: {
     gap: 14,
+  },
+  complianceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  complianceLabel: {
+    color: '#59616C',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  complianceLabelReady: {
+    color: '#146C5D',
+  },
+  compliancePill: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 2,
+    minWidth: 104,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  compliancePillReady: {
+    backgroundColor: '#E9F4F1',
+    borderColor: '#146C5D',
+  },
+  complianceValue: {
+    color: '#20242A',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  complianceValueReady: {
+    color: '#146C5D',
   },
   dangerButton: {
     backgroundColor: '#FFF1F0',
@@ -486,6 +664,8 @@ const styles = StyleSheet.create({
     borderColor: '#146C5D',
     borderRadius: 8,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: 12,

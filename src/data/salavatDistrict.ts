@@ -54,6 +54,7 @@ export type SalavatRoutePreset = {
   pickup: string;
   destination: string;
   subtitle: string;
+  estimatedDistanceKm: number;
   estimatedTime: string;
 };
 
@@ -229,6 +230,24 @@ const fixedDistrictPoints: SalavatAddressSuggestion[] = [
 const generatedHouseSuggestions = salavatDistrictHouses.map(houseRecordToSuggestion);
 const generatedStreetSuggestions = salavatDistrictStreets.map(streetRecordToSuggestion);
 
+export const salavatDistrictCoverageSummary = {
+  settlements: salavatDistrictSettlements.length,
+  streets: salavatDistrictStreetSourceSummary.streets,
+  houses: salavatDistrictHouseSourceSummary.houses,
+  poi: fixedDistrictPoints.length,
+  suggestions:
+    fixedDistrictPoints.length + generatedHouseSuggestions.length + generatedStreetSuggestions.length,
+  sources: {
+    gar: salavatDistrictHouseSourceSummary.garHouses + salavatDistrictStreetSourceSummary.garStreets,
+    osm: salavatDistrictHouseSourceSummary.osmHouses + salavatDistrictStreetSourceSummary.osmStreets,
+    manualPoi: fixedDistrictPoints.length,
+  },
+  generatedAt: {
+    houses: salavatDistrictHouseSourceSummary.generatedAt,
+    streets: salavatDistrictStreetSourceSummary.generatedAt,
+  },
+} as const;
+
 export const salavatAddressSuggestions: SalavatAddressSuggestion[] = [
   ...fixedDistrictPoints,
   ...generatedHouseSuggestions,
@@ -242,6 +261,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Санаторий Янгантау, с. Янгантау',
     subtitle: 'Самый понятный курортный маршрут района',
+    estimatedDistanceKm: 17.5,
     estimatedTime: '25-35 мин',
   },
   {
@@ -250,6 +270,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Санаторий Янгантау, с. Янгантау',
     destination: 'Источник Кургазак, д. Комсомол',
     subtitle: 'Короткая поездка к источнику',
+    estimatedDistanceKm: 5.2,
     estimatedTime: '10-15 мин',
   },
   {
@@ -258,6 +279,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Источник Кургазак, д. Комсомол',
     subtitle: 'Маршрут для гостей района',
+    estimatedDistanceKm: 19.5,
     estimatedTime: '25-35 мин',
   },
   {
@@ -266,6 +288,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Мурсалимкино, железнодорожная станция',
     subtitle: 'Связь с железнодорожной точкой',
+    estimatedDistanceKm: 31,
     estimatedTime: '35-50 мин',
   },
   {
@@ -274,6 +297,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Центр Аркаулово, с. Аркаулово',
     subtitle: 'Сельский маршрут внутри района',
+    estimatedDistanceKm: 22,
     estimatedTime: '25-40 мин',
   },
   {
@@ -282,6 +306,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Центр Лаклы, с. Лаклы',
     subtitle: 'Маршрут к южной части района',
+    estimatedDistanceKm: 34,
     estimatedTime: '35-55 мин',
   },
   {
@@ -290,6 +315,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'д. Идрисово',
     subtitle: 'Направление к природным точкам Юрюзани',
+    estimatedDistanceKm: 24,
     estimatedTime: '25-40 мин',
   },
   {
@@ -298,6 +324,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Салаватская центральная районная больница, с. Малояз',
     destination: 'Санаторий Янгантау, с. Янгантау',
     subtitle: 'Медицинский и курортный маршрут',
+    estimatedDistanceKm: 18,
     estimatedTime: '25-35 мин',
   },
 ];

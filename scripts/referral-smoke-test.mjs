@@ -1,0 +1,288 @@
+import { spawn } from 'node:child_process';
+import { rm } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+const port = Number(process.env.REFERRAL_SMOKE_PORT || 3310);
+const baseUrl = `http://localhost:${port}`;
+const dbPath = resolve(process.cwd(), '.data/referral-smoke-db.json');
+
+let backend;
+
+try {
+  await rm(dbPath, { force: true });
+  backend = spawn(process.execPath, ['scripts/mvp-backend.mjs'], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      MVP_ADMIN_PASSWORD: 'smoke-admin',
+      MVP_DB_PATH: dbPath,
+      MVP_INVITE_BASE_URL: 'https://links.example.com/invite',
+      PORT: String(port),
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  backend.stderr.on('data', (chunk) => {
+    process.stderr.write(chunk);
+  });
+
+  await waitForBackend();
+
+  const stamp = Date.now();
+  const inviter = await register({
+    email: `inviter-${stamp}@example.test`,
+    firstName: 'Smoke',
+    lastName: 'Inviter',
+    password: 'password-1',
+    phone: `+7900${String(stamp).slice(-7)}`,
+    role: 'client',
+  });
+  const inviterDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
+    token: inviter.session.token,
+  });
+  const code = inviterDashboard.referralCode;
+
+  assert(code, 'Inviter referral code was not created');
+  assert(
+    inviterDashboard.inviteUrls?.client?.includes('role=client'),
+    'Client invite URL should include role=client',
+  );
+  assert(
+    inviterDashboard.inviteUrls?.driver?.includes('role=driver'),
+    'Driver invite URL should include role=driver',
+  );
+
+  const validation = await api(`/referrals/validate?code=${encodeURIComponent(code)}`);
+  assert(validation.valid, 'Referral code validation failed');
+
+  const invitedClient = await register({
+    email: `client-${stamp}@example.test`,
+    firstName: 'Smoke',
+    lastName: 'Client',
+    password: 'password-1',
+    phone: `+7910${String(stamp).slice(-7)}`,
+    referralCode: code,
+    role: 'client',
+  });
+  const invitedClientDashboard = await api(`/referrals?userId=${invitedClient.user.id}`, {
+    token: invitedClient.session.token,
+  });
+
+  assert(
+    invitedClientDashboard.bonusBalance === 300,
+    `Invited client should receive 300 bonus, got ${invitedClientDashboard.bonusBalance}`,
+  );
+
+  for (let index = 0; index < 5; index += 1) {
+    await completeClientOrder(invitedClient.user.id, index);
+  }
+
+  const rewardedClientDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
+    token: inviter.session.token,
+  });
+  const clientReferral = rewardedClientDashboard.referrals.find(
+    (referral) => referral.inviteeUserId === invitedClient.user.id,
+  );
+
+  assert(clientReferral?.status === 'rewarded', 'Client referral should be rewarded after 5 trips');
+  assert(
+    rewardedClientDashboard.bonusBalance >= 60,
+    `Inviter client reward should be at least 60, got ${rewardedClientDashboard.bonusBalance}`,
+  );
+
+  const invitedDriver = await register({
+    carBrand: 'Lada',
+    carModel: 'Vesta',
+    carPlate: 'A001AA102',
+    email: `driver-${stamp}@example.test`,
+    firstName: 'Smoke',
+    lastName: 'Driver',
+    password: 'password-1',
+    phone: `+7920${String(stamp).slice(-7)}`,
+    referralCode: code,
+    role: 'driver',
+    vehicleDocumentsReady: 'yes',
+  });
+  const drivers = await api('/drivers');
+  const driver = drivers.drivers.find((item) => item.userId === invitedDriver.user.id);
+
+  assert(driver, 'Driver profile was not created from invited driver registration');
+  const approvedDriver = await api(`/drivers/${encodeURIComponent(driver.id)}/status`, {
+    body: { status: 'approved' },
+    method: 'PATCH',
+  });
+
+  assert(
+    approvedDriver.driver.subscriptionStatus === 'active',
+    'Invited driver should receive trial access after approval',
+  );
+  assert(
+    approvedDriver.driver.canReceiveOrders === false,
+    'Approved invited driver should still wait for compliance before orders',
+  );
+
+  const blockedOrder = await createOrder({
+    destination: 'Blocked driver destination',
+    paymentMethod: 'cash',
+    pickup: 'Blocked driver pickup',
+    role: 'client',
+    tariff: 'economy',
+    total: 100,
+  });
+  await expectApiFailure(`/orders/${encodeURIComponent(blockedOrder.id)}/assign`, {
+    body: { driverId: driver.id, status: 'accepted' },
+    method: 'PATCH',
+  });
+
+  const compliantDriver = await api(`/drivers/${encodeURIComponent(driver.id)}/compliance`, {
+    body: {
+      contractStatus: 'signed',
+      documentsStatus: 'approved',
+      registryStatus: 'active',
+      taxProfileStatus: 'approved',
+      vehiclePermitStatus: 'approved',
+    },
+    method: 'PATCH',
+  });
+
+  assert(
+    compliantDriver.driver.canReceiveOrders === true,
+    'Driver should receive orders after compliance is completed',
+  );
+
+  for (let index = 0; index < 10; index += 1) {
+    await completeDriverOrder(driver.id, index);
+  }
+
+  const finalDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
+    token: inviter.session.token,
+  });
+  const driverReferral = finalDashboard.referrals.find(
+    (referral) => referral.inviteeUserId === invitedDriver.user.id,
+  );
+
+  assert(driverReferral?.status === 'rewarded', 'Driver referral should be rewarded after 10 orders');
+  assert(
+    finalDashboard.bonusBalance >= 360,
+    `Inviter total reward should be at least 360, got ${finalDashboard.bonusBalance}`,
+  );
+
+  console.log('Referral smoke test passed');
+} finally {
+  if (backend) {
+    backend.kill();
+  }
+
+  await rm(dbPath, { force: true });
+}
+
+async function register(body) {
+  return api('/auth/register', {
+    body,
+    method: 'POST',
+  });
+}
+
+async function completeClientOrder(userId, index) {
+  const order = await createOrder({
+    destination: `Client destination ${index}`,
+    paymentMethod: 'cash',
+    pickup: `Client pickup ${index}`,
+    role: 'client',
+    tariff: 'economy',
+    total: 100,
+    userId,
+  });
+
+  await api(`/orders/${encodeURIComponent(order.id)}/status`, {
+    body: { status: 'completed' },
+    method: 'PATCH',
+  });
+  await delay(5);
+}
+
+async function completeDriverOrder(driverId, index) {
+  const order = await createOrder({
+    destination: `Driver destination ${index}`,
+    paymentMethod: 'cash',
+    pickup: `Driver pickup ${index}`,
+    role: 'client',
+    tariff: 'economy',
+    total: 100,
+  });
+
+  await api(`/orders/${encodeURIComponent(order.id)}/assign`, {
+    body: { driverId, status: 'accepted' },
+    method: 'PATCH',
+  });
+  await api(`/orders/${encodeURIComponent(order.id)}/status`, {
+    body: { status: 'completed' },
+    method: 'PATCH',
+  });
+  await delay(5);
+}
+
+async function createOrder(body) {
+  const response = await api('/orders', {
+    body,
+    method: 'POST',
+  });
+
+  return response.order;
+}
+
+async function waitForBackend() {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < 5000) {
+    try {
+      await api('/health');
+      return;
+    } catch {
+      await delay(100);
+    }
+  }
+
+  throw new Error('Backend did not start in time');
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: options.method || 'GET',
+    headers: {
+      ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+      accept: 'application/json',
+      'content-type': 'application/json',
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(payload?.error || `Request failed: ${response.status} ${path}`);
+  }
+
+  return payload;
+}
+
+async function expectApiFailure(path, options = {}) {
+  try {
+    await api(path, options);
+  } catch {
+    return;
+  }
+
+  throw new Error(`Request should have failed: ${path}`);
+}
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function delay(ms) {
+  return new Promise((resolveDelay) => {
+    setTimeout(resolveDelay, ms);
+  });
+}

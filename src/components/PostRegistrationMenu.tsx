@@ -39,7 +39,9 @@ type PostRegistrationMenuProps = {
   role: AccountRole;
   firstName?: string;
   availableCarsCount?: number;
+  driverStats?: DriverStatsSummary;
   driverLine?: {
+    accessBlockers?: string[];
     canToggle: boolean;
     isOnline: boolean;
     status: string;
@@ -48,9 +50,21 @@ type PostRegistrationMenuProps = {
   onToggleDriverLine?: () => void;
   onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
+  onOpenReferral: () => void;
   onOpenSavedPlace: () => void;
   onOpenSubscription: () => void;
   onOpenSupportChat: () => void;
+};
+
+export type DriverStatsSummary = {
+  todayOrders: number;
+  weekOrders: number;
+  monthOrders: number;
+  gross: number;
+  commission: number;
+  subscriptionCost: number;
+  payout: number;
+  billingMode: 'monthly' | 'commission';
 };
 
 const iconMap: Record<MenuIconName, ComponentType<LucideProps>> = {
@@ -71,12 +85,14 @@ const iconMap: Record<MenuIconName, ComponentType<LucideProps>> = {
 
 export function PostRegistrationMenu({
   availableCarsCount = 0,
+  driverStats,
   driverLine,
   firstName,
   onBackToRegistration,
   onToggleDriverLine,
   onOpenOrderHistory,
   onOpenOrderFlow,
+  onOpenReferral,
   onOpenSavedPlace,
   onOpenSubscription,
   onOpenSupportChat,
@@ -110,6 +126,11 @@ export function PostRegistrationMenu({
 
     if (target === 'subscription') {
       onOpenSubscription();
+      return;
+    }
+
+    if (target === 'referral') {
+      onOpenReferral();
       return;
     }
 
@@ -201,9 +222,11 @@ export function PostRegistrationMenu({
                 <Car color="#FFFFFF" size={28} strokeWidth={2.5} />
               </View>
               <View style={styles.availableCarsCopy}>
-                <Text style={styles.availableCarsLabel}>Доступно машин</Text>
+                <Text style={styles.availableCarsLabel}>Машин доступно сейчас</Text>
                 <Text style={styles.availableCarsValue}>{availableCarsCount}</Text>
-                <Text style={styles.availableCarsHint}>Нажмите, чтобы заказать поездку</Text>
+                <Text style={styles.availableCarsHint}>
+                  Сейчас в зоне Салаватского района
+                </Text>
               </View>
             </Pressable>
           ) : null}
@@ -247,7 +270,7 @@ export function PostRegistrationMenu({
                     driverLine?.isOnline && styles.driverLineTextOnline,
                   ]}
                 >
-                  {driverLine?.isOnline ? 'На линии' : 'Не на линии'}
+                  {driverLine?.isOnline ? 'Работаю' : 'Не работаю'}
                 </Text>
                 <Text
                   style={[
@@ -257,13 +280,26 @@ export function PostRegistrationMenu({
                 >
                   {driverLine?.canToggle
                     ? driverLine.isOnline
-                      ? 'Нажмите, чтобы уйти с линии'
-                      : 'Нажмите, чтобы выйти на линию'
+                      ? 'Нажмите, чтобы завершить смену'
+                      : 'Нажмите, чтобы начать смену'
                     : `Доступ: ${driverLine?.status ?? 'нужен допуск'}`}
                 </Text>
               </View>
             </Pressable>
           ) : null}
+
+          {role === 'driver' && driverLine ? (
+            <View style={styles.accessPanel}>
+              <Text style={styles.accessTitle}>Документы и допуск</Text>
+              <Text style={styles.accessText}>
+                {driverLine.canToggle
+                  ? 'Проверка завершена, можно выходить на линию.'
+                  : `Не закрыто: ${formatDriverBlockers(driverLine.accessBlockers ?? [])}`}
+              </Text>
+            </View>
+          ) : null}
+
+          {role === 'driver' && driverStats ? <DriverStatsCard stats={driverStats} /> : null}
 
           <View style={styles.menuList}>
             {config.menuItems.map((item) => (
@@ -280,6 +316,7 @@ export function PostRegistrationMenu({
         <View style={styles.main}>
           <SectionPageView
             appTitle={config.title}
+            driverStats={activeItem.id === 'payouts' ? driverStats : undefined}
             onActionTarget={handleActionTarget}
             page={activePage}
           />
@@ -348,11 +385,12 @@ function QuickActionCard({ action, onActionTarget }: QuickActionCardProps) {
 
 type SectionPageViewProps = {
   appTitle: string;
+  driverStats?: DriverStatsSummary;
   onActionTarget: (target?: MenuActionTarget) => void;
   page: SectionPage;
 };
 
-function SectionPageView({ appTitle, onActionTarget, page }: SectionPageViewProps) {
+function SectionPageView({ appTitle, driverStats, onActionTarget, page }: SectionPageViewProps) {
   const Icon = iconMap[page.icon];
 
   return (
@@ -382,6 +420,8 @@ function SectionPageView({ appTitle, onActionTarget, page }: SectionPageViewProp
           </View>
         ))}
       </View>
+
+      {driverStats ? <DriverStatsPanel stats={driverStats} /> : null}
 
       <View style={styles.statusPanel}>
         <Text style={styles.statusTitle}>{page.statusTitle}</Text>
@@ -431,6 +471,61 @@ function SectionPageView({ appTitle, onActionTarget, page }: SectionPageViewProp
   );
 }
 
+function DriverStatsCard({ stats }: { stats: DriverStatsSummary }) {
+  return (
+    <View style={styles.driverStatsCard}>
+      <Text style={styles.driverStatsTitle}>Статистика месяца</Text>
+      <View style={styles.driverStatsRows}>
+        <MiniStat label="Заказы" value={String(stats.monthOrders)} />
+        <MiniStat label="Заработано" value={`${stats.gross} ₽`} />
+        <MiniStat
+          label={stats.billingMode === 'commission' ? 'К удержанию' : 'Подписка'}
+          value={`${stats.billingMode === 'commission' ? stats.commission : stats.subscriptionCost} ₽`}
+        />
+      </View>
+      <Text style={styles.driverStatsHint}>К выплате: {stats.payout} ₽</Text>
+    </View>
+  );
+}
+
+function DriverStatsPanel({ stats }: { stats: DriverStatsSummary }) {
+  return (
+    <View style={styles.financePanel}>
+      <Text style={styles.panelTitle}>Доход и удержания</Text>
+      <Text style={styles.panelSubtitle}>
+        Считаем завершенные заказы текущего водителя. При модели 12% удержание считается с
+        поездок, при месячном доступе комиссия с заказов равна нулю.
+      </Text>
+      <View style={styles.metricsGrid}>
+        <MiniMetric label="Сегодня" value={`${stats.todayOrders} заказов`} />
+        <MiniMetric label="Неделя" value={`${stats.weekOrders} заказов`} />
+        <MiniMetric label="Месяц" value={`${stats.monthOrders} заказов`} />
+        <MiniMetric label="Заработано" value={`${stats.gross} ₽`} />
+        <MiniMetric label="Комиссия" value={`${stats.commission} ₽`} />
+        <MiniMetric label="К выплате" value={`${stats.payout} ₽`} />
+      </View>
+    </View>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.miniStat}>
+      <Text style={styles.miniStatLabel}>{label}</Text>
+      <Text style={styles.miniStatValue}>{value}</Text>
+    </View>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metricCard}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
+    </View>
+  );
+}
+
 type SectionDataRowProps = {
   row: SectionRow;
 };
@@ -450,11 +545,47 @@ function SectionDataRow({ row }: SectionDataRowProps) {
   );
 }
 
+function formatDriverBlockers(blockers: string[]) {
+  if (!blockers.length) {
+    return 'проверка допуска';
+  }
+
+  const labels: Record<string, string> = {
+    contract: 'договор',
+    documents: 'документы',
+    driver_review: 'проверка анкеты',
+    paid_access: 'доступ к заказам',
+    registry: 'реестр такси',
+    tax_profile: 'налоговый профиль',
+    vehicle_permit: 'разрешение авто',
+  };
+
+  return blockers.map((blocker) => labels[blocker] ?? blocker).join(', ');
+}
+
 const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  accessPanel: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 5,
+    padding: 12,
+  },
+  accessText: {
+    color: '#59616C',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  accessTitle: {
+    color: '#20242A',
+    fontSize: 13,
+    fontWeight: '900',
   },
   appMeta: {
     color: '#59616C',
@@ -613,6 +744,35 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 34,
   },
+  driverStatsCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+  },
+  driverStatsHint: {
+    color: '#146C5D',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  driverStatsRows: {
+    gap: 8,
+  },
+  driverStatsTitle: {
+    color: '#20242A',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  financePanel: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#C5DDD7',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 16,
+  },
   heroCopy: {
     flex: 1,
     gap: 6,
@@ -747,6 +907,28 @@ const styles = StyleSheet.create({
     color: '#20242A',
     fontSize: 22,
     fontWeight: '900',
+  },
+  miniStat: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAF9',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    padding: 10,
+  },
+  miniStatLabel: {
+    color: '#59616C',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  miniStatValue: {
+    color: '#20242A',
+    fontSize: 14,
+    fontWeight: '900',
+    textAlign: 'right',
   },
   notePanel: {
     alignItems: 'flex-start',

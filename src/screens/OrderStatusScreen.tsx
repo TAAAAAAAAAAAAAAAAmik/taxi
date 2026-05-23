@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
@@ -32,23 +32,34 @@ import { orderStatusConfig } from '../data/orderStatus';
 import { roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { useAppState } from '../state/AppState';
-import type { OrderParticipant } from '../state/AppState';
+import type { AppOrder, OrderParticipant, PaymentStatus } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OrderStatus'>;
 
 const reviewMoods = ['Спокойно', 'Быстро', 'Аккуратно', 'По-доброму'];
 const reviewFacetOptions = ['Подача', 'Чистота', 'Маршрут', 'Общение', 'Безопасность'];
+const paymentStatusLabels: Record<PaymentStatus, string> = {
+  authorized: 'Оплата авторизована',
+  failed: 'Оплата не прошла',
+  paid: 'Оплачено',
+  pending: 'Ожидает оплаты',
+  refunded: 'Возврат',
+};
 
 export function OrderStatusScreen({ navigation, route }: Props) {
   const { firstName, order, role } = route.params;
   const config = orderStatusConfig[role];
-  const { addFavoriteDriver, addOrderReview, orders, updateOrderStatus } = useAppState();
+  const {
+    addFavoriteDriver,
+    addOrderReview,
+    orders,
+    refreshServerData,
+    updateOrderPaymentStatus,
+    updateOrderStatus,
+  } = useAppState();
   const { width } = useWindowDimensions();
   const isWide = width >= 840;
-  const initialStepIndex = Math.max(
-    config.steps.findIndex((step) => step.id === (order as { status?: string }).status),
-    0,
-  );
+  const initialStepIndex = getStepIndex(config.steps, (order as { status?: string }).status);
   const [activeStepIndex, setActiveStepIndex] = useState(initialStepIndex);
   const [contactOpen, setContactOpen] = useState(false);
   const [contactResult, setContactResult] = useState<string | null>(null);
@@ -61,6 +72,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const activeStep = config.steps[activeStepIndex];
   const isCompleted = activeStepIndex === config.steps.length - 1;
   const currentOrder = orders.find((item) => item.id === order.id);
+  const displayedOrder = (currentOrder ?? order) as AppOrder;
   const routeDriver = (order as typeof order & { driver?: OrderParticipant }).driver;
   const driver = currentOrder?.driver ?? routeDriver ?? {
     id: 'driver-alexey-solaris',
@@ -84,17 +96,39 @@ export function OrderStatusScreen({ navigation, route }: Props) {
           .join(' · ') || config.participantMeta
       : config.participantMeta;
   const existingReview = currentOrder?.review;
+  const liveStatus = currentOrder?.status ?? (order as { status?: string }).status;
+  const paymentStatus = displayedOrder.paymentStatus ?? 'pending';
+  const isPaid = paymentStatus === 'paid';
+  const paymentEvent = displayedOrder.paymentEvents?.[0];
   const progress = useMemo(
     () => Math.round(((activeStepIndex + 1) / config.steps.length) * 100),
     [activeStepIndex, config.steps.length],
   );
+  const primaryActionLabel = getPrimaryActionLabel(role, activeStep.id, config.primaryAction);
 
-  const advance = () => {
+  useEffect(() => {
+    setActiveStepIndex(getStepIndex(config.steps, liveStatus));
+  }, [config.steps, liveStatus]);
+
+  const advance = async () => {
+    if (role === 'client') {
+      await refreshServerData();
+      return;
+    }
+
     setActiveStepIndex((current) => {
       const nextIndex = Math.min(current + 1, config.steps.length - 1);
       updateOrderStatus(order.id, config.steps[nextIndex].id);
       return nextIndex;
     });
+  };
+
+  const confirmPayment = async () => {
+    await updateOrderPaymentStatus(
+      order.id,
+      'paid',
+      role === 'driver' ? 'Водитель подтвердил оплату в MVP' : 'Клиент выполнил демо-оплату',
+    );
   };
 
   const chooseContact = async (mode: 'call' | 'chat') => {
@@ -207,7 +241,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                   ]}
                 >
                   <Text style={styles.primaryButtonText}>
-                    {isCompleted ? 'Статус завершен' : config.primaryAction}
+                    {isCompleted ? 'Статус завершен' : primaryActionLabel}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -382,13 +416,13 @@ export function OrderStatusScreen({ navigation, route }: Props) {
           <View style={[styles.sideColumn, isWide && styles.sideColumnWide]}>
             <View style={styles.panel}>
               <SectionHeader title="Маршрут" />
-              <InfoRow icon={<MapPinned color="#146C5D" size={18} />} label="Подача" value={order.pickup} />
+              <InfoRow icon={<MapPinned color="#146C5D" size={18} />} label="Подача" value={displayedOrder.pickup} />
               <InfoRow
                 icon={<Route color="#146C5D" size={18} />}
                 label="Назначение"
-                value={order.destination}
+                value={displayedOrder.destination}
               />
-              <InfoRow icon={<Clock3 color="#146C5D" size={18} />} label="Тариф" value={order.tariff} />
+              <InfoRow icon={<Clock3 color="#146C5D" size={18} />} label="Тариф" value={displayedOrder.tariff} />
             </View>
 
             <View style={styles.panel}>
@@ -440,17 +474,59 @@ export function OrderStatusScreen({ navigation, route }: Props) {
 
             <View style={styles.panel}>
               <SectionHeader title="Оплата и детали" />
+              <View style={[styles.paymentStatusBox, isPaid && styles.paymentStatusBoxPaid]}>
+                <View style={styles.paymentStatusTop}>
+                  <CreditCard color={isPaid ? '#146C5D' : '#B7791F'} size={18} strokeWidth={2.4} />
+                  <Text style={styles.paymentStatusTitle}>{paymentStatusLabels[paymentStatus]}</Text>
+                </View>
+                <Text style={styles.paymentStatusText}>
+                  {isPaid
+                    ? `Оплата закрыта${
+                        displayedOrder.paidAt ? `: ${new Date(displayedOrder.paidAt).toLocaleString('ru-RU')}` : ''
+                      }.`
+                    : paymentStatus === 'authorized'
+                    ? 'Средства авторизованы в MVP. После завершения поездки оплата закроется автоматически.'
+                    : 'Оплата ожидает подтверждения. Для демо можно закрыть ее вручную.'}
+                </Text>
+                {paymentEvent?.note ? <Text style={styles.paymentStatusText}>{paymentEvent.note}</Text> : null}
+                {!isPaid ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={confirmPayment}
+                    style={({ pressed }) => [styles.paymentActionButton, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.paymentActionButtonText}>
+                      {role === 'driver' ? 'Подтвердить оплату' : 'Оплатить демо'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
               <InfoRow
                 icon={<CreditCard color="#146C5D" size={18} />}
                 label="Способ"
-                value={order.paymentMethod}
+                value={displayedOrder.paymentMethod}
               />
-              <InfoRow icon={<ReceiptText color="#146C5D" size={18} />} label="Сумма" value={`${order.total} ₽`} />
+              <InfoRow icon={<ReceiptText color="#146C5D" size={18} />} label="Сумма" value={`${displayedOrder.total} ₽`} />
               <InfoRow
                 icon={<ShieldCheck color="#146C5D" size={18} />}
                 label="Опции"
-                value={order.options.length > 0 ? order.options.join(', ') : 'Без дополнительных опций'}
+                value={displayedOrder.options.length > 0 ? displayedOrder.options.join(', ') : 'Без дополнительных опций'}
               />
+              {displayedOrder.receipt ? (
+                <View style={styles.receiptBox}>
+                  <Text style={styles.receiptTitle}>Чек {displayedOrder.receipt.id}</Text>
+                  <Text style={styles.receiptText}>
+                    {displayedOrder.receipt.fiscalNumber || 'MVP-фискальный номер'} ·{' '}
+                    {new Date(displayedOrder.receipt.issuedAt).toLocaleString('ru-RU')}
+                  </Text>
+                  {(displayedOrder.receipt.items ?? []).map((item) => (
+                    <View key={`${item.label}-${item.amount}`} style={styles.receiptLine}>
+                      <Text style={styles.receiptText}>{item.label}</Text>
+                      <Text style={styles.receiptValue}>{item.amount} ₽</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
               <View style={styles.detailList}>
                 {config.details.map((detail) => (
                   <View key={detail} style={styles.detailItem}>
@@ -510,6 +586,50 @@ function MiniAction({ icon, label, onPress }: MiniActionProps) {
       <Text style={styles.miniActionText}>{label}</Text>
     </Pressable>
   );
+}
+
+function getStepIndex(steps: Array<{ id: string }>, status?: string) {
+  const normalizedStatus = normalizeOrderStatus(status);
+  return Math.max(
+    steps.findIndex((step) => step.id === normalizedStatus),
+    0,
+  );
+}
+
+function normalizeOrderStatus(status?: string) {
+  if (status === 'assigned') {
+    return 'accepted';
+  }
+
+  if (status === 'arriving' || status === 'to_pickup') {
+    return 'accepted';
+  }
+
+  if (status === 'in_progress') {
+    return 'started';
+  }
+
+  return status;
+}
+
+function getPrimaryActionLabel(role: string, status: string, fallback: string) {
+  if (role === 'client') {
+    return 'Обновить статус';
+  }
+
+  if (status === 'accepted') {
+    return 'Я на месте';
+  }
+
+  if (status === 'arrived') {
+    return 'Начать поездку';
+  }
+
+  if (status === 'started') {
+    return 'Завершить поездку';
+  }
+
+  return fallback;
 }
 
 const styles = StyleSheet.create({
@@ -699,6 +819,48 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 16,
   },
+  paymentActionButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#146C5D',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: 12,
+  },
+  paymentActionButtonText: {
+    color: '#146C5D',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  paymentStatusBox: {
+    backgroundColor: '#FFF3E5',
+    borderColor: '#F3C38A',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  paymentStatusBoxPaid: {
+    backgroundColor: '#EAF6EA',
+    borderColor: '#B9DDBB',
+  },
+  paymentStatusText: {
+    color: '#59616C',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  paymentStatusTitle: {
+    color: '#20242A',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  paymentStatusTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
   participant: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -761,6 +923,36 @@ const styles = StyleSheet.create({
     borderRadius: 99,
     height: 9,
     overflow: 'hidden',
+  },
+  receiptBox: {
+    backgroundColor: '#F8FAF9',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 7,
+    padding: 12,
+  },
+  receiptLine: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  receiptText: {
+    color: '#59616C',
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  receiptTitle: {
+    color: '#20242A',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  receiptValue: {
+    color: '#20242A',
+    fontSize: 12,
+    fontWeight: '900',
   },
   ratingRow: {
     alignItems: 'center',
