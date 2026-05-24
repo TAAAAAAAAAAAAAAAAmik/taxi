@@ -1,9 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, CreditCard, Percent, WalletCards } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CreditCard,
+  Percent,
+  ReceiptText,
+  RotateCcw,
+  WalletCards,
+} from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { DriverBillingMode, driverAccessPlans } from '../data/subscription';
+import {
+  DriverBillingMode,
+  DriverSubscriptionPayment,
+  driverAccessPlans,
+} from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
 import { useAppState } from '../state/AppState';
 
@@ -11,18 +23,39 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 
 export function SubscriptionScreen({ navigation, route }: Props) {
   const { firstName, role } = route.params;
-  const { activateDriverSubscription, driverSubscription } = useAppState();
+  const {
+    driverPayments,
+    driverSubscription,
+    payDriverSubscription,
+    refundDriverSubscriptionPayment,
+    serverMessage,
+  } = useAppState();
   const [selectedMode, setSelectedMode] = useState<DriverBillingMode>(driverSubscription.billingMode);
+  const [busy, setBusy] = useState(false);
+  const [refundBusyId, setRefundBusyId] = useState<string | undefined>();
   const selectedPlan = driverAccessPlans[selectedMode];
   const isActive = driverSubscription.status === 'active';
+  const paidPayments = useMemo(
+    () => driverPayments.filter((payment) => payment.status === 'paid'),
+    [driverPayments],
+  );
+  const lastRefundablePayment = paidPayments.find((payment) => payment.amount > 0);
 
-  const confirmPlan = () => {
-    if (!isActive || driverSubscription.billingMode !== selectedMode) {
-      activateDriverSubscription(selectedMode);
+  const confirmPlan = async () => {
+    if (isActive && driverSubscription.billingMode === selectedMode) {
+      navigation.navigate('OrderFlow', { firstName, role });
       return;
     }
 
-    navigation.navigate('OrderFlow', { firstName, role });
+    setBusy(true);
+    await payDriverSubscription(selectedMode);
+    setBusy(false);
+  };
+
+  const refundPayment = async (paymentId: string) => {
+    setRefundBusyId(paymentId);
+    await refundDriverSubscriptionPayment(paymentId, 'Возврат водителю из экрана подписки');
+    setRefundBusyId(undefined);
   };
 
   return (
@@ -44,11 +77,21 @@ export function SubscriptionScreen({ navigation, route }: Props) {
           <View style={styles.heroCopy}>
             <Text style={styles.title}>Оплата доступа водителя</Text>
             <Text style={styles.subtitle}>
-              Выберите: платить каждый месяц по 5000 ₽ и ездить без комиссии или работать без
-              оплаты заранее и отдавать 12% с каждой выполненной поездки.
+              Выберите месячный доступ или комиссию с поездок. Backend сохраняет платеж,
+              продление, возврат, историю и чек подписки.
             </Text>
             <Text style={styles.metaLine}>{firstName?.trim() || 'Водитель-партнер'}</Text>
           </View>
+        </View>
+
+        <View style={styles.statusGrid}>
+          <StatusCard
+            label="Статус"
+            value={formatAccessStatus(driverSubscription.status)}
+            helper={driverSubscription.expiresAt ? `До ${formatDate(driverSubscription.expiresAt)}` : 'Без даты окончания'}
+          />
+          <StatusCard label="Модель" value={driverSubscription.planName} helper={formatPlanCost(driverSubscription.billingMode)} />
+          <StatusCard label="Платежи" value={String(driverPayments.length)} helper="Операции доступа" />
         </View>
 
         <View style={styles.card}>
@@ -75,32 +118,54 @@ export function SubscriptionScreen({ navigation, route }: Props) {
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Выбрано: {selectedPlan.shortName}</Text>
             <Text style={styles.summaryText}>{selectedPlan.description}</Text>
-            <Text style={styles.summaryText}>
-              Текущий статус: {driverSubscription.status}. Активная модель:{' '}
-              {driverSubscription.planName}.
-            </Text>
+            <Text style={styles.summaryText}>{serverMessage}</Text>
           </View>
 
           <Pressable
             accessibilityRole="button"
+            disabled={busy}
             onPress={confirmPlan}
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              busy && styles.disabledButton,
+              pressed && styles.pressed,
+            ]}
           >
             <CreditCard color="#FFFFFF" size={18} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>
-              {isActive && driverSubscription.billingMode === selectedMode
+              {busy
+                ? 'Проводим операцию'
+                : isActive && driverSubscription.billingMode === selectedMode
                 ? 'Перейти к заказам'
                 : selectedPlan.primaryAction}
             </Text>
           </Pressable>
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.navigate('OrderFlow', { firstName, role })}
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.secondaryButtonText}>Перейти к заказам</Text>
-          </Pressable>
+          {lastRefundablePayment ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={refundBusyId === lastRefundablePayment.id}
+              onPress={() => refundPayment(lastRefundablePayment.id)}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            >
+              <RotateCcw color="#A33B2E" size={17} strokeWidth={2.4} />
+              <Text style={styles.refundButtonText}>
+                {refundBusyId === lastRefundablePayment.id ? 'Возвращаем платеж' : 'Вернуть последний платеж'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <ReceiptText color="#146C5D" size={20} strokeWidth={2.4} />
+            <Text style={styles.sectionTitle}>История платежей и чеки</Text>
+          </View>
+          {driverPayments.length > 0 ? (
+            driverPayments.map((payment) => <PaymentRow key={payment.id} payment={payment} />)
+          ) : (
+            <Text style={styles.emptyText}>Платежей пока нет. После оплаты здесь появится операция и чек.</Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -136,6 +201,97 @@ function PlanChoice({ active, headline, icon, onPress, text, title }: PlanChoice
   );
 }
 
+function StatusCard({ helper, label, value }: { helper: string; label: string; value: string }) {
+  return (
+    <View style={styles.statusCard}>
+      <Text style={styles.statusLabel}>{label}</Text>
+      <Text style={styles.statusValue}>{value}</Text>
+      <Text style={styles.statusHelper}>{helper}</Text>
+    </View>
+  );
+}
+
+function PaymentRow({ payment }: { payment: DriverSubscriptionPayment }) {
+  const isRefunded = payment.status === 'refunded';
+  const receipt = payment.refundReceipt ?? payment.receipt;
+
+  return (
+    <View style={styles.paymentRow}>
+      <View style={styles.paymentIcon}>
+        {isRefunded ? (
+          <RotateCcw color="#A33B2E" size={18} strokeWidth={2.4} />
+        ) : (
+          <CheckCircle2 color="#146C5D" size={18} strokeWidth={2.4} />
+        )}
+      </View>
+      <View style={styles.paymentCopy}>
+        <Text style={styles.paymentTitle}>
+          {payment.planName} · {formatMoney(payment.amount)}
+        </Text>
+        <Text style={styles.paymentText}>
+          {formatPaymentStatus(payment.status)} · {payment.paymentMethod} · {payment.provider.name}
+        </Text>
+        <Text style={styles.paymentText}>
+          {formatDate(payment.paidAt ?? payment.createdAt)}
+          {payment.accessExpiresAt ? ` · доступ до ${formatDate(payment.accessExpiresAt)}` : ''}
+        </Text>
+        {receipt ? (
+          <Text style={styles.receiptText}>
+            Чек {receipt.fiscalNumber} · {receipt.fiscalStatus}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function formatAccessStatus(status: string) {
+  if (status === 'active') {
+    return 'Активен';
+  }
+
+  if (status === 'expired') {
+    return 'Истек';
+  }
+
+  return 'Не оплачен';
+}
+
+function formatPaymentStatus(status: DriverSubscriptionPayment['status']) {
+  const labels: Record<DriverSubscriptionPayment['status'], string> = {
+    failed: 'Ошибка',
+    paid: 'Оплачен',
+    pending: 'Ожидает',
+    refunded: 'Возврат',
+  };
+
+  return labels[status];
+}
+
+function formatPlanCost(mode: DriverBillingMode) {
+  const plan = driverAccessPlans[mode];
+
+  return mode === 'monthly' ? `${plan.monthlyPrice} ₽ за 30 дней` : `${plan.commissionPercent}% с поездки`;
+}
+
+function formatMoney(value: number) {
+  return `${value.toLocaleString('ru-RU')} ₽`;
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  });
+}
+
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
@@ -157,6 +313,8 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 16,
   },
+  disabledButton: { opacity: 0.64 },
+  emptyText: { color: '#59616C', fontSize: 14, lineHeight: 20 },
   hero: {
     alignItems: 'flex-start',
     backgroundColor: '#FFFFFF',
@@ -178,6 +336,26 @@ const styles = StyleSheet.create({
   },
   metaLine: { color: '#146C5D', fontSize: 13, fontWeight: '900' },
   page: { backgroundColor: '#F4F7F5', gap: 16, minHeight: '100%', padding: 16 },
+  paymentCopy: { flex: 1, gap: 4, minWidth: 0 },
+  paymentIcon: {
+    alignItems: 'center',
+    backgroundColor: '#E9F4F1',
+    borderRadius: 8,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  paymentRow: {
+    backgroundColor: '#F8FAF9',
+    borderColor: '#E1E6EC',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 12,
+  },
+  paymentText: { color: '#59616C', fontSize: 12, lineHeight: 17 },
+  paymentTitle: { color: '#20242A', fontSize: 14, fontWeight: '900' },
   planChoice: {
     backgroundColor: '#F8FAF9',
     borderColor: '#D8DEE6',
@@ -207,6 +385,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   primaryButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  receiptText: { color: '#146C5D', fontSize: 12, fontWeight: '800' },
+  refundButtonText: { color: '#A33B2E', fontSize: 14, fontWeight: '900' },
   safeArea: { backgroundColor: '#F4F7F5', flex: 1 },
   secondaryButton: {
     alignItems: 'center',
@@ -214,12 +394,28 @@ const styles = StyleSheet.create({
     borderColor: '#D8DEE6',
     borderRadius: 8,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
     justifyContent: 'center',
     minHeight: 48,
     paddingHorizontal: 16,
   },
-  secondaryButtonText: { color: '#20242A', fontSize: 14, fontWeight: '900' },
+  sectionHeader: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   sectionTitle: { color: '#20242A', fontSize: 18, fontWeight: '900' },
+  statusCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    gap: 5,
+    minWidth: 170,
+    padding: 14,
+  },
+  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statusHelper: { color: '#59616C', fontSize: 12, lineHeight: 17 },
+  statusLabel: { color: '#59616C', fontSize: 12, fontWeight: '800' },
+  statusValue: { color: '#20242A', fontSize: 17, fontWeight: '900' },
   subtitle: { color: '#59616C', fontSize: 15, lineHeight: 22 },
   summaryBox: {
     backgroundColor: '#E9F4F1',

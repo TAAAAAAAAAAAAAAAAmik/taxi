@@ -499,6 +499,7 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
       statusTitle: 'Документы ждут загрузки',
       statusText: 'Файлы должны загружаться только через защищенный канал и храниться с ограниченным доступом.',
       primaryAction: 'Загрузить документы',
+      primaryTarget: 'documents',
       secondaryAction: 'Посмотреть требования',
       metrics: [
         { label: 'Загружено', value: '0/4', helper: 'Нужны фото документов' },
@@ -511,18 +512,21 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
           title: 'Паспорт',
           subtitle: 'Серия, номер и фото разворота.',
           icon: 'file',
+          target: 'documents',
         },
         {
           id: 'license',
           title: 'Водительское удостоверение',
           subtitle: 'Номер и фото обеих сторон.',
           icon: 'shield',
+          target: 'documents',
         },
         {
           id: 'insurance',
           title: 'ОСАГО',
           subtitle: 'Полис и срок действия.',
           icon: 'car',
+          target: 'documents',
         },
       ],
       listTitle: 'Пакет документов',
@@ -556,7 +560,7 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
           status: 'Нужно',
         },
       ],
-      note: 'Этот экран дальше стоит связать с камерой, галереей и серверной модерацией.',
+      note: 'Файлы отправляются на MVP backend и переводят пакет документов в статус проверки.',
     },
     vehicle: {
       title: 'Автомобиль',

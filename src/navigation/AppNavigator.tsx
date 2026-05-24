@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AdminPanelScreen } from '../screens/AdminPanelScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
+import { DriverDocumentsScreen } from '../screens/DriverDocumentsScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { OrderFlowScreen } from '../screens/OrderFlowScreen';
 import { OrderHistoryScreen } from '../screens/OrderHistoryScreen';
@@ -88,6 +89,7 @@ export function AppNavigator() {
         <Stack.Screen component={VerifyPhoneScreen} name="VerifyPhone" />
         <Stack.Screen component={VerifyEmailScreen} name="VerifyEmail" />
         <Stack.Screen component={DashboardScreen} name="Dashboard" />
+        <Stack.Screen component={DriverDocumentsScreen} name="DriverDocuments" />
         <Stack.Screen component={OrderFlowScreen} name="OrderFlow" />
         <Stack.Screen component={OrderStatusScreen} name="OrderStatus" />
         <Stack.Screen component={SubscriptionScreen} name="Subscription" />

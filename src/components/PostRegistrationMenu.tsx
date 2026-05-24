@@ -49,6 +49,7 @@ type PostRegistrationMenuProps = {
   onBackToRegistration: () => void;
   onToggleDriverLine?: () => void;
   onOpenOrderFlow: () => void;
+  onOpenDriverDocuments: () => void;
   onOpenOrderHistory: () => void;
   onOpenReferral: () => void;
   onOpenSavedPlace: () => void;
@@ -91,6 +92,7 @@ export function PostRegistrationMenu({
   onBackToRegistration,
   onToggleDriverLine,
   onOpenOrderHistory,
+  onOpenDriverDocuments,
   onOpenOrderFlow,
   onOpenReferral,
   onOpenSavedPlace,
@@ -121,6 +123,11 @@ export function PostRegistrationMenu({
 
     if (target === 'history') {
       onOpenOrderHistory();
+      return;
+    }
+
+    if (target === 'documents') {
+      onOpenDriverDocuments();
       return;
     }
 

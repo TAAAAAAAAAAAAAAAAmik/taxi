@@ -5,17 +5,22 @@ import { resolve } from 'node:path';
 const port = Number(process.env.REFERRAL_SMOKE_PORT || 3310);
 const baseUrl = `http://localhost:${port}`;
 const dbPath = resolve(process.cwd(), '.data/referral-smoke-db.json');
+const documentStoragePath = resolve(process.cwd(), '.data/referral-smoke-documents');
+const tinyImageBase64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
 let backend;
 
 try {
   await rm(dbPath, { force: true });
+  await rm(documentStoragePath, { force: true, recursive: true });
   backend = spawn(process.execPath, ['scripts/mvp-backend.mjs'], {
     cwd: process.cwd(),
     env: {
       ...process.env,
       MVP_ADMIN_PASSWORD: 'smoke-admin',
       MVP_DB_PATH: dbPath,
+      MVP_DOCUMENT_STORAGE_PATH: documentStoragePath,
       MVP_INVITE_BASE_URL: 'https://links.example.com/invite',
       PORT: String(port),
     },
@@ -107,6 +112,31 @@ try {
   const driver = drivers.drivers.find((item) => item.userId === invitedDriver.user.id);
 
   assert(driver, 'Driver profile was not created from invited driver registration');
+  const documentResponse = await api(`/drivers/${encodeURIComponent(driver.id)}/documents`, {
+    body: {
+      documents: ['passport', 'driverLicense', 'sts', 'osago'].map((kind) => ({
+        base64: tinyImageBase64,
+        fileName: `${kind}.png`,
+        height: 1,
+        kind,
+        mimeType: 'image/png',
+        source: 'library',
+        width: 1,
+      })),
+    },
+    method: 'POST',
+    token: invitedDriver.session.token,
+  });
+
+  assert(
+    Object.keys(documentResponse.driver.documentUploads || {}).length === 4,
+    'Driver document upload metadata should contain 4 files',
+  );
+  assert(
+    documentResponse.driver.documentsStatus === 'pending',
+    'Uploaded driver documents should wait for admin approval',
+  );
+
   const approvedDriver = await api(`/drivers/${encodeURIComponent(driver.id)}/status`, {
     body: { status: 'approved' },
     method: 'PATCH',
@@ -174,6 +204,7 @@ try {
   }
 
   await rm(dbPath, { force: true });
+  await rm(documentStoragePath, { force: true, recursive: true });
 }
 
 async function register(body) {

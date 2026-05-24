@@ -5,7 +5,12 @@ import {
   DriverSubscriptionPayment,
 } from '../data/subscription';
 import { OrderStatusSummary } from '../navigation/types';
-import type { AppOrder, DriverProfile, PaymentStatus } from '../state/AppState';
+import type {
+  AppOrder,
+  DriverDocumentUploadInput,
+  DriverProfile,
+  PaymentStatus,
+} from '../state/AppState';
 
 const fallbackApiUrl = 'http://localhost:3100';
 let apiAuthToken: string | undefined;
@@ -373,6 +378,21 @@ export async function updateDriverCompliance(driverId: string, payload: DriverCo
     {
       body: JSON.stringify(payload),
       method: 'PATCH',
+    },
+  );
+
+  return response.driver;
+}
+
+export async function submitDriverDocuments(
+  driverId: string,
+  documents: DriverDocumentUploadInput[],
+) {
+  const response = await request<{ driver: DriverProfile }>(
+    `/drivers/${encodeURIComponent(driverId)}/documents`,
+    {
+      body: JSON.stringify({ documents }),
+      method: 'POST',
     },
   );
 

@@ -49,6 +49,15 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Нужно сделать фото документов водителя для проверки допуска.",
+          "photosPermission": "Нужно выбрать фото документов водителя для проверки допуска."
+        }
+      ]
+    ],
     "extra": {
       "apiBaseUrl": "https://api.example.com",
       "linksDomain": "links.example.com",

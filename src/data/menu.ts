@@ -25,6 +25,7 @@ export type MenuItem = {
 
 export type MenuActionTarget =
   | 'history'
+  | 'documents'
   | 'homeAddress'
   | 'none'
   | 'order'
@@ -212,6 +213,7 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         title: 'Документы на проверку',
         subtitle: 'Фото паспорта, ВУ, СТС и ОСАГО.',
         icon: 'file',
+        target: 'documents',
       },
       {
         id: 'subscription',

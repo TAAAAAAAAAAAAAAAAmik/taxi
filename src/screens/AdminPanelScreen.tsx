@@ -19,7 +19,7 @@ import {
 import { salavatDistrictHouseSourceSummary, salavatDistrictHouses } from '../data/salavatDistrictHouses';
 import { driverAccessPlans } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
-import { useAppState } from '../state/AppState';
+import { DriverDocumentKind, DriverDocumentUpload, useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminPanel'>;
 
@@ -298,6 +298,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                     <CompliancePill label="Реестр" value={driver.registryStatus} readyValue="active" />
                     <CompliancePill label="Налоги" value={driver.taxProfileStatus} readyValue="approved" />
                   </View>
+                  <DocumentUploadSummary uploads={driver.documentUploads} />
                   <View style={styles.rowActions}>
                     <Pressable
                       accessibilityRole="button"
@@ -414,11 +415,43 @@ type PlanRowProps = {
   value: string;
 };
 
+const documentLabels: Record<DriverDocumentKind, string> = {
+  driverLicense: 'ВУ',
+  osago: 'ОСАГО',
+  passport: 'Паспорт',
+  sts: 'СТС',
+};
+
 function PlanRow({ title, value }: PlanRowProps) {
   return (
     <View style={styles.planRow}>
       <Text style={styles.planTitle}>{title}</Text>
       <Text style={styles.planValue}>{value}</Text>
+    </View>
+  );
+}
+
+function DocumentUploadSummary({
+  uploads,
+}: {
+  uploads?: Partial<Record<DriverDocumentKind, DriverDocumentUpload>>;
+}) {
+  const uploadedItems = (Object.keys(documentLabels) as DriverDocumentKind[])
+    .map((kind) => uploads?.[kind])
+    .filter(Boolean) as DriverDocumentUpload[];
+
+  if (!uploadedItems.length) {
+    return <Text style={styles.orderText}>Фото документов еще не загружены водителем.</Text>;
+  }
+
+  return (
+    <View style={styles.documentUploadBox}>
+      <Text style={styles.documentUploadTitle}>Загружено файлов: {uploadedItems.length}/4</Text>
+      {uploadedItems.map((item) => (
+        <Text key={item.kind} style={styles.documentUploadText}>
+          {documentLabels[item.kind]} · {item.fileName} · {item.status}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -491,6 +524,25 @@ const styles = StyleSheet.create({
   dangerButtonText: {
     color: '#B42318',
     fontSize: 12,
+    fontWeight: '900',
+  },
+  documentUploadBox: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8DEE6',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 3,
+    marginTop: 4,
+    padding: 10,
+  },
+  documentUploadText: {
+    color: '#59616C',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  documentUploadTitle: {
+    color: '#20242A',
+    fontSize: 13,
     fontWeight: '900',
   },
   backButton: {

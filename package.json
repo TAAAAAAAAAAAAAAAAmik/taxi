@@ -11,7 +11,10 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test:dispatch": "node scripts/dispatch-smoke-test.mjs",
+    "test:driver-billing": "node scripts/driver-billing-smoke-test.mjs",
+    "test:documents": "node scripts/driver-documents-smoke-test.mjs",
     "test:referrals": "node scripts/referral-smoke-test.mjs",
+    "test:verification": "node scripts/verification-smoke-test.mjs",
     "import:salavat-streets": "node scripts/import-salavat-streets.mjs",
     "import:salavat-addresses": "node scripts/import-salavat-addresses.mjs"
   },

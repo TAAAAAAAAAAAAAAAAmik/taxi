@@ -260,6 +260,45 @@ function requireString(value, field) {
   return value.trim();
 }
 
+function sanitizeFileName(value) {
+  const sanitized = String(value || '')
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .slice(0, 96);
+
+  return sanitized || 'document.jpg';
+}
+
+function sanitizeStorageSegment(value) {
+  return String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .slice(0, 80);
+}
+
+function normalizeImageMimeType(value) {
+  const mimeType = String(value || '').trim().toLowerCase();
+
+  return ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif', 'image/webp'].includes(
+    mimeType,
+  )
+    ? mimeType.replace('image/jpg', 'image/jpeg')
+    : 'image/jpeg';
+}
+
+function getImageExtension(mimeType) {
+  const extensions = {
+    'image/heic': '.heic',
+    'image/heif': '.heif',
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+  };
+
+  return extensions[normalizeImageMimeType(mimeType)] || '.jpg';
+}
+
 function normalizeOrder(order) {
   const normalizedOrder = {
     ...order,
@@ -1314,6 +1353,101 @@ function normalizeDriverDocumentUpload(kind, upload) {
   };
 }
 
+async function applyDriverDocumentUploads(driver, payload) {
+  const now = new Date().toISOString();
+  const currentUploads = normalizeDriverDocumentUploads(driver.documentUploads);
+  const documents = Array.isArray(payload.documents) ? payload.documents : [];
+
+  if (!documents.length) {
+    throw new Error('documents are required');
+  }
+
+  for (const item of documents) {
+    const kind = normalizeDriverDocumentKind(item.kind);
+    const mimeType = normalizeImageMimeType(item.mimeType);
+    const fileName = sanitizeFileName(item.fileName || `${kind}${getImageExtension(mimeType)}`);
+    const fileBuffer = decodeDocumentImage(item.base64, mimeType);
+    const storageKey = await writeDriverDocumentFile(driver.id, kind, mimeType, fileBuffer);
+
+    currentUploads[kind] = {
+      fileName,
+      fileSize: fileBuffer.length,
+      height: Math.max(0, Number(item.height || 0)),
+      kind,
+      mimeType,
+      source: item.source === 'camera' ? 'camera' : 'library',
+      status: 'pending',
+      storageKey,
+      uploadedAt: now,
+      width: Math.max(0, Number(item.width || 0)),
+    };
+  }
+
+  driver.documentUploads = currentUploads;
+  driver.documentsStatus = 'pending';
+
+  if (currentUploads.sts || currentUploads.osago) {
+    driver.vehiclePermitStatus = 'pending';
+  }
+
+  return applyDriverAccessState(driver);
+}
+
+function normalizeDriverDocumentKind(value) {
+  const kind = String(value || '').trim();
+
+  if (!driverDocumentKinds.includes(kind)) {
+    throw new Error('Unsupported document type');
+  }
+
+  return kind;
+}
+
+function decodeDocumentImage(value, mimeType) {
+  let rawValue = String(value || '').trim();
+  const dataUriMatch = rawValue.match(/^data:([^;]+);base64,(.+)$/i);
+
+  if (dataUriMatch) {
+    const declaredMimeType = normalizeImageMimeType(dataUriMatch[1]);
+
+    if (declaredMimeType !== normalizeImageMimeType(mimeType)) {
+      throw new Error('Image MIME type mismatch');
+    }
+
+    rawValue = dataUriMatch[2];
+  }
+
+  const normalizedBase64 = rawValue.replace(/\s+/g, '');
+
+  if (!normalizedBase64) {
+    throw new Error('Image data is required');
+  }
+
+  const fileBuffer = Buffer.from(normalizedBase64, 'base64');
+
+  if (!fileBuffer.length) {
+    throw new Error('Image data is empty');
+  }
+
+  if (fileBuffer.length > 5_000_000) {
+    throw new Error('Image file is too large');
+  }
+
+  return fileBuffer;
+}
+
+async function writeDriverDocumentFile(driverId, kind, mimeType, fileBuffer) {
+  const safeDriverId = sanitizeStorageSegment(driverId) || 'driver';
+  const fileName = `${Date.now()}-${randomUUID().slice(0, 8)}-${kind}${getImageExtension(mimeType)}`;
+  const relativeStorageKey = `${safeDriverId}/${fileName}`;
+  const targetPath = resolve(documentStoragePath, safeDriverId, fileName);
+
+  await mkdir(dirname(targetPath), { recursive: true });
+  await writeFile(targetPath, fileBuffer);
+
+  return relativeStorageKey;
+}
+
 function normalizeDriverComplianceStatus(value, driver) {
   if (driverComplianceStatusValues.includes(value)) {
     return value;
@@ -1847,12 +1981,40 @@ async function handleRequest(request, response) {
         plate: String(payload.plate || ''),
         status: payload.status === 'approved' ? 'approved' : 'pending',
         billingMode: payload.billingMode === 'monthly' ? 'monthly' : 'commission',
+        documentUploads: {},
         subscriptionStatus: payload.subscriptionStatus === 'active' ? 'active' : 'inactive',
         updatedAt: now,
       };
       db.drivers.unshift(applyDriverAccessState(driver));
       await writeDb(db);
       sendJson(response, 201, { driver });
+      return;
+    }
+
+    if (request.method === 'POST' && pathParts[0] === 'drivers' && pathParts[2] === 'documents') {
+      const sessionContext = getSessionContext(db, request);
+      const payload = await readBody(request);
+      const driver = db.drivers.find((item) => item.id === pathParts[1]);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
+      if (!driver) {
+        sendJson(response, 404, { error: 'Driver not found' });
+        return;
+      }
+
+      if (sessionContext.user.role !== 'admin' && driver.userId !== sessionContext.user.id) {
+        sendJson(response, 403, { error: 'Driver document access denied' });
+        return;
+      }
+
+      await applyDriverDocumentUploads(driver, payload);
+      driver.updatedAt = new Date().toISOString();
+      await writeDb(db);
+      sendJson(response, 200, { driver });
       return;
     }
 

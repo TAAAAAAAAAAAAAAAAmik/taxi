@@ -55,6 +55,7 @@ export function DashboardScreen({ navigation, route }: Props) {
           updateDriverAvailability(currentDriver.id, !currentDriver.isOnline);
         }}
         onOpenOrderFlow={() => navigation.navigate('OrderFlow', { firstName, role })}
+        onOpenDriverDocuments={() => navigation.navigate('DriverDocuments', { firstName, role })}
         onOpenOrderHistory={() => navigation.navigate('OrderHistory', { firstName, role })}
         onOpenReferral={() => navigation.navigate('Referral', { firstName, role })}
         onOpenSavedPlace={() => navigation.navigate('SavedPlace', { firstName, role })}

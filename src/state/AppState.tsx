@@ -28,6 +28,7 @@ import {
   refundDriverSubscriptionPayment as refundDriverSubscriptionPaymentApi,
   requestVerificationCode as requestVerificationCodeApi,
   setApiAuthToken,
+  submitDriverDocuments as submitDriverDocumentsApi,
   updateDriverAccess as updateDriverAccessApi,
   updateDriverAvailability as updateDriverAvailabilityApi,
   updateDriverCompliance as updateDriverComplianceApi,
@@ -59,6 +60,31 @@ export type DriverSubscription = {
 
 export type ApiConnectionState = 'checking' | 'connected' | 'offline';
 export type PaymentStatus = 'authorized' | 'failed' | 'paid' | 'pending' | 'refunded';
+export type DriverDocumentKind = 'driverLicense' | 'osago' | 'passport' | 'sts';
+
+export type DriverDocumentUpload = {
+  fileName: string;
+  fileSize?: number;
+  height?: number;
+  kind: DriverDocumentKind;
+  mimeType: string;
+  source: 'camera' | 'library';
+  status: 'missing' | 'pending' | 'approved' | 'rejected';
+  storageKey?: string;
+  uploadedAt: string;
+  width?: number;
+};
+
+export type DriverDocumentUploadInput = {
+  base64: string;
+  fileName?: string | null;
+  fileSize?: number;
+  height?: number;
+  kind: DriverDocumentKind;
+  mimeType?: string | null;
+  source: 'camera' | 'library';
+  width?: number;
+};
 
 export type OrderParticipant = {
   id: string;
@@ -73,6 +99,7 @@ export type DriverProfile = OrderParticipant & {
   billingMode: DriverBillingMode;
   canReceiveOrders?: boolean;
   contractStatus: 'missing' | 'pending' | 'signed' | 'rejected';
+  documentUploads?: Partial<Record<DriverDocumentKind, DriverDocumentUpload>>;
   documentsStatus: 'missing' | 'pending' | 'approved' | 'rejected';
   isOnline?: boolean;
   registryStatus: 'missing' | 'pending' | 'active' | 'rejected';
@@ -209,6 +236,7 @@ type AppStateValue = {
     title?: string;
   }) => void;
   updateDriverComplianceStatus: (driverId: string, payload: DriverCompliancePatch) => Promise<void>;
+  submitDriverDocuments: (driverId: string, documents: DriverDocumentUploadInput[]) => Promise<void>;
   updateDriverAvailability: (driverId: string, isOnline: boolean) => Promise<void>;
   updateDriverReviewStatus: (driverId: string, status: DriverProfile['status']) => Promise<void>;
   updateOrderPaymentStatus: (orderId: string, status: PaymentStatus, note?: string) => Promise<void>;
@@ -236,19 +264,6 @@ function createDriverAccessState(billingMode: DriverBillingMode, status: DriverS
     ordersCommission: plan.commissionPercent,
     planName: plan.name,
     status,
-  };
-}
-
-function createDriverSubscriptionFromProfile(driver: DriverProfile): DriverSubscription {
-  const plan = driverAccessPlans[driver.billingMode];
-
-  return {
-    billingMode: driver.billingMode,
-    expiresAt: driver.accessExpiresAt,
-    monthlyPrice: plan.monthlyPrice,
-    ordersCommission: plan.commissionPercent,
-    planName: plan.name,
-    status: driver.subscriptionStatus,
   };
 }
 
@@ -432,28 +447,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       adminReferralDashboard,
       activateDriverSubscription: (billingMode = 'monthly') => {
         void payDriverSubscription(billingMode);
-        return;
-
-        const nextSubscription = createDriverAccessState(billingMode, 'active');
-        const currentDriver = currentUser
-          ? drivers.find((driver) => driver.userId === currentUser.id)
-          : undefined;
-
-        setDriverSubscription(nextSubscription);
-        if (currentDriver) {
-          updateDriverAccessApi(currentDriver.id, billingMode)
-            .then((serverDriver) => {
-              setDrivers((current) =>
-                current.map((driver) => (driver.id === serverDriver.id ? serverDriver : driver)),
-              );
-              setServerStatus('connected');
-              setServerMessage('Доступ водителя активирован на backend.');
-            })
-            .catch(() => {
-              setServerStatus('offline');
-              setServerMessage('Backend не отвечает. Доступ отмечен только локально.');
-            });
-        }
       },
       addOrder: async (order, role, clientName) => {
         const localOrder = createLocalOrder(order, role, clientName, currentUser);
@@ -564,6 +557,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }
       },
       orders,
+      payDriverSubscription,
       referralDashboard,
       registerAccount: async (payload) => {
         try {
@@ -581,6 +575,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           return null;
         }
       },
+      refundDriverSubscriptionPayment,
       requestVerificationCode: async (channel, target) => {
         try {
           const result = await requestVerificationCodeApi(channel, target);
@@ -610,8 +605,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           return null;
         }
       },
-      payDriverSubscription,
-      refundDriverSubscriptionPayment,
       refreshAdminReferralDashboard,
       refreshServerData,
       refreshReferralDashboard,
@@ -702,6 +695,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   }
                 : driver,
             ),
+          );
+        }
+      },
+      submitDriverDocuments: async (driverId, documents) => {
+        try {
+          const serverDriver = await submitDriverDocumentsApi(driverId, documents);
+          setDrivers((current) =>
+            current.map((driver) => (driver.id === serverDriver.id ? serverDriver : driver)),
+          );
+          setServerStatus('connected');
+          setServerMessage('Документы водителя отправлены на backend.');
+        } catch {
+          setServerStatus('offline');
+          setServerMessage('Backend не отвечает. Документы отмечены локально, файлы не сохранены на сервер.');
+          setDrivers((current) =>
+            current.map((driver) => {
+              if (driver.id !== driverId) {
+                return driver;
+              }
+
+              const nextDriver = {
+                ...driver,
+                documentUploads: {
+                  ...(driver.documentUploads ?? {}),
+                  ...createLocalDocumentUploads(documents),
+                },
+                documentsStatus: 'pending' as const,
+                vehiclePermitStatus:
+                  documents.some((document) => ['osago', 'sts'].includes(document.kind))
+                    ? ('pending' as const)
+                    : driver.vehiclePermitStatus,
+              };
+
+              return {
+                ...nextDriver,
+                canReceiveOrders: hasCompletedDriverCompliance(nextDriver),
+              };
+            }),
           );
         }
       },
@@ -889,6 +920,66 @@ const initialDrivers: DriverProfile[] = [
   },
 ];
 
+function createDriverSubscriptionFromProfile(driver: DriverProfile): DriverSubscription {
+  const plan = driverAccessPlans[driver.billingMode];
+  const expiresAt = driver.accessExpiresAt;
+  const hasExpired =
+    driver.subscriptionStatus === 'active' && expiresAt ? Date.parse(expiresAt) <= Date.now() : false;
+
+  return {
+    billingMode: driver.billingMode,
+    expiresAt,
+    monthlyPrice: plan.monthlyPrice,
+    ordersCommission: plan.commissionPercent,
+    planName: plan.name,
+    status: hasExpired ? 'expired' : driver.subscriptionStatus,
+  };
+}
+
+function createLocalDriverPayment(
+  driver: DriverProfile | undefined,
+  billingMode: DriverBillingMode,
+  subscription: DriverSubscription,
+): DriverSubscriptionPayment {
+  const plan = driverAccessPlans[billingMode];
+  const now = new Date().toISOString();
+  const amount = plan.monthlyPrice;
+  const id = `LOCAL-DSP-${Date.now().toString().slice(-7)}`;
+
+  return {
+    accessExpiresAt: subscription.expiresAt,
+    accessStartsAt: now,
+    amount,
+    billingMode,
+    createdAt: now,
+    currency: 'RUB',
+    driverId: driver?.id ?? 'local-driver',
+    driverName: driver?.name,
+    id,
+    paidAt: now,
+    paymentMethod: amount > 0 ? 'Локальная демо-карта' : 'Комиссия с поездок',
+    planName: plan.name,
+    provider: {
+      mode: 'demo',
+      name: 'local-demo',
+    },
+    receipt: {
+      currency: 'RUB',
+      driverId: driver?.id ?? 'local-driver',
+      fiscalNumber: `LOCAL-${id}`,
+      fiscalStatus: 'demo',
+      id: `LOCAL-RC-${Date.now().toString().slice(-7)}`,
+      issuedAt: now,
+      items: [{ amount, label: plan.name }],
+      paymentId: id,
+      paymentStatus: 'paid',
+      total: amount,
+    },
+    status: 'paid',
+    updatedAt: now,
+  };
+}
+
 function hasCompletedDriverCompliance(driver: DriverProfile) {
   return (
     driver.status === 'approved' &&
@@ -899,6 +990,24 @@ function hasCompletedDriverCompliance(driver: DriverProfile) {
     driver.registryStatus === 'active' &&
     driver.taxProfileStatus === 'approved'
   );
+}
+
+function createLocalDocumentUploads(documents: DriverDocumentUploadInput[]) {
+  return documents.reduce<Partial<Record<DriverDocumentKind, DriverDocumentUpload>>>((uploads, document) => {
+    uploads[document.kind] = {
+      fileName: document.fileName?.trim() || `${document.kind}.jpg`,
+      fileSize: document.fileSize,
+      height: document.height,
+      kind: document.kind,
+      mimeType: document.mimeType || 'image/jpeg',
+      source: document.source,
+      status: 'pending',
+      uploadedAt: new Date().toISOString(),
+      width: document.width,
+    };
+
+    return uploads;
+  }, {});
 }
 
 function createLocalOrder(
@@ -953,50 +1062,6 @@ function createReceipt(order: OrderStatusSummary): TripReceipt {
     paymentStatus: 'paid',
     subtotal: order.total,
     total: order.total,
-  };
-}
-
-function createLocalDriverPayment(
-  driver: DriverProfile | undefined,
-  billingMode: DriverBillingMode,
-  subscription: DriverSubscription,
-): DriverSubscriptionPayment {
-  const now = new Date().toISOString();
-  const plan = driverAccessPlans[billingMode];
-  const amount = billingMode === 'monthly' ? plan.monthlyPrice : 0;
-  const paymentId = `DP-LOCAL-${Date.now().toString().slice(-7)}`;
-
-  return {
-    amount,
-    billingMode,
-    createdAt: now,
-    currency: 'RUB',
-    driverId: driver?.id ?? 'local-driver',
-    driverName: driver?.name,
-    id: paymentId,
-    paidAt: now,
-    paymentMethod: 'Локальная MVP-активация',
-    planName: plan.name,
-    provider: {
-      mode: 'demo',
-      name: 'local-demo',
-    },
-    receipt: {
-      currency: 'RUB',
-      driverId: driver?.id ?? 'local-driver',
-      fiscalNumber: `LOCAL-${paymentId}`,
-      fiscalStatus: 'demo',
-      id: `RC-${paymentId}`,
-      issuedAt: now,
-      items: [{ amount, label: plan.name }],
-      paymentId,
-      paymentStatus: 'paid',
-      total: amount,
-    },
-    status: 'paid',
-    updatedAt: now,
-    accessExpiresAt: subscription.expiresAt,
-    accessStartsAt: now,
   };
 }
 

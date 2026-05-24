@@ -48,6 +48,10 @@ export type RootStackParamList = {
     role: AccountRole;
     firstName?: string;
   };
+  DriverDocuments: {
+    role: AccountRole;
+    firstName?: string;
+  };
   OrderHistory: {
     role: AccountRole;
     firstName?: string;
