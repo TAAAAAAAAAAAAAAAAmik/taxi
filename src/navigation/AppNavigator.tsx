@@ -26,6 +26,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const webOrigin =
   typeof window === 'undefined' || !window.location?.origin ? undefined : window.location.origin;
+const webBasePath = normalizeWebBasePath(getPublicEnv('EXPO_PUBLIC_WEB_BASE_PATH'));
+const webBaseOrigin = webOrigin && webBasePath ? `${webOrigin}${webBasePath}` : undefined;
 const linksOrigin = normalizePublicOrigin(getPublicEnv('EXPO_PUBLIC_LINKS_DOMAIN'));
 
 const linking: LinkingOptions<RootStackParamList> = {
@@ -47,9 +49,16 @@ const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
     'taxipartner://',
     ...(linksOrigin ? [linksOrigin] : []),
+    ...(webBaseOrigin ? [webBaseOrigin] : []),
     ...(webOrigin ? [webOrigin] : []),
   ],
 };
+
+function normalizeWebBasePath(value: string | undefined) {
+  const rawPath = String(value || '').trim().replace(/^\/+|\/+$/g, '');
+
+  return rawPath ? `/${rawPath}` : '';
+}
 
 function normalizeReferralCodeParam(value: string) {
   return String(value || '')
