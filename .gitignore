@@ -27,6 +27,12 @@ yarn-debug.*
 yarn-error.*
 expo-web*.log
 backend*.log
+*.log
+*.err.log
+
+# Python
+__pycache__/
+*.pyc
 
 # local MVP database
 .data/

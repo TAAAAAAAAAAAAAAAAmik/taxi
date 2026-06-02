@@ -1,5 +1,3 @@
-import { AccountRole } from './registration';
-
 export type OrderStatusStep = {
   id: string;
   title: string;
@@ -23,7 +21,7 @@ export type OrderStatusConfig = {
   details: string[];
 };
 
-export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
+export const orderStatusConfig: Record<string, OrderStatusConfig> = {
   client: {
     title: 'Статус поездки',
     subtitle: 'Клиент видит поиск водителя, подачу автомобиля и ход поездки.',
@@ -34,7 +32,7 @@ export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
     contactPhone: '+7 917 000-42-11',
     chatActionLabel: 'Написать водителю в приложении',
     callActionLabel: 'Позвонить водителю',
-    primaryAction: 'Обновить статус',
+    primaryAction: 'Статус обновляется автоматически',
     completedTitle: 'Поездка завершена',
     completedText: 'Чек сформирован, поездка добавлена в историю. Можно оставить оценку.',
     steps: [
@@ -145,4 +143,12 @@ export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
     ],
     details: ['Контроль водителя', 'Контроль автомобиля', 'Финансовое закрытие'],
   },
+};
+
+orderStatusConfig.self_employed_driver = orderStatusConfig.driver;
+orderStatusConfig.park_admin = orderStatusConfig.fleet;
+orderStatusConfig.park_driver = {
+  ...orderStatusConfig.driver,
+  subtitle: 'Водитель таксопарка ведет заказ, а парк видит статус в своем кабинете.',
+  participantMeta: 'Комментарий, связь и данные таксопарка доступны после принятия заказа',
 };

@@ -21,7 +21,7 @@ try {
       MVP_ADMIN_PASSWORD: 'smoke-admin',
       MVP_DB_PATH: dbPath,
       MVP_DOCUMENT_STORAGE_PATH: documentStoragePath,
-      MVP_INVITE_BASE_URL: 'https://links.example.com/invite',
+      MVP_INVITE_BASE_URL: 'taxipartner://invite',
       PORT: String(port),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -33,6 +33,7 @@ try {
 
   await waitForBackend();
 
+  const admin = await loginAdmin();
   const stamp = Date.now();
   const inviter = await register({
     email: `inviter-${stamp}@example.test`,
@@ -53,8 +54,8 @@ try {
     'Client invite URL should include role=client',
   );
   assert(
-    inviterDashboard.inviteUrls?.driver?.includes('role=driver'),
-    'Driver invite URL should include role=driver',
+    inviterDashboard.inviteUrls?.driver?.includes('role=self_employed_driver'),
+    'Driver invite URL should include role=self_employed_driver',
   );
 
   const validation = await api(`/referrals/validate?code=${encodeURIComponent(code)}`);
@@ -140,6 +141,7 @@ try {
   const approvedDriver = await api(`/drivers/${encodeURIComponent(driver.id)}/status`, {
     body: { status: 'approved' },
     method: 'PATCH',
+    token: admin.session.token,
   });
 
   assert(
@@ -173,6 +175,7 @@ try {
       vehiclePermitStatus: 'approved',
     },
     method: 'PATCH',
+    token: admin.session.token,
   });
 
   assert(
@@ -210,6 +213,15 @@ try {
 async function register(body) {
   return api('/auth/register', {
     body,
+    method: 'POST',
+  });
+}
+
+async function loginAdmin() {
+  return api('/auth/admin-login', {
+    body: {
+      password: 'smoke-admin',
+    },
     method: 'POST',
   });
 }

@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { RegistrationField } from '../data/registration';
+import { kx } from '../theme/kinetixTheme';
 
 type FieldInputProps = {
   field: RegistrationField;
@@ -21,7 +22,7 @@ export function FieldInput({ field, value, onChangeText }: FieldInputProps) {
         keyboardType={field.keyboardType ?? 'default'}
         onChangeText={onChangeText}
         placeholder={field.placeholder}
-        placeholderTextColor="#8A8F98"
+        placeholderTextColor="#A89F91"
         secureTextEntry={field.secureTextEntry}
         style={styles.input}
         textContentType={field.textContentType}
@@ -37,26 +38,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   helper: {
-    color: '#68717D',
+    color: kx.text.secondary,
     fontSize: 12,
     lineHeight: 17,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
-    borderRadius: 8,
+    backgroundColor: kx.surface.input,
+    borderColor: kx.text.secondary,
+    borderRadius: kx.radius.control,
     borderWidth: 1,
-    color: '#20242A',
+    color: kx.text.primary,
     fontSize: 16,
-    minHeight: 50,
+    minHeight: kx.touch.regular,
     paddingHorizontal: 14,
   },
   label: {
-    color: '#20242A',
+    color: kx.text.primary,
     fontSize: 14,
     fontWeight: '700',
   },
   required: {
-    color: '#C75319',
+    color: kx.color.danger,
   },
 });

@@ -2,6 +2,8 @@ import { ComponentType } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LucideProps } from 'lucide-react-native';
 
+import { kx } from '../theme/kinetixTheme';
+
 type RoleCardProps = {
   title: string;
   subtitle: string;
@@ -23,7 +25,7 @@ export function RoleCard({ title, subtitle, active, Icon, onPress }: RoleCardPro
       ]}
     >
       <View style={[styles.iconWrap, active && styles.activeIconWrap]}>
-        <Icon color={active ? '#FFFFFF' : '#146C5D'} size={20} strokeWidth={2.2} />
+        <Icon color={active ? kx.color.graphite : kx.color.amber} size={20} strokeWidth={2.2} />
       </View>
       <View style={styles.copy}>
         <Text style={[styles.title, active && styles.activeTitle]}>{title}</Text>
@@ -35,20 +37,20 @@ export function RoleCard({ title, subtitle, active, Icon, onPress }: RoleCardPro
 
 const styles = StyleSheet.create({
   activeCard: {
-    backgroundColor: '#E9F4F1',
-    borderColor: '#146C5D',
+    backgroundColor: kx.surface.selected,
+    borderColor: kx.color.amber,
   },
   activeIconWrap: {
-    backgroundColor: '#146C5D',
+    backgroundColor: kx.color.amber,
   },
   activeTitle: {
-    color: '#0B4C42',
+    color: kx.color.graphite,
   },
   card: {
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
-    borderRadius: 8,
+    backgroundColor: kx.surface.card,
+    borderColor: kx.color.amber,
+    borderRadius: kx.radius.card,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
@@ -60,8 +62,8 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#EAF1EF',
-    borderRadius: 8,
+    backgroundColor: kx.surface.raised,
+    borderRadius: kx.radius.card,
     height: 38,
     justifyContent: 'center',
     width: 38,
@@ -70,12 +72,12 @@ const styles = StyleSheet.create({
     opacity: 0.82,
   },
   subtitle: {
-    color: '#59616C',
+    color: kx.text.secondary,
     fontSize: 13,
     lineHeight: 18,
   },
   title: {
-    color: '#20242A',
+    color: kx.text.primary,
     fontSize: 16,
     fontWeight: '800',
   },

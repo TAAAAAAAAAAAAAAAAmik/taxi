@@ -1,5 +1,3 @@
-import { AccountRole } from './registration';
-
 export type MenuIconName =
   | 'bell'
   | 'briefcase'
@@ -24,6 +22,7 @@ export type MenuItem = {
 };
 
 export type MenuActionTarget =
+  | 'deleteAccount'
   | 'history'
   | 'documents'
   | 'homeAddress'
@@ -60,7 +59,7 @@ export type RoleMenuConfig = {
   metrics: DashboardMetric[];
 };
 
-export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
+export const roleMenuConfig: Record<string, RoleMenuConfig> = {
   client: {
     title: 'Меню клиента',
     subtitle: 'Заказы, адреса, оплата и поддержка в одном кабинете.',
@@ -156,25 +155,25 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
   },
   driver: {
     title: 'Меню водителя',
-    subtitle: 'Подписка, заказы, документы, выплаты и профиль водителя-партнера.',
-    statusTitle: 'Доступ к заказам по подписке',
-    statusText: 'Водитель оплачивает месяц доступа и принимает заказы без комиссии сервиса.',
-    primaryAction: 'Оформить подписку',
+    subtitle: 'Расчеты, заказы, документы, сверка дня и профиль водителя-партнера.',
+    statusTitle: 'Доступ к заказам и сверка',
+    statusText: 'Клиент платит водителю напрямую, сервис считает 7% к вечернему переводу.',
+    primaryAction: 'Открыть расчеты',
     secondaryAction: 'Посмотреть заказы',
     menuItems: [
       {
         id: 'subscription',
-        title: 'Подписка',
-        subtitle: 'Месяц доступа, 0% комиссии с заказов',
+        title: 'Расчеты',
+        subtitle: '0 ₽/мес, 7% к переводу',
         icon: 'wallet',
         badge: 'Главное',
       },
       {
         id: 'orders',
         title: 'Лента заказов',
-        subtitle: 'Доступна после подписки и проверки',
+        subtitle: 'Доступна после проверки и допуска',
         icon: 'briefcase',
-        badge: 'После оплаты',
+        badge: 'После допуска',
       },
       {
         id: 'documents',
@@ -190,8 +189,8 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
       },
       {
         id: 'payouts',
-        title: 'Выплаты',
-        subtitle: 'Баланс, реквизиты, история',
+        title: 'Сверка дня',
+        subtitle: 'Собрано, к переводу, подтверждения',
         icon: 'wallet',
       },
       {
@@ -206,6 +205,12 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         subtitle: 'Помощь водителю и спорные поездки',
         icon: 'headphones',
       },
+      {
+        id: 'profile',
+        title: 'Профиль',
+        subtitle: 'Данные аккаунта и удаление',
+        icon: 'shield',
+      },
     ],
     quickActions: [
       {
@@ -217,15 +222,15 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
       },
       {
         id: 'subscription',
-        title: 'Месячный доступ',
-        subtitle: 'Оплата подписки открывает заказы.',
+        title: 'Расчеты',
+        subtitle: 'Доля сервиса по завершенным поездкам.',
         icon: 'wallet',
         target: 'subscription',
       },
       {
         id: 'bank-details',
-        title: 'Реквизиты выплат',
-        subtitle: 'Банк, БИК и счет для переводов.',
+        title: 'Перевод доли',
+        subtitle: 'Сумма к вечерней сверке.',
         icon: 'wallet',
       },
       {
@@ -237,19 +242,19 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
     ],
     metrics: [
       {
-        label: 'Подписка',
-        value: 'Не активна',
-        helper: 'Нужна оплата месяца',
+        label: 'Доля сервиса',
+        value: '7%',
+        helper: 'К переводу за день',
       },
       {
-        label: 'Баланс',
+        label: 'Собрано',
         value: '0 ₽',
-        helper: 'Все заказы без комиссии',
+        helper: 'После выполненных заказов',
       },
       {
-        label: 'Комиссия',
-        value: '0%',
-        helper: 'После оплаты доступа',
+        label: 'К переводу',
+        value: '0 ₽',
+        helper: 'После завершения поездок',
       },
     ],
   },
@@ -297,6 +302,12 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         subtitle: 'Проверки, блокировки, события',
         icon: 'bell',
       },
+      {
+        id: 'profile',
+        title: 'Профиль',
+        subtitle: 'Данные аккаунта и удаление',
+        icon: 'shield',
+      },
     ],
     quickActions: [
       {
@@ -336,4 +347,60 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
       },
     ],
   },
+};
+
+roleMenuConfig.self_employed_driver = roleMenuConfig.driver;
+roleMenuConfig.park_admin = roleMenuConfig.fleet;
+roleMenuConfig.park_driver = {
+  ...roleMenuConfig.driver,
+  title: 'Меню водителя таксопарка',
+  subtitle: 'Заказы, документы, выплаты и связь с вашим таксопарком.',
+  statusTitle: 'Доступ зависит от таксопарка',
+  statusText: 'Заказы доступны, если таксопарк активирован вручную, водитель активен и документы валидны.',
+  primaryAction: 'Посмотреть заказы',
+  secondaryAction: 'Мой таксопарк',
+  menuItems: [
+    {
+      id: 'orders',
+      title: 'Лента заказов',
+      subtitle: 'Доступ через активный таксопарк',
+      icon: 'briefcase',
+      badge: 'Работа',
+    },
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Паспорт, ВУ, СТС, ОСАГО',
+      icon: 'file',
+    },
+    {
+      id: 'vehicle',
+      title: 'Автомобиль',
+      subtitle: 'Данные машины и статус проверки',
+      icon: 'car',
+    },
+    {
+      id: 'payouts',
+      title: 'Выплаты',
+      subtitle: 'Баланс, реквизиты, история',
+      icon: 'wallet',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Связь с парком и сервисом',
+      icon: 'headphones',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные аккаунта и удаление',
+      icon: 'shield',
+    },
+  ],
+  metrics: [
+    { label: 'Таксопарк', value: 'Привязан', helper: 'Оплата на стороне парка' },
+    { label: 'Документы', value: 'Проверка', helper: 'Нужна валидация' },
+    { label: 'Комиссия', value: '0%', helper: 'По подписке парка' },
+  ],
 };

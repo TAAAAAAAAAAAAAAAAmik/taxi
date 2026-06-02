@@ -1,7 +1,8 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
+  Car,
   Check,
   CircleDot,
   Clock3,
@@ -21,6 +22,9 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Animated,
+  AppState as NativeAppState,
+  Easing,
   Linking,
   Text,
   TextInput,
@@ -29,7 +33,7 @@ import {
 } from 'react-native';
 
 import { orderStatusConfig } from '../data/orderStatus';
-import { roleCopy } from '../data/registration';
+import { isDriverLikeRole, roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { useAppState } from '../state/AppState';
 import type { AppOrder, OrderParticipant, PaymentStatus } from '../state/AppState';
@@ -52,8 +56,12 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const {
     addFavoriteDriver,
     addOrderReview,
+    notifications,
     orders,
     refreshServerData,
+    realtimeMessage,
+    realtimeStatus,
+    realtimeUpdatedAt,
     updateOrderPaymentStatus,
     updateOrderStatus,
   } = useAppState();
@@ -68,6 +76,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const [reviewFacets, setReviewFacets] = useState<string[]>(['Подача']);
   const [reviewComment, setReviewComment] = useState('');
   const [favoriteAdded, setFavoriteAdded] = useState(false);
+  const [pinCode, setPinCode] = useState('');
+  const [pinError, setPinError] = useState('');
 
   const activeStep = config.steps[activeStepIndex];
   const isCompleted = activeStepIndex === config.steps.length - 1;
@@ -100,26 +110,95 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const paymentStatus = displayedOrder.paymentStatus ?? 'pending';
   const isPaid = paymentStatus === 'paid';
   const paymentEvent = displayedOrder.paymentEvents?.[0];
+  const requiresTripPin = Boolean(displayedOrder.safetyPinRequired && displayedOrder.tripPin);
   const progress = useMemo(
     () => Math.round(((activeStepIndex + 1) / config.steps.length) * 100),
     [activeStepIndex, config.steps.length],
   );
   const primaryActionLabel = getPrimaryActionLabel(role, activeStep.id, config.primaryAction);
+  const isDriverRole = isDriverLikeRole(role);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const etaFlickerAnim = useRef(new Animated.Value(1)).current;
+  const [etaUpdatedAt, setEtaUpdatedAt] = useState(() => new Date());
+  const etaMinutes = useMemo(
+    () =>
+      calculateEtaMinutes(
+        displayedOrder.routeEstimate?.durationMin,
+        liveStatus,
+        etaUpdatedAt,
+      ),
+    [displayedOrder.routeEstimate?.durationMin, etaUpdatedAt, liveStatus],
+  );
 
   useEffect(() => {
     setActiveStepIndex(getStepIndex(config.steps, liveStatus));
   }, [config.steps, liveStatus]);
 
+  useEffect(() => {
+    const subscription = NativeAppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        console.info(`[realtime] app foreground: force status refresh for ${order.id}`);
+        void refreshServerData();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [order.id, refreshServerData]);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(pulseAnim, {
+        duration: 1600,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, [pulseAnim]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setEtaUpdatedAt(new Date());
+      Animated.sequence([
+        Animated.timing(etaFlickerAnim, {
+          duration: 120,
+          toValue: 0.45,
+          useNativeDriver: true,
+        }),
+        Animated.timing(etaFlickerAnim, {
+          duration: 220,
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 30000);
+
+    return () => clearInterval(timer);
+  }, [etaFlickerAnim]);
+
   const advance = async () => {
     if (role === 'client') {
-      await refreshServerData();
       return;
     }
 
+    const nextIndex = Math.min(activeStepIndex + 1, config.steps.length - 1);
+    const nextStatus = config.steps[nextIndex].id;
+
+    if (nextStatus === 'started' && requiresTripPin && pinCode.trim().length !== 4) {
+      setPinError('Введите 4-значный PIN клиента.');
+      return;
+    }
+
+    setPinError('');
     setActiveStepIndex((current) => {
-      const nextIndex = Math.min(current + 1, config.steps.length - 1);
-      updateOrderStatus(order.id, config.steps[nextIndex].id);
-      return nextIndex;
+      const calculatedNextIndex = Math.min(current + 1, config.steps.length - 1);
+      const calculatedNextStatus = config.steps[calculatedNextIndex].id;
+      updateOrderStatus(
+        order.id,
+        calculatedNextStatus,
+        calculatedNextStatus === 'started' ? pinCode.trim() : undefined,
+      );
+      return calculatedNextIndex;
     });
   };
 
@@ -127,7 +206,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
     await updateOrderPaymentStatus(
       order.id,
       'paid',
-      role === 'driver' ? 'Водитель подтвердил оплату в MVP' : 'Клиент выполнил демо-оплату',
+      isDriverRole ? 'Водитель подтвердил оплату в MVP' : 'Клиент выполнил демо-оплату',
     );
   };
 
@@ -180,28 +259,58 @@ export function OrderStatusScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#146C5D" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>К заказу</Text>
           </Pressable>
 
           <View style={styles.rolePill}>
-            <UserRound color="#146C5D" size={17} strokeWidth={2.4} />
+            <UserRound color="#D4A853" size={17} strokeWidth={2.4} />
             <Text style={styles.rolePillText}>{roleCopy[role].title}</Text>
           </View>
         </View>
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Route color="#146C5D" size={30} strokeWidth={2.4} />
+            <Route color="#D4A853" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>{config.title}</Text>
-            <Text style={styles.subtitle}>{config.subtitle}</Text>
+            <Text numberOfLines={2} style={styles.title}>{config.title}</Text>
+            <Text numberOfLines={2} style={styles.subtitle}>{config.subtitle}</Text>
             <Text style={styles.metaLine}>
               {firstName?.trim() || 'Пользователь'} · заказ {order.id}
             </Text>
           </View>
         </View>
+
+        <View style={styles.livePanel}>
+          <View style={[styles.liveDot, realtimeStatus === 'live' && styles.liveDotActive]} />
+          <View style={styles.liveCopy}>
+            <Text style={styles.liveTitle}>
+              {realtimeStatus === 'live'
+                ? 'Статус приходит с сервера'
+                : realtimeStatus === 'polling'
+                  ? 'Статус сверяется каждые 5 секунд'
+                  : 'Подключаем серверный статус'}
+            </Text>
+            <Text numberOfLines={2} style={styles.liveText}>
+              {notifications.find((item) => item.orderId === order.id)?.title || realtimeMessage}
+              {realtimeUpdatedAt ? ` · ${new Date(realtimeUpdatedAt).toLocaleTimeString('ru-RU')}` : ''}
+            </Text>
+          </View>
+        </View>
+
+        {role === 'client' ? (
+          <TripPulseMap
+            destination={displayedOrder.destination}
+            driver={driver}
+            etaFlickerAnim={etaFlickerAnim}
+            etaMinutes={etaMinutes}
+            isCompleted={isCompleted}
+            pickup={displayedOrder.pickup}
+            pulseAnim={pulseAnim}
+            status={liveStatus}
+          />
+        ) : null}
 
         <View style={[styles.layout, isWide && styles.layoutWide]}>
           <View style={styles.mainColumn}>
@@ -209,16 +318,16 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <View style={styles.statusHeader}>
                 <View style={styles.statusIcon}>
                   {isCompleted ? (
-                    <Check color="#FFFFFF" size={24} strokeWidth={3} />
+                    <Check color="#F5F0E8" size={24} strokeWidth={3} />
                   ) : (
-                    <CircleDot color="#FFFFFF" size={24} strokeWidth={2.6} />
+                    <CircleDot color="#F5F0E8" size={24} strokeWidth={2.6} />
                   )}
                 </View>
                 <View style={styles.statusCopy}>
                   <Text style={styles.statusTitle}>
                     {isCompleted ? config.completedTitle : activeStep.title}
                   </Text>
-                  <Text style={styles.statusText}>
+                  <Text numberOfLines={3} style={styles.statusText}>
                     {isCompleted ? config.completedText : activeStep.description}
                   </Text>
                 </View>
@@ -230,20 +339,22 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <Text style={styles.progressText}>Прогресс заказа: {progress}%</Text>
 
               <View style={styles.actionRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={isCompleted}
-                  onPress={advance}
-                  style={({ pressed }) => [
-                    styles.primaryButton,
-                    isCompleted && styles.primaryButtonMuted,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    {isCompleted ? 'Статус завершен' : primaryActionLabel}
-                  </Text>
-                </Pressable>
+                {isDriverRole ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isCompleted}
+                    onPress={advance}
+                    style={({ pressed }) => [
+                      styles.primaryButton,
+                      isCompleted && styles.primaryButtonMuted,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      {isCompleted ? 'Статус завершен' : primaryActionLabel}
+                    </Text>
+                  </Pressable>
+                ) : null}
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => navigation.navigate('Dashboard', { firstName, role })}
@@ -277,13 +388,13 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                           isActive && styles.stepDotActive,
                         ]}
                       >
-                        {isDone ? <Check color="#FFFFFF" size={14} strokeWidth={3} /> : null}
+                        {isDone ? <Check color="#F5F0E8" size={14} strokeWidth={3} /> : null}
                       </View>
                       <View style={styles.stepCopy}>
                         <Text style={[styles.stepTitle, isActive && styles.stepTitleActive]}>
                           {step.title}
                         </Text>
-                        <Text style={styles.stepDescription}>{step.description}</Text>
+                        <Text numberOfLines={2} style={styles.stepDescription}>{step.description}</Text>
                       </View>
                     </View>
                   );
@@ -292,9 +403,44 @@ export function OrderStatusScreen({ navigation, route }: Props) {
             </View>
 
             {isCompleted && role === 'client' ? (
+              <View style={styles.goodRoadPanel}>
+                <View style={styles.goodRoadCar}>
+                  <Car color="#0C0C0C" size={28} strokeWidth={2.6} />
+                </View>
+                <View style={styles.goodRoadCopy}>
+                  <Text style={styles.goodRoadTitle}>Спасибо, что вы с Kinetix</Text>
+                  <Text numberOfLines={2} style={styles.goodRoadText}>Добрая дорога завершена. Поездку можно повторить или сохранить водителя.</Text>
+                </View>
+                <View style={styles.sparkRow}>
+                  <View style={styles.spark} />
+                  <View style={[styles.spark, styles.sparkSmall]} />
+                  <View style={styles.spark} />
+                </View>
+                <View style={styles.actionRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => navigation.navigate('OrderFlow', { firstName, role })}
+                    style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.primaryButtonText}>Повторить поездку</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={addDriverToFavorites}
+                    style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.secondaryButtonText}>
+                      {favoriteAdded ? 'В избранном' : 'В избранное'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
+            {isCompleted && role === 'client' ? (
               <View style={styles.reviewPanel}>
                 <SectionHeader title="Слепок поездки" />
-                <Text style={styles.reviewIntro}>
+                <Text numberOfLines={3} style={styles.reviewIntro}>
                   Не просто звезды: сохраните, чем именно водитель был хорош. Потом в истории можно
                   добавить его в приоритет.
                 </Text>
@@ -320,8 +466,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                           style={({ pressed }) => [styles.starButton, pressed && styles.pressed]}
                         >
                           <Star
-                            color={rating <= reviewRating ? '#F5A524' : '#AEB8C4'}
-                            fill={rating <= reviewRating ? '#F5A524' : 'transparent'}
+                            color={rating <= reviewRating ? '#D4A853' : '#D4A853'}
+                            fill={rating <= reviewRating ? '#D4A853' : 'transparent'}
                             size={26}
                             strokeWidth={2.4}
                           />
@@ -383,7 +529,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                       multiline
                       onChangeText={setReviewComment}
                       placeholder="Что запомнилось? Например: аккуратно ехал, помог с багажом"
-                      placeholderTextColor="#8A8F98"
+                      placeholderTextColor="#A89F91"
                       style={styles.reviewInput}
                       value={reviewComment}
                     />
@@ -401,7 +547,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                         onPress={addDriverToFavorites}
                         style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
                       >
-                        <Heart color="#146C5D" size={17} strokeWidth={2.4} />
+                        <Heart color="#D4A853" size={17} strokeWidth={2.4} />
                         <Text style={styles.secondaryButtonText}>
                           {favoriteAdded ? 'В избранном' : 'В избранные'}
                         </Text>
@@ -416,20 +562,20 @@ export function OrderStatusScreen({ navigation, route }: Props) {
           <View style={[styles.sideColumn, isWide && styles.sideColumnWide]}>
             <View style={styles.panel}>
               <SectionHeader title="Маршрут" />
-              <InfoRow icon={<MapPinned color="#146C5D" size={18} />} label="Подача" value={displayedOrder.pickup} />
+              <InfoRow icon={<MapPinned color="#D4A853" size={18} />} label="Подача" value={displayedOrder.pickup} />
               <InfoRow
-                icon={<Route color="#146C5D" size={18} />}
+                icon={<Route color="#D4A853" size={18} />}
                 label="Назначение"
                 value={displayedOrder.destination}
               />
-              <InfoRow icon={<Clock3 color="#146C5D" size={18} />} label="Тариф" value={displayedOrder.tariff} />
+              <InfoRow icon={<Clock3 color="#D4A853" size={18} />} label="Тариф" value={displayedOrder.tariff} />
             </View>
 
             <View style={styles.panel}>
               <SectionHeader title={config.participantTitle} />
               <View style={styles.participant}>
                 <View style={styles.participantIcon}>
-                  <UserRound color="#146C5D" size={22} strokeWidth={2.4} />
+                  <UserRound color="#D4A853" size={22} strokeWidth={2.4} />
                 </View>
                 <View style={styles.participantCopy}>
                   <Text style={styles.participantName}>{participantName}</Text>
@@ -438,14 +584,14 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               </View>
               <View style={styles.miniActions}>
                 <MiniAction
-                  icon={<Phone color="#146C5D" size={16} />}
+                  icon={<Phone color="#D4A853" size={16} />}
                   label="Связь"
                   onPress={() => {
                     setContactOpen((current) => !current);
                     setContactResult(null);
                   }}
                 />
-                <MiniAction icon={<ShieldCheck color="#146C5D" size={16} />} label="Безопасность" />
+                <MiniAction icon={<ShieldCheck color="#D4A853" size={16} />} label="Безопасность" />
               </View>
               {contactOpen ? (
                 <View style={styles.contactPanel}>
@@ -455,7 +601,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                     onPress={() => chooseContact('chat')}
                     style={({ pressed }) => [styles.contactButton, pressed && styles.pressed]}
                   >
-                    <MessageCircle color="#146C5D" size={17} strokeWidth={2.4} />
+                    <MessageCircle color="#D4A853" size={17} strokeWidth={2.4} />
                     <Text style={styles.contactButtonText}>{config.chatActionLabel}</Text>
                   </Pressable>
                   <Pressable
@@ -463,7 +609,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                     onPress={() => chooseContact('call')}
                     style={({ pressed }) => [styles.contactButton, pressed && styles.pressed]}
                   >
-                    <Phone color="#146C5D" size={17} strokeWidth={2.4} />
+                    <Phone color="#D4A853" size={17} strokeWidth={2.4} />
                     <Text style={styles.contactButtonText}>{config.callActionLabel}</Text>
                   </Pressable>
                   <Text style={styles.contactPhone}>Мобильный номер: {contactPhone}</Text>
@@ -476,7 +622,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <SectionHeader title="Оплата и детали" />
               <View style={[styles.paymentStatusBox, isPaid && styles.paymentStatusBoxPaid]}>
                 <View style={styles.paymentStatusTop}>
-                  <CreditCard color={isPaid ? '#146C5D' : '#B7791F'} size={18} strokeWidth={2.4} />
+                  <CreditCard color={isPaid ? '#D4A853' : '#5C8D89'} size={18} strokeWidth={2.4} />
                   <Text style={styles.paymentStatusTitle}>{paymentStatusLabels[paymentStatus]}</Text>
                 </View>
                 <Text style={styles.paymentStatusText}>
@@ -496,19 +642,19 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                     style={({ pressed }) => [styles.paymentActionButton, pressed && styles.pressed]}
                   >
                     <Text style={styles.paymentActionButtonText}>
-                      {role === 'driver' ? 'Подтвердить оплату' : 'Оплатить демо'}
+                      {isDriverRole ? 'Подтвердить оплату' : 'Оплатить демо'}
                     </Text>
                   </Pressable>
                 ) : null}
               </View>
               <InfoRow
-                icon={<CreditCard color="#146C5D" size={18} />}
+                icon={<CreditCard color="#D4A853" size={18} />}
                 label="Способ"
                 value={displayedOrder.paymentMethod}
               />
-              <InfoRow icon={<ReceiptText color="#146C5D" size={18} />} label="Сумма" value={`${displayedOrder.total} ₽`} />
+              <InfoRow icon={<ReceiptText color="#D4A853" size={18} />} label="Сумма" value={`${displayedOrder.total} ₽`} />
               <InfoRow
-                icon={<ShieldCheck color="#146C5D" size={18} />}
+                icon={<ShieldCheck color="#D4A853" size={18} />}
                 label="Опции"
                 value={displayedOrder.options.length > 0 ? displayedOrder.options.join(', ') : 'Без дополнительных опций'}
               />
@@ -530,7 +676,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <View style={styles.detailList}>
                 {config.details.map((detail) => (
                   <View key={detail} style={styles.detailItem}>
-                    <Check color="#146C5D" size={15} strokeWidth={3} />
+                    <Check color="#D4A853" size={15} strokeWidth={3} />
                     <Text style={styles.detailText}>{detail}</Text>
                   </View>
                 ))}
@@ -546,6 +692,89 @@ export function OrderStatusScreen({ navigation, route }: Props) {
 type SectionHeaderProps = {
   title: string;
 };
+
+type TripPulseMapProps = {
+  destination: string;
+  driver: OrderParticipant;
+  etaFlickerAnim: Animated.Value;
+  etaMinutes: number;
+  isCompleted: boolean;
+  pickup: string;
+  pulseAnim: Animated.Value;
+  status?: string;
+};
+
+function TripPulseMap({
+  destination,
+  driver,
+  etaFlickerAnim,
+  etaMinutes,
+  isCompleted,
+  pickup,
+  pulseAnim,
+  status,
+}: TripPulseMapProps) {
+  const pulseScale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.65, 1.9],
+  });
+  const pulseOpacity = pulseAnim.interpolate({
+    inputRange: [0, 0.72, 1],
+    outputRange: [0.55, 0.18, 0],
+  });
+  const showDriver = Boolean(driver?.id && status && !['searching', 'created'].includes(status));
+
+  return (
+    <View style={styles.mapPanel}>
+      <View style={styles.mapRoute}>
+        <View style={styles.mapPoint} />
+        <View style={styles.mapLine} />
+        <View style={styles.mapPointFinish} />
+      </View>
+      <View style={styles.mapContent}>
+        <View style={styles.pulseStage}>
+          <Animated.View
+            style={[
+              styles.pulseRing,
+              {
+                opacity: pulseOpacity,
+                transform: [{ scale: pulseScale }],
+              },
+            ]}
+          />
+          <View style={styles.pulseRay} />
+          <View style={styles.pulseDot} />
+        </View>
+        <View style={styles.routeCopy}>
+          <Text numberOfLines={1} style={styles.routeTitle}>
+            {pickup}
+          </Text>
+          <Text numberOfLines={1} style={styles.routeTextMain}>
+            {destination}
+          </Text>
+          <Animated.Text style={[styles.etaText, { opacity: etaFlickerAnim }]}>
+            {isCompleted ? 'Поездка завершена' : `Подача примерно ${etaMinutes} мин`}
+          </Animated.Text>
+        </View>
+      </View>
+      {showDriver ? (
+        <View style={styles.driverSheet}>
+          <View style={styles.driverAvatar}>
+            <Car color="#0C0C0C" size={22} strokeWidth={2.6} />
+          </View>
+          <View style={styles.driverSheetCopy}>
+            <Text style={styles.driverSheetTitle}>{driver.name}</Text>
+            <Text style={styles.driverSheetText}>
+              {[driver.rating ? `рейтинг ${driver.rating}` : null, driver.vehicle, driver.plate]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 function SectionHeader({ title }: SectionHeaderProps) {
   return <Text style={styles.sectionTitle}>{title}</Text>;
@@ -614,7 +843,7 @@ function normalizeOrderStatus(status?: string) {
 
 function getPrimaryActionLabel(role: string, status: string, fallback: string) {
   if (role === 'client') {
-    return 'Обновить статус';
+    return fallback;
   }
 
   if (status === 'accepted') {
@@ -632,6 +861,23 @@ function getPrimaryActionLabel(role: string, status: string, fallback: string) {
   return fallback;
 }
 
+function calculateEtaMinutes(durationMin = 8, status?: string, updatedAt = new Date()) {
+  if (['completed', 'closed'].includes(status || '')) {
+    return 0;
+  }
+
+  if (status === 'started') {
+    return Math.max(2, Math.round(durationMin / 2));
+  }
+
+  if (status === 'arrived') {
+    return 1;
+  }
+
+  const drift = Math.floor(updatedAt.getSeconds() / 30);
+  return Math.max(2, Math.round(Math.min(18, durationMin || 8) - drift));
+}
+
 const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
@@ -640,8 +886,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -650,14 +896,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   contactButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -666,34 +912,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   contactButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     flex: 1,
     fontSize: 13,
     fontWeight: '900',
   },
   contactPanel: {
-    backgroundColor: '#EEF5F3',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 9,
     padding: 12,
   },
   contactPhone: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
   },
   contactResult: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#2C2926',
     borderRadius: 8,
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 12,
     lineHeight: 17,
     padding: 10,
   },
   contactTitle: {
-    color: '#0B4C42',
+    color: '#D4A853',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -706,21 +952,89 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   detailText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flex: 1,
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
-  hero: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+  driverAvatar: {
+    alignItems: 'center',
+    backgroundColor: '#F6C600',
+    borderRadius: 8,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  driverSheet: {
+    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
+    borderColor: '#F6C600',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 14,
-    padding: 18,
+    gap: 12,
+    marginTop: 14,
+    padding: 12,
+  },
+  driverSheetCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  driverSheetText: {
+    color: '#B0B0B0',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  driverSheetTitle: {
+    color: '#F5F5F5',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  etaText: {
+    color: '#F6C600',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  goodRoadCar: {
+    alignItems: 'center',
+    backgroundColor: '#F6C600',
+    borderRadius: 8,
+    height: 54,
+    justifyContent: 'center',
+    width: 54,
+  },
+  goodRoadCopy: {
+    gap: 5,
+  },
+  goodRoadPanel: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#F6C600',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  goodRoadText: {
+    color: '#B0B0B0',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  goodRoadTitle: {
+    color: '#F5F5F5',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  hero: {
+    alignItems: 'flex-start',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 12,
   },
   heroCopy: {
     flex: 1,
@@ -729,11 +1043,11 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
-    height: 58,
+    height: 46,
     justifyContent: 'center',
-    width: 58,
+    width: 46,
   },
   infoCopy: {
     flex: 1,
@@ -742,14 +1056,14 @@ const styles = StyleSheet.create({
   },
   infoIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 36,
     justifyContent: 'center',
     width: 36,
   },
   infoLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -759,7 +1073,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   infoValue: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
     lineHeight: 19,
@@ -771,20 +1085,95 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     flexDirection: 'row',
   },
+  liveCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  liveDot: {
+    backgroundColor: '#5C8D89',
+    borderRadius: 5,
+    height: 10,
+    marginTop: 5,
+    width: 10,
+  },
+  liveDotActive: {
+    backgroundColor: '#7A9A7E',
+  },
+  livePanel: {
+    alignItems: 'flex-start',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 9,
+    padding: 12,
+  },
+  liveText: {
+    color: '#A89F91',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
+  liveTitle: {
+    color: '#D4A853',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  mapContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 16,
+  },
+  mapLine: {
+    backgroundColor: '#F6C600',
+    borderRadius: 99,
+    flex: 1,
+    height: 3,
+  },
+  mapPanel: {
+    backgroundColor: '#0C0C0C',
+    borderColor: '#F6C600',
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: 'hidden',
+    padding: 12,
+  },
+  mapPoint: {
+    backgroundColor: '#F6C600',
+    borderRadius: 7,
+    height: 14,
+    width: 14,
+  },
+  mapPointFinish: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#F6C600',
+    borderRadius: 7,
+    borderWidth: 2,
+    height: 14,
+    width: 14,
+  },
+  mapRoute: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 18,
+  },
   mainColumn: {
     flex: 1,
     gap: 16,
     minWidth: 0,
   },
   metaLine: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   miniAction: {
     alignItems: 'center',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -801,28 +1190,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   miniActionText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#F4F7F5',
-    gap: 16,
+    backgroundColor: '#1E1C1A',
+    gap: 12,
     minHeight: '100%',
-    padding: 16,
+    padding: 14,
   },
   panel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 14,
-    padding: 16,
+    gap: 10,
+    padding: 12,
   },
   paymentActionButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#146C5D',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -830,29 +1219,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   paymentActionButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   paymentStatusBox: {
-    backgroundColor: '#FFF3E5',
-    borderColor: '#F3C38A',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
     padding: 12,
   },
   paymentStatusBoxPaid: {
-    backgroundColor: '#EAF6EA',
-    borderColor: '#B9DDBB',
+    backgroundColor: '#37322E',
+    borderColor: '#7A9A7E',
   },
   paymentStatusText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   paymentStatusTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -873,60 +1262,92 @@ const styles = StyleSheet.create({
   },
   participantIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 42,
     justifyContent: 'center',
     width: 42,
   },
   participantMeta: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   participantName: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 15,
     fontWeight: '900',
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 48,
     paddingHorizontal: 16,
   },
   primaryButtonMuted: {
-    backgroundColor: '#89958F',
+    backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 14,
     fontWeight: '900',
   },
   progressFill: {
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 99,
     height: '100%',
   },
   progressText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
   },
   progressTrack: {
-    backgroundColor: '#DDE5E2',
+    backgroundColor: '#37322E',
     borderRadius: 99,
     height: 9,
     overflow: 'hidden',
   },
+  pulseDot: {
+    backgroundColor: '#F6C600',
+    borderRadius: 10,
+    height: 20,
+    position: 'absolute',
+    width: 20,
+  },
+  pulseRay: {
+    backgroundColor: '#F6C600',
+    borderRadius: 99,
+    height: 4,
+    position: 'absolute',
+    right: 2,
+    top: 39,
+    transform: [{ rotate: '-18deg' }],
+    width: 42,
+  },
+  pulseRing: {
+    borderColor: '#F6C600',
+    borderRadius: 42,
+    borderWidth: 2,
+    height: 84,
+    position: 'absolute',
+    width: 84,
+  },
+  pulseStage: {
+    alignItems: 'center',
+    height: 90,
+    justifyContent: 'center',
+    width: 96,
+  },
   receiptBox: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 7,
@@ -939,18 +1360,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   receiptText: {
-    color: '#59616C',
+    color: '#A89F91',
     flex: 1,
     fontSize: 12,
     lineHeight: 17,
   },
   receiptTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   receiptValue: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 12,
     fontWeight: '900',
   },
@@ -960,8 +1381,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   reviewChip: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 38,
@@ -969,8 +1390,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
   },
   reviewChipActive: {
-    backgroundColor: '#146C5D',
-    borderColor: '#146C5D',
+    backgroundColor: '#D4A853',
+    borderColor: '#D4A853',
   },
   reviewChips: {
     flexDirection: 'row',
@@ -978,40 +1399,55 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   reviewChipText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '900',
   },
   reviewChipTextActive: {
-    color: '#FFFFFF',
+    color: '#F5F0E8',
   },
   reviewInput: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#A89F91',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     minHeight: 82,
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
   reviewIntro: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 19,
   },
   reviewPanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 13,
-    padding: 16,
+    gap: 10,
+    padding: 12,
+  },
+  routeCopy: {
+    flex: 1,
+    gap: 6,
+    minWidth: 0,
+  },
+  routeTextMain: {
+    color: '#B0B0B0',
+    fontSize: 14,
+    lineHeight: 19,
+  },
+  routeTitle: {
+    color: '#F5F5F5',
+    fontSize: 18,
+    fontWeight: '900',
   },
   rolePill: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 7,
@@ -1019,18 +1455,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   rolePillText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1040,32 +1476,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   sectionTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 18,
     fontWeight: '900',
   },
   savedReviewBox: {
-    backgroundColor: '#EAF6EA',
-    borderColor: '#B9DDBB',
+    backgroundColor: '#37322E',
+    borderColor: '#7A9A7E',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 12,
   },
   savedReviewText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 19,
   },
   savedReviewTitle: {
-    color: '#26733E',
+    color: '#7A9A7E',
     fontSize: 15,
     fontWeight: '900',
+  },
+  spark: {
+    backgroundColor: '#F6C600',
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  sparkRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sparkSmall: {
+    height: 5,
+    marginTop: 2,
+    width: 5,
   },
   sideColumn: {
     flexShrink: 0,
@@ -1087,27 +1538,27 @@ const styles = StyleSheet.create({
   },
   statusIcon: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
     width: 46,
   },
   statusPanel: {
-    backgroundColor: '#E9F4F1',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 14,
-    padding: 16,
+    gap: 10,
+    padding: 12,
   },
   statusText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 14,
     lineHeight: 20,
   },
   statusTitle: {
-    color: '#0B4C42',
+    color: '#D4A853',
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 27,
@@ -1125,23 +1576,23 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   stepDescription: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   stepDot: {
-    backgroundColor: '#DDE5E2',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 24,
     marginTop: 1,
     width: 24,
   },
   stepDotActive: {
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
   },
   stepDotDone: {
     alignItems: 'center',
-    backgroundColor: '#26733E',
+    backgroundColor: '#7A9A7E',
     justifyContent: 'center',
   },
   stepRow: {
@@ -1150,26 +1601,26 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   steps: {
-    gap: 13,
+    gap: 10,
   },
   stepTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   stepTitleActive: {
-    color: '#146C5D',
+    color: '#D4A853',
   },
   subtitle: {
-    color: '#59616C',
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#A89F91',
+    fontSize: 14,
+    lineHeight: 20,
   },
   title: {
-    color: '#20242A',
-    fontSize: 30,
+    color: '#F5F0E8',
+    fontSize: 24,
     fontWeight: '900',
-    lineHeight: 36,
+    lineHeight: 30,
   },
   topBar: {
     alignItems: 'center',

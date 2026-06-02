@@ -5,14 +5,31 @@ export type OrderStatusSummary = {
   pickup: string;
   destination: string;
   tariff: string;
+  tariffId?: string;
   total: number;
   paymentMethod: string;
   options: string[];
+  optionsTotal?: number;
+  routeEstimate?: {
+    confidence: 'draft' | 'estimated' | 'preset';
+    calculatedAt?: string;
+    currency?: 'RUB' | string;
+    distanceKm: number;
+    distancePrice: number;
+    durationMin: number;
+    eta?: string;
+    note: string;
+    surgeCoefficient?: number;
+    tariffId?: string;
+    total: number;
+  };
+  surgeCoefficient?: number;
 };
 
 export type RootStackParamList = {
   Welcome: undefined;
   Login: undefined;
+  PasswordReset: undefined;
   AdminPanel: undefined;
   Registration:
     | {

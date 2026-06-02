@@ -27,8 +27,9 @@ try {
 
   await waitForBackend();
 
-  const firstDriver = await createReadyDriver('First Driver', '+79001000001', 'A101AA102');
-  const secondDriver = await createReadyDriver('Second Driver', '+79001000002', 'A202AA102');
+  const admin = await loginAdmin();
+  const firstDriver = await createReadyDriver(admin.session.token, 'First Driver', '+79001000001', 'A101AA102');
+  const secondDriver = await createReadyDriver(admin.session.token, 'Second Driver', '+79001000002', 'A202AA102');
   const order = await createOrder({
     clientName: 'Dispatch Client',
     clientPhone: '+79009999999',
@@ -50,6 +51,7 @@ try {
 
   assert(accepted.order.status === 'accepted', `Expected accepted order, got ${accepted.order.status}`);
   assert(accepted.order.driver?.id === firstDriver.id, 'First driver should own the order');
+  assert(accepted.order.tripPin, 'Assigned order should expose client trip PIN');
 
   await expectApiFailure(`/orders/${encodeURIComponent(order.id)}/assign`, {
     body: { driverId: secondDriver.id },
@@ -58,7 +60,7 @@ try {
 
   for (const status of ['arrived', 'started', 'completed']) {
     const result = await api(`/orders/${encodeURIComponent(order.id)}/status`, {
-      body: { status },
+      body: { pinCode: status === 'started' ? accepted.order.tripPin : undefined, status },
       method: 'PATCH',
     });
 
@@ -73,6 +75,57 @@ try {
   assert(completed?.paidAt, 'Completed order should have paidAt');
   assert(completed?.paymentEvents?.some((item) => item.status === 'paid'), 'Payment history should include paid');
   assert(completed?.statusHistory?.some((item) => item.status === 'accepted'), 'Status history should include accept');
+  assert(completed?.driverCollectedAmount === completed?.total, 'Driver should collect the full trip amount');
+  assert(completed?.serviceShareRate === 7, `Expected 7% service share, got ${completed?.serviceShareRate}`);
+  assert(
+    completed?.serviceShareAmount === Math.round((completed?.total || 0) * 0.07),
+    `Expected service share from total, got ${completed?.serviceShareAmount}`,
+  );
+  assert(completed?.serviceShareStatus === 'pending_transfer', 'Service share should wait for daily transfer');
+  assert(
+    completed?.driverNetAmount === (completed?.total || 0) - (completed?.serviceShareAmount || 0),
+    'Driver net amount should be total minus service share',
+  );
+
+  const reportedTransfer = await api(`/orders/${encodeURIComponent(order.id)}/service-share`, {
+    body: {
+      note: 'Smoke driver transfer report',
+      status: 'reported_transferred',
+    },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+  assert(
+    reportedTransfer.order.serviceShareStatus === 'reported_transferred',
+    'Driver should be able to report service share transfer',
+  );
+  assert(reportedTransfer.order.serviceShareReportedAt, 'Transfer report should store reportedAt');
+
+  const confirmedTransfer = await api(`/orders/${encodeURIComponent(order.id)}/service-share`, {
+    body: {
+      note: 'Smoke admin transfer confirmation',
+      status: 'confirmed',
+    },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+  assert(
+    confirmedTransfer.order.serviceShareStatus === 'confirmed',
+    'Admin should confirm service share receipt',
+  );
+  assert(confirmedTransfer.order.serviceShareConfirmedAt, 'Transfer confirmation should store confirmedAt');
+
+  const shareSummary = await api(
+    `/service-share/summary?date=${encodeURIComponent(confirmedTransfer.order.serviceShareBatchDate)}`,
+    {
+      token: admin.session.token,
+    },
+  );
+  assert(shareSummary.summary.orders.length >= 1, 'Service share summary should include completed order');
+  assert(
+    shareSummary.summary.summary.confirmedAmount >= completed.serviceShareAmount,
+    'Service share summary should include confirmed amount',
+  );
 
   const refunded = await api(`/orders/${encodeURIComponent(order.id)}/payment`, {
     body: { note: 'Smoke refund check', paymentStatus: 'refunded' },
@@ -89,7 +142,16 @@ try {
   await rm(dbPath, { force: true });
 }
 
-async function createReadyDriver(name, phone, plate) {
+async function loginAdmin() {
+  return api('/auth/admin-login', {
+    body: {
+      password: 'smoke-admin',
+    },
+    method: 'POST',
+  });
+}
+
+async function createReadyDriver(adminToken, name, phone, plate) {
   const created = await api('/drivers', {
     body: {
       billingMode: 'commission',
@@ -101,6 +163,7 @@ async function createReadyDriver(name, phone, plate) {
       vehicle: 'Lada Vesta',
     },
     method: 'POST',
+    token: adminToken,
   });
 
   const compliant = await api(`/drivers/${encodeURIComponent(created.driver.id)}/compliance`, {
@@ -112,6 +175,7 @@ async function createReadyDriver(name, phone, plate) {
       vehiclePermitStatus: 'approved',
     },
     method: 'PATCH',
+    token: adminToken,
   });
 
   assert(compliant.driver.canReceiveOrders, `${name} should be allowed to receive orders`);
@@ -146,6 +210,7 @@ async function api(path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: options.method || 'GET',
     headers: {
+      ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
       accept: 'application/json',
       'content-type': 'application/json',
     },

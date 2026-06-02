@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -693,6 +693,26 @@ function mergeHouseRecords(...recordGroups) {
   return Array.from(records.values()).sort(compareHouseRecords);
 }
 
+async function loadExistingHouseRecords() {
+  try {
+    const text = await readFile(outputPath, 'utf8');
+    const marker = 'export const salavatDistrictHouses: SalavatHouseRecord[] = ';
+    const markerIndex = text.indexOf(marker);
+    const arrayStart = markerIndex >= 0 ? text.indexOf('[', markerIndex) : -1;
+    const arrayEnd = text.lastIndexOf('];');
+
+    if (arrayStart < 0 || arrayEnd < arrayStart) {
+      return [];
+    }
+
+    const source = text.slice(arrayStart, arrayEnd + 1);
+    const parsed = Function(`"use strict"; return (${source});`)();
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function compareHouseRecords(left, right) {
   const settlementOrder = left.settlement.localeCompare(right.settlement, 'ru');
   const streetOrder = left.street.localeCompare(right.street, 'ru');
@@ -758,6 +778,7 @@ export const salavatDistrictHouses: SalavatHouseRecord[] = ${json};
 `;
 }
 
+const existingRecords = await loadExistingHouseRecords();
 let fiasImport = { fiasVersion: null, records: [] };
 let osmRecords = [];
 let osmQueryMode = 'none';
@@ -782,13 +803,14 @@ try {
   console.warn(`OSM house import skipped: ${error.message}`);
 }
 
-const records = mergeHouseRecords(fiasImport.records, osmRecords);
+const records = mergeHouseRecords(existingRecords, fiasImport.records, osmRecords);
 
 await writeFile(
   outputPath,
   serializeTs(records, {
     fiasVersion: fiasImport.fiasVersion,
     garCount: fiasImport.records.length,
+    existingCount: existingRecords.length,
     osmCount: osmRecords.length,
     osmQueryMode,
     osmRawCount,

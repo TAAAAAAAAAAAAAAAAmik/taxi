@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, Gift, LockKeyhole, ShieldCheck, MapPinned, ReceiptText, Wallet } from 'lucide-react-native';
+import { ArrowLeft, Eye, Gift, LockKeyhole, ShieldCheck, MapPinned, ReceiptText, Wallet } from 'lucide-react-native';
 import {
   Pressable,
   SafeAreaView,
@@ -17,9 +17,25 @@ import {
   salavatDistrictStreetSourceSummary,
 } from '../data/salavatDistrict';
 import { salavatDistrictHouseSourceSummary, salavatDistrictHouses } from '../data/salavatDistrictHouses';
+import { isSelfEmployedDriverRole } from '../data/registration';
 import { driverAccessPlans } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
-import { DriverDocumentKind, DriverDocumentUpload, useAppState } from '../state/AppState';
+import {
+  AdminAddressPoint,
+  createAdminAddress,
+  deleteAdminAddress,
+  fetchAdminAddresses,
+  fetchDriverDocumentFile,
+  updateAdminAddress,
+} from '../services/apiClient';
+import {
+  AppOrder,
+  DriverDocumentAuditEntry,
+  DriverDocumentKind,
+  DriverDocumentUpload,
+  useAppState,
+} from '../state/AppState';
+import { isDemoModeEnabled } from '../utils/runtimeFlags';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminPanel'>;
 
@@ -27,6 +43,19 @@ const demoAdminPassword = 'admin-demo-5000';
 
 export function AdminPanelScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
+  const [documentAccessNotices, setDocumentAccessNotices] = useState<Record<string, string>>({});
+  const [documentReviewReasons, setDocumentReviewReasons] = useState<Record<string, string>>({});
+  const [addressNotice, setAddressNotice] = useState('');
+  const [adminAddresses, setAdminAddresses] = useState<AdminAddressPoint[]>([]);
+  const [addressForm, setAddressForm] = useState({
+    category: 'address',
+    latitude: '',
+    longitude: '',
+    settlement: 'Салаватский район',
+    subtitle: '',
+    title: '',
+  });
+  const [editingAddressId, setEditingAddressId] = useState<string | undefined>();
   const [submitted, setSubmitted] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const {
@@ -36,15 +65,196 @@ export function AdminPanelScreen({ navigation }: Props) {
     drivers,
     orders,
     loginAdmin,
+    notifications,
     refreshAdminReferralDashboard,
     refreshServerData,
+    refreshServiceShareSummary,
+    realtimeMessage,
+    realtimeStatus,
+    realtimeUpdatedAt,
+    reviewDriverDocuments,
     serverMessage,
     serverStatus,
+    serviceShareSummary,
     supportThreads,
+    updateDriverAccess,
     updateDriverComplianceStatus,
+    updateOrderServiceShareStatus,
     updateDriverReviewStatus,
   } = useAppState();
   const approvedDrivers = drivers.filter((driver) => driver.canReceiveOrders);
+  const expiringPolicyUploads = drivers.flatMap((driver) =>
+    (['osago', 'osgop'] as DriverDocumentKind[])
+      .map((kind) => ({ driver, kind, upload: driver.documentUploads?.[kind] }))
+      .filter(({ upload }) => isExpiringPolicy(upload)),
+  );
+  const showDemoAdmin = isDemoModeEnabled();
+  const dailyServiceShare = useMemo(
+    () => serviceShareSummary ?? buildLocalServiceShareSummary(orders),
+    [orders, serviceShareSummary],
+  );
+
+  const loadAdminAddresses = useCallback(async () => {
+    try {
+      const addresses = await fetchAdminAddresses();
+      setAdminAddresses(addresses);
+      setAddressNotice(`Адресный слой обновлен: ${addresses.length} ручных точек.`);
+    } catch (error) {
+      setAddressNotice(error instanceof Error ? error.message : 'Не удалось загрузить адреса.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (unlocked) {
+      void loadAdminAddresses();
+      void refreshServiceShareSummary();
+    }
+  }, [loadAdminAddresses, refreshServiceShareSummary, unlocked]);
+
+  const updateAddressForm = (field: keyof typeof addressForm, value: string) => {
+    setAddressForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const resetAddressForm = () => {
+    setEditingAddressId(undefined);
+    setAddressForm({
+      category: 'address',
+      latitude: '',
+      longitude: '',
+      settlement: 'Салаватский район',
+      subtitle: '',
+      title: '',
+    });
+  };
+
+  const editAddress = (address: AdminAddressPoint) => {
+    setEditingAddressId(address.id);
+    setAddressForm({
+      category: address.category,
+      latitude: address.coordinates?.latitude ? String(address.coordinates.latitude) : '',
+      longitude: address.coordinates?.longitude ? String(address.coordinates.longitude) : '',
+      settlement: address.settlement,
+      subtitle: address.subtitle,
+      title: address.title,
+    });
+  };
+
+  const saveAddress = async () => {
+    const title = addressForm.title.trim();
+
+    if (!title) {
+      setAddressNotice('Укажите название улицы, дома или POI.');
+      return;
+    }
+
+    const latitude = Number(addressForm.latitude.replace(',', '.'));
+    const longitude = Number(addressForm.longitude.replace(',', '.'));
+    const coordinates =
+      Number.isFinite(latitude) && Number.isFinite(longitude)
+        ? { latitude, longitude }
+        : undefined;
+    const payload = {
+      category: addressForm.category.trim() || 'address',
+      coordinates,
+      displayAddress: [title, addressForm.subtitle.trim()].filter(Boolean).join(', '),
+      settlement: addressForm.settlement.trim() || 'Салаватский район',
+      subtitle: addressForm.subtitle.trim(),
+      title,
+    };
+
+    try {
+      const address = editingAddressId
+        ? await updateAdminAddress(editingAddressId, payload)
+        : await createAdminAddress(payload);
+      setAdminAddresses((current) => [
+        address,
+        ...current.filter((item) => item.id !== address.id),
+      ]);
+      setAddressNotice(editingAddressId ? 'Адрес обновлен и попадет в подсказки.' : 'Адрес добавлен в подсказки.');
+      resetAddressForm();
+    } catch (error) {
+      setAddressNotice(error instanceof Error ? error.message : 'Не удалось сохранить адрес.');
+    }
+  };
+
+  const removeAddress = async (addressId: string) => {
+    try {
+      await deleteAdminAddress(addressId);
+      setAdminAddresses((current) => current.filter((address) => address.id !== addressId));
+      setAddressNotice('Адрес удален из ручного слоя подсказок.');
+      if (editingAddressId === addressId) {
+        resetAddressForm();
+      }
+    } catch (error) {
+      setAddressNotice(error instanceof Error ? error.message : 'Не удалось удалить адрес.');
+    }
+  };
+
+  const updateDocumentReviewReason = (driverId: string, reason: string) => {
+    setDocumentReviewReasons((current) => ({
+      ...current,
+      [driverId]: reason,
+    }));
+  };
+
+  const approveDriverDocuments = async (driverId: string) => {
+    await reviewDriverDocuments(driverId, {
+      note: documentReviewReasons[driverId],
+      status: 'approved',
+    });
+    updateDocumentReviewReason(driverId, '');
+  };
+
+  const openDriverDocumentFile = async (driverId: string, kind: DriverDocumentKind) => {
+    const noticeKey = `${driverId}:${kind}`;
+
+    setDocumentAccessNotices((current) => ({
+      ...current,
+      [noticeKey]: 'Открываем защищенный файл...',
+    }));
+
+    try {
+      const file = await fetchDriverDocumentFile(driverId, kind);
+      const browserBridge = globalThis as typeof globalThis & {
+        URL?: {
+          createObjectURL?: (blob: Blob) => string;
+          revokeObjectURL?: (url: string) => void;
+        };
+        open?: (url: string, target?: string, features?: string) => unknown;
+      };
+      const objectUrl = browserBridge.URL?.createObjectURL?.(file.blob);
+
+      if (objectUrl && typeof browserBridge.open === 'function') {
+        browserBridge.open(objectUrl, '_blank', 'noopener,noreferrer');
+        setTimeout(() => browserBridge.URL?.revokeObjectURL?.(objectUrl), 60_000);
+      }
+
+      setDocumentAccessNotices((current) => ({
+        ...current,
+        [noticeKey]: `${documentLabels[kind]}: файл доступен сотруднику (${formatFileSize(file.size)}).`,
+      }));
+    } catch (error) {
+      setDocumentAccessNotices((current) => ({
+        ...current,
+        [noticeKey]: `Не удалось открыть ${documentLabels[kind]}: ${
+          error instanceof Error ? error.message : 'ошибка доступа'
+        }`,
+      }));
+    }
+  };
+
+  const rejectDriverDocuments = async (driverId: string, rejectedKinds: DriverDocumentKind[]) => {
+    const reason = documentReviewReasons[driverId]?.trim() || 'Фото не читается или данные не совпадают.';
+
+    await reviewDriverDocuments(driverId, {
+      reason,
+      rejectedKinds,
+      status: 'rejected',
+    });
+  };
 
   const stats = useMemo(
     () => [
@@ -121,7 +331,7 @@ export function AdminPanelScreen({ navigation }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#146C5D" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
         </View>
@@ -129,10 +339,10 @@ export function AdminPanelScreen({ navigation }: Props) {
         {!unlocked ? (
           <View style={styles.loginCard}>
             <View style={styles.iconWrap}>
-              <LockKeyhole color="#146C5D" size={30} strokeWidth={2.4} />
+              <LockKeyhole color="#D4A853" size={30} strokeWidth={2.4} />
             </View>
-            <Text style={styles.title}>Админ-панель</Text>
-            <Text style={styles.subtitle}>
+            <Text numberOfLines={2} style={styles.title}>Админ-панель</Text>
+            <Text numberOfLines={3} style={styles.subtitle}>
               Для входа нужен только личный пароль администратора. Логин, телефон и почта не
               запрашиваются.
             </Text>
@@ -148,7 +358,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 }}
                 onSubmitEditing={() => handleSubmit()}
                 placeholder="Введите личный пароль"
-                placeholderTextColor="#8A8F98"
+                placeholderTextColor="#A89F91"
                 secureTextEntry
                 style={styles.input}
                 value={password}
@@ -163,42 +373,56 @@ export function AdminPanelScreen({ navigation }: Props) {
               onPress={() => handleSubmit()}
               style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
             >
-              <ShieldCheck color="#FFFFFF" size={18} strokeWidth={2.4} />
+              <ShieldCheck color="#F5F0E8" size={18} strokeWidth={2.4} />
               <Text style={styles.primaryButtonText}>Войти в админ-панель</Text>
             </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              onPress={handleDemoSubmit}
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-            >
-              <LockKeyhole color="#146C5D" size={18} strokeWidth={2.4} />
-              <Text style={styles.secondaryButtonText}>Демо-админ</Text>
-            </Pressable>
+            {showDemoAdmin ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={handleDemoSubmit}
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+              >
+                <LockKeyhole color="#D4A853" size={18} strokeWidth={2.4} />
+                <Text style={styles.secondaryButtonText}>Демо-админ</Text>
+              </Pressable>
+            ) : null}
 
-            <Text style={styles.helperText}>
-              Пароль проверяется на MVP backend. Для локального запуска по умолчанию:
-              admin-demo-5000. Перед пилотом задайте MVP_ADMIN_PASSWORD.
+            <Text numberOfLines={3} style={styles.helperText}>
+              {showDemoAdmin
+                ? 'Пароль проверяется на MVP backend. Для локального запуска по умолчанию: admin-demo-5000. Перед пилотом задайте MVP_ADMIN_PASSWORD.'
+                : 'Пароль проверяется на backend. Для production задайте MVP_ADMIN_PASSWORD в секретах окружения.'}
             </Text>
           </View>
         ) : (
           <View style={styles.adminLayout}>
             <View style={styles.headerCard}>
-              <Text style={styles.title}>Админ-панель</Text>
-              <Text style={styles.subtitle}>
+              <Text numberOfLines={2} style={styles.title}>Админ-панель</Text>
+              <Text numberOfLines={2} style={styles.subtitle}>
                 Быстрый контроль MVP: заказы, поддержка, адресный слой и модель оплаты водителей.
               </Text>
             </View>
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <ShieldCheck color="#146C5D" size={20} strokeWidth={2.4} />
+                <ShieldCheck color="#D4A853" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Backend</Text>
               </View>
               <Text style={styles.sectionText}>
                 Статус: {serverStatus === 'connected' ? 'подключен' : 'локальный режим'}.
               </Text>
-              <Text style={styles.sectionTextMuted}>{serverMessage}</Text>
+              <Text style={styles.sectionText}>
+                Real-time: {formatRealtimeStatus(realtimeStatus)}
+                {realtimeUpdatedAt ? ` · ${new Date(realtimeUpdatedAt).toLocaleTimeString('ru-RU')}` : ''}.
+              </Text>
+              <Text numberOfLines={2} style={styles.sectionTextMuted}>{serverMessage}</Text>
+              <Text numberOfLines={2} style={styles.sectionTextMuted}>{realtimeMessage}</Text>
+              {notifications[0] ? (
+                <View style={styles.orderRow}>
+                  <Text numberOfLines={1} style={styles.orderTitle}>{notifications[0].title}</Text>
+                  <Text numberOfLines={2} style={styles.orderText}>{notifications[0].body}</Text>
+                </View>
+              ) : null}
               <Pressable
                 accessibilityRole="button"
                 onPress={refreshServerData}
@@ -211,38 +435,71 @@ export function AdminPanelScreen({ navigation }: Props) {
             <View style={styles.statsGrid}>
               {stats.map((item) => (
                 <View key={item.label} style={styles.statCard}>
-                  <Text style={styles.statLabel}>{item.label}</Text>
+                  <Text numberOfLines={1} style={styles.statLabel}>{item.label}</Text>
                   <Text style={styles.statValue}>{item.value}</Text>
-                  <Text style={styles.statHelper}>{item.helper}</Text>
+                  <Text numberOfLines={2} style={styles.statHelper}>{item.helper}</Text>
                 </View>
               ))}
             </View>
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <Wallet color="#146C5D" size={20} strokeWidth={2.4} />
-                <Text style={styles.sectionTitle}>Оплата водителя</Text>
+                <Wallet color="#D4A853" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Расчеты с водителем</Text>
               </View>
               <PlanRow title={driverAccessPlans.monthly.name} value={driverAccessPlans.monthly.headline} />
               <PlanRow title={driverAccessPlans.commission.name} value={driverAccessPlans.commission.headline} />
               <Text style={styles.sectionText}>
-                Текущая локальная модель водителя: {driverSubscription.planName}. Статус:{' '}
-                {driverSubscription.status}.
+                Сегодня: собрано {dailyServiceShare.summary.totalCollectedAmount} ₽, доля сервиса{' '}
+                {dailyServiceShare.summary.totalServiceShareAmount} ₽, ожидает перевода{' '}
+                {dailyServiceShare.summary.pendingTransferAmount} ₽, водитель отметил{' '}
+                {dailyServiceShare.summary.reportedTransferAmount} ₽, подтверждено{' '}
+                {dailyServiceShare.summary.confirmedAmount} ₽.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => refreshServiceShareSummary()}
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.secondaryButtonText}>Обновить сверку</Text>
+              </Pressable>
+              {dailyServiceShare.drivers.length ? (
+                dailyServiceShare.drivers.slice(0, 6).map((driver) => (
+                  <View key={driver.driverId} style={styles.orderRow}>
+                    <Text style={styles.orderTitle}>
+                      {driver.driverName} · {driver.ordersCount} заказов
+                    </Text>
+                    <Text style={styles.orderText}>
+                      Собрано {driver.totalCollectedAmount} ₽ · доля сервиса{' '}
+                      {driver.totalServiceShareAmount} ₽
+                    </Text>
+                    <Text style={styles.orderText}>
+                      Ожидает {driver.pendingTransferAmount} ₽ · отмечено водителем{' '}
+                      {driver.reportedTransferAmount} ₽ · подтверждено {driver.confirmedAmount} ₽
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.sectionTextMuted}>Сегодня нет начисленной доли сервиса.</Text>
+              )}
+              <Text numberOfLines={2} style={styles.sectionText}>
+                В схеме доли сервиса клиент платит водителю напрямую, а backend начисляет сумму к
+                вечернему переводу по завершенным поездкам.
               </Text>
             </View>
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <Gift color="#146C5D" size={20} strokeWidth={2.4} />
+                <Gift color="#D4A853" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Рефералы</Text>
               </View>
-              <Text style={styles.sectionText}>
+              <Text numberOfLines={2} style={styles.sectionText}>
                 Всего: {adminReferralDashboard?.summary.referrals ?? 0}. Регистрация:{' '}
                 {adminReferralDashboard?.summary.registered ?? 0}. В процессе:{' '}
                 {adminReferralDashboard?.summary.qualified ?? 0}. Начислено:{' '}
                 {adminReferralDashboard?.summary.rewarded ?? 0}.
               </Text>
-              <Text style={styles.sectionTextMuted}>
+              <Text numberOfLines={1} style={styles.sectionTextMuted}>
                 Бонусных операций: {adminReferralDashboard?.summary.walletEntries ?? 0}. Сумма:{' '}
                 {adminReferralDashboard?.summary.walletTotal ?? 0} ₽.
               </Text>
@@ -256,14 +513,14 @@ export function AdminPanelScreen({ navigation }: Props) {
               {adminReferralDashboard?.referrals.length ? (
                 adminReferralDashboard.referrals.slice(0, 8).map((referral) => (
                   <View key={referral.id} style={styles.orderRow}>
-                    <Text style={styles.orderTitle}>
+                    <Text numberOfLines={1} style={styles.orderTitle}>
                       {referral.inviterName} → {referral.inviteeName}
                     </Text>
-                    <Text style={styles.orderText}>
-                      {referral.inviteeRole === 'driver' ? 'Водитель' : 'Клиент'} · {referral.status} ·{' '}
+                    <Text numberOfLines={1} style={styles.orderText}>
+                      {isSelfEmployedDriverRole(referral.inviteeRole) ? 'Самозанятый водитель' : 'Клиент'} · {referral.status} ·{' '}
                       {referral.rewardAmount} ₽
                     </Text>
-                    <Text style={styles.orderText}>
+                    <Text numberOfLines={1} style={styles.orderText}>
                       Прогресс: {referral.progress?.completedOrders ?? 0}/
                       {referral.progress?.requiredOrders ?? 0} поездок · код {referral.code}
                     </Text>
@@ -276,20 +533,41 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <ShieldCheck color="#146C5D" size={20} strokeWidth={2.4} />
+                <ShieldCheck color="#D4A853" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Водители</Text>
               </View>
-              {drivers.map((driver) => (
+              {expiringPolicyUploads.length ? (
+                <View style={styles.reviewBox}>
+                  <Text style={styles.orderTitle}>Истекающие полисы</Text>
+                  {expiringPolicyUploads.map(({ driver, kind, upload }) => (
+                    <Text numberOfLines={1} key={`${driver.id}:${kind}`} style={styles.orderText}>
+                      {driver.name}: {documentLabels[kind]} до {formatDate(upload?.expiresAt)}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+              {drivers.map((driver) => {
+                const uploadedDocumentKinds = (Object.keys(driver.documentUploads ?? {}) as DriverDocumentKind[]);
+                const requiredDocumentCount = Object.keys(documentLabels).length;
+                const rejectedDocumentKinds = driver.documentReview?.rejectedKinds.length
+                  ? driver.documentReview.rejectedKinds
+                  : uploadedDocumentKinds;
+
+                return (
                 <View key={driver.id} style={styles.orderRow}>
-                  <Text style={styles.orderTitle}>
+                  <Text numberOfLines={1} style={styles.orderTitle}>
                     {driver.name} · {driver.vehicle || 'авто не указано'}
                   </Text>
-                  <Text style={styles.orderText}>
+                  <Text numberOfLines={1} style={styles.orderText}>
                     {driver.phone || 'телефон не указан'} · {driver.plate || 'номер не указан'} · статус:{' '}
                     {driver.status}
                   </Text>
-                  <Text style={styles.orderText}>
+                  <Text numberOfLines={1} style={styles.orderText}>
                     Допуск к заказам: {driver.canReceiveOrders ? 'открыт' : 'закрыт'}.
+                  </Text>
+                  <Text numberOfLines={1} style={styles.orderText}>
+                    Пилотный доступ: {driver.subscriptionStatus}
+                    {driver.accessExpiresAt ? ` до ${formatDate(driver.accessExpiresAt)}` : ''}.
                   </Text>
                   <View style={styles.complianceGrid}>
                     <CompliancePill label="Документы" value={driver.documentsStatus} readyValue="approved" />
@@ -298,7 +576,53 @@ export function AdminPanelScreen({ navigation }: Props) {
                     <CompliancePill label="Реестр" value={driver.registryStatus} readyValue="active" />
                     <CompliancePill label="Налоги" value={driver.taxProfileStatus} readyValue="approved" />
                   </View>
-                  <DocumentUploadSummary uploads={driver.documentUploads} />
+                  <DocumentUploadSummary
+                    audit={driver.documentAudit}
+                    getAccessNotice={(kind) => documentAccessNotices[`${driver.id}:${kind}`]}
+                    onOpenDocument={(kind) => openDriverDocumentFile(driver.id, kind)}
+                    uploads={driver.documentUploads}
+                  />
+                  <View style={styles.reviewBox}>
+                    <Text style={styles.documentUploadTitle}>Модерация документов</Text>
+                    <Text numberOfLines={2} style={styles.orderText}>
+                      Решение: {driver.documentReview?.status ?? driver.documentsStatus}. Причина:{' '}
+                      {driver.documentReview?.reason || 'не указана'}.
+                    </Text>
+                    <TextInput
+                      onChangeText={(value) => updateDocumentReviewReason(driver.id, value)}
+                      placeholder="Причина отказа или заметка проверки"
+                      placeholderTextColor="#81786B"
+                      style={styles.reasonInput}
+                      value={documentReviewReasons[driver.id] ?? ''}
+                    />
+                    <View style={styles.rowActions}>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={uploadedDocumentKinds.length < requiredDocumentCount}
+                        onPress={() => approveDriverDocuments(driver.id)}
+                        style={({ pressed }) => [
+                          styles.smallButton,
+                          uploadedDocumentKinds.length < requiredDocumentCount && styles.mutedButton,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={styles.smallButtonText}>Одобрить документы</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={!uploadedDocumentKinds.length}
+                        onPress={() => rejectDriverDocuments(driver.id, rejectedDocumentKinds)}
+                        style={({ pressed }) => [
+                          styles.smallButton,
+                          styles.dangerButton,
+                          !uploadedDocumentKinds.length && styles.mutedButton,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={styles.dangerButtonText}>Отклонить с причиной</Text>
+                      </Pressable>
+                    </View>
+                  </View>
                   <View style={styles.rowActions}>
                     <Pressable
                       accessibilityRole="button"
@@ -335,11 +659,25 @@ export function AdminPanelScreen({ navigation }: Props) {
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      onPress={() =>
-                        updateDriverComplianceStatus(driver.id, {
-                          documentsStatus: 'rejected',
-                        })
-                      }
+                      onPress={() => updateDriverAccess(driver.id, 'monthly', 'active')}
+                      style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.smallButtonText}>Активировать доступ</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => updateDriverAccess(driver.id, 'monthly', 'inactive')}
+                      style={({ pressed }) => [
+                        styles.smallButton,
+                        styles.dangerButton,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.dangerButtonText}>Отключить доступ</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => rejectDriverDocuments(driver.id, rejectedDocumentKinds)}
                       style={({ pressed }) => [
                         styles.smallButton,
                         styles.dangerButton,
@@ -350,39 +688,170 @@ export function AdminPanelScreen({ navigation }: Props) {
                     </Pressable>
                   </View>
                 </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
+                <MapPinned color="#D4A853" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Адресный слой</Text>
+              </View>
+              <Text numberOfLines={2} style={styles.sectionText}>
+                Подсказок адресов и POI: {salavatAddressSuggestions.length}. Улиц/дорог:{' '}
+                {salavatDistrictStreetSourceSummary.streets}. Домов:{' '}
+                {salavatDistrictHouses.length}.
+              </Text>
+              <Text numberOfLines={2} style={styles.sectionTextMuted}>{salavatDistrictHouseSourceSummary.note}</Text>
+              <Text numberOfLines={2} style={styles.sectionTextMuted}>
+                Ручные изменения сохраняются на backend и сразу участвуют в `/geo/address-search`.
+              </Text>
+              <View style={styles.inlineForm}>
+                <TextInput
+                  onChangeText={(value) => updateAddressForm('title', value)}
+                  placeholder="Название"
+                  placeholderTextColor="#A89F91"
+                  style={[styles.input, styles.inlineInput]}
+                  value={addressForm.title}
+                />
+                <TextInput
+                  onChangeText={(value) => updateAddressForm('category', value)}
+                  placeholder="тип: street/house/poi"
+                  placeholderTextColor="#A89F91"
+                  style={[styles.input, styles.inlineInput]}
+                  value={addressForm.category}
+                />
+              </View>
+              <TextInput
+                onChangeText={(value) => updateAddressForm('subtitle', value)}
+                placeholder="Описание или адрес"
+                placeholderTextColor="#A89F91"
+                style={styles.input}
+                value={addressForm.subtitle}
+              />
+              <View style={styles.inlineForm}>
+                <TextInput
+                  onChangeText={(value) => updateAddressForm('settlement', value)}
+                  placeholder="населенный пункт"
+                  placeholderTextColor="#A89F91"
+                  style={[styles.input, styles.inlineInput]}
+                  value={addressForm.settlement}
+                />
+                <TextInput
+                  keyboardType="decimal-pad"
+                  onChangeText={(value) => updateAddressForm('latitude', value)}
+                  placeholder="широта"
+                  placeholderTextColor="#A89F91"
+                  style={[styles.input, styles.inlineInput]}
+                  value={addressForm.latitude}
+                />
+                <TextInput
+                  keyboardType="decimal-pad"
+                  onChangeText={(value) => updateAddressForm('longitude', value)}
+                  placeholder="долгота"
+                  placeholderTextColor="#A89F91"
+                  style={[styles.input, styles.inlineInput]}
+                  value={addressForm.longitude}
+                />
+              </View>
+              <View style={styles.rowActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={saveAddress}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    {editingAddressId ? 'Сохранить адрес' : 'Добавить адрес'}
+                  </Text>
+                </Pressable>
+                {editingAddressId ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={resetAddressForm}
+                    style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.secondaryButtonText}>Отмена</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void loadAdminAddresses();
+                  }}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.secondaryButtonText}>Обновить</Text>
+                </Pressable>
+              </View>
+              {addressNotice ? <Text numberOfLines={2} style={styles.sectionTextMuted}>{addressNotice}</Text> : null}
+              {adminAddresses.slice(0, 6).map((address) => (
+                <View key={address.id} style={styles.orderRow}>
+                  <Text numberOfLines={1} style={styles.orderTitle}>
+                    {address.title} · {address.category}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.orderText}>{address.displayAddress || address.subtitle}</Text>
+                  <View style={styles.rowActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => editAddress(address)}
+                      style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.smallButtonText}>Редактировать</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => {
+                        void removeAddress(address.id);
+                      }}
+                      style={({ pressed }) => [styles.dangerButton, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.dangerButtonText}>Удалить</Text>
+                    </Pressable>
+                  </View>
+                </View>
               ))}
             </View>
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <MapPinned color="#146C5D" size={20} strokeWidth={2.4} />
-                <Text style={styles.sectionTitle}>Адресный слой</Text>
-              </View>
-              <Text style={styles.sectionText}>
-                Подсказок адресов и POI: {salavatAddressSuggestions.length}. Улиц/дорог:{' '}
-                {salavatDistrictStreetSourceSummary.streets}. Домов:{' '}
-                {salavatDistrictHouses.length}.
-              </Text>
-              <Text style={styles.sectionTextMuted}>{salavatDistrictHouseSourceSummary.note}</Text>
-            </View>
-
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <ReceiptText color="#146C5D" size={20} strokeWidth={2.4} />
+                <ReceiptText color="#D4A853" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Последние заказы</Text>
               </View>
               {orders.length > 0 ? (
                 orders.slice(0, 5).map((order) => (
                   <View key={order.id} style={styles.orderRow}>
-                    <Text style={styles.orderTitle}>
+                    <Text numberOfLines={1} style={styles.orderTitle}>
                       {order.id} · {order.total} ₽ · {order.status}
                     </Text>
-                    <Text style={styles.orderText}>
+                    <Text numberOfLines={1} style={styles.orderText}>
                       {order.pickup} → {order.destination}
                     </Text>
-                    <Text style={styles.orderText}>
+                    <Text numberOfLines={1} style={styles.orderText}>
                       Водитель: {order.driver ? `${order.driver.name}, ${order.driver.vehicle}` : 'не назначен'}
                     </Text>
+                    {(order.serviceShareAmount ?? order.driverCommission ?? 0) > 0 ? (
+                      <Text style={styles.orderText}>
+                        Доля сервиса: {order.serviceShareAmount ?? order.driverCommission ?? 0} ₽ ·{' '}
+                        {formatServiceShareStatus(order.serviceShareStatus)}
+                      </Text>
+                    ) : null}
+                    {order.serviceShareStatus === 'reported_transferred' ? (
+                      <View style={styles.rowActions}>
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() =>
+                            updateOrderServiceShareStatus(
+                              order.id,
+                              'confirmed',
+                              'Admin confirmed service share receipt',
+                            )
+                          }
+                          style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                        >
+                          <Text style={styles.smallButtonText}>Подтвердить перевод</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
                     {!order.driver && approvedDrivers.length > 0 ? (
                       <View style={styles.rowActions}>
                         {approvedDrivers.slice(0, 2).map((driver) => (
@@ -418,9 +887,171 @@ type PlanRowProps = {
 const documentLabels: Record<DriverDocumentKind, string> = {
   driverLicense: 'ВУ',
   osago: 'ОСАГО',
+  osgop: 'ОСГОП',
   passport: 'Паспорт',
   sts: 'СТС',
 };
+
+function formatFileSize(size: number) {
+  if (size >= 1_000_000) {
+    return `${(size / 1_000_000).toFixed(1)} МБ`;
+  }
+
+  if (size >= 1_000) {
+    return `${Math.ceil(size / 1_000)} КБ`;
+  }
+
+  return `${size} Б`;
+}
+
+function isExpiringPolicy(upload?: DriverDocumentUpload) {
+  if (!upload?.expiresAt || upload.status !== 'approved') {
+    return false;
+  }
+
+  const expiresAt = Date.parse(upload.expiresAt);
+  if (!Number.isFinite(expiresAt)) {
+    return false;
+  }
+
+  const daysLeft = (expiresAt - Date.now()) / 86_400_000;
+  return daysLeft >= 0 && daysLeft <= 14;
+}
+
+function formatDate(value?: string) {
+  if (!value) {
+    return 'дата не указана';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString('ru-RU');
+}
+
+function formatRealtimeStatus(status: 'connecting' | 'live' | 'offline' | 'polling') {
+  if (status === 'live') {
+    return 'события приходят сразу';
+  }
+
+  if (status === 'polling') {
+    return 'fallback-обновление';
+  }
+
+  if (status === 'offline') {
+    return 'недоступен';
+  }
+
+  return 'подключается';
+}
+
+function buildLocalServiceShareSummary(orders: AppOrder[]) {
+  const today = new Date().toISOString().slice(0, 10);
+  const completedOrders = orders.filter((order) => {
+    const serviceShareAmount = order.serviceShareAmount ?? order.driverCommission ?? 0;
+    const batchDate = order.serviceShareBatchDate ?? order.completedAt?.slice(0, 10);
+
+    return (
+      ['closed', 'completed'].includes(order.status) &&
+      batchDate === today &&
+      serviceShareAmount > 0
+    );
+  });
+  const byDriver = new Map<
+    string,
+    {
+      confirmedAmount: number;
+      driverId: string;
+      driverName: string;
+      ordersCount: number;
+      pendingTransferAmount: number;
+      reportedTransferAmount: number;
+      totalCollectedAmount: number;
+      totalServiceShareAmount: number;
+    }
+  >();
+  const summary = {
+    confirmedAmount: 0,
+    ordersCount: completedOrders.length,
+    pendingTransferAmount: 0,
+    reportedTransferAmount: 0,
+    totalCollectedAmount: 0,
+    totalServiceShareAmount: 0,
+  };
+
+  completedOrders.forEach((order) => {
+    const driverId = order.driver?.id ?? 'unassigned-driver';
+    const driverName = order.driver?.name ?? 'Водитель не назначен';
+    const collectedAmount = order.driverCollectedAmount ?? order.total;
+    const serviceShareAmount = order.serviceShareAmount ?? order.driverCommission ?? 0;
+    const status = order.serviceShareStatus ?? 'pending_transfer';
+
+    if (!byDriver.has(driverId)) {
+      byDriver.set(driverId, {
+        confirmedAmount: 0,
+        driverId,
+        driverName,
+        ordersCount: 0,
+        pendingTransferAmount: 0,
+        reportedTransferAmount: 0,
+        totalCollectedAmount: 0,
+        totalServiceShareAmount: 0,
+      });
+    }
+
+    const driverSummary = byDriver.get(driverId);
+
+    if (!driverSummary) {
+      return;
+    }
+
+    driverSummary.ordersCount += 1;
+    driverSummary.totalCollectedAmount += collectedAmount;
+    driverSummary.totalServiceShareAmount += serviceShareAmount;
+    summary.totalCollectedAmount += collectedAmount;
+    summary.totalServiceShareAmount += serviceShareAmount;
+
+    if (status === 'confirmed') {
+      driverSummary.confirmedAmount += serviceShareAmount;
+      summary.confirmedAmount += serviceShareAmount;
+    } else if (status === 'reported_transferred') {
+      driverSummary.reportedTransferAmount += serviceShareAmount;
+      summary.reportedTransferAmount += serviceShareAmount;
+    } else {
+      driverSummary.pendingTransferAmount += serviceShareAmount;
+      summary.pendingTransferAmount += serviceShareAmount;
+    }
+  });
+
+  return {
+    date: today,
+    drivers: Array.from(byDriver.values()).sort((left, right) =>
+      right.totalServiceShareAmount - left.totalServiceShareAmount,
+    ),
+    orders: completedOrders.map((order) => ({
+      driverId: order.driver?.id,
+      driverName: order.driver?.name,
+      id: order.id,
+      serviceShareAmount: order.serviceShareAmount ?? order.driverCommission ?? 0,
+      status: order.serviceShareStatus ?? 'pending_transfer',
+      total: order.total,
+    })),
+    summary,
+  };
+}
+
+function formatServiceShareStatus(status: AppOrder['serviceShareStatus']) {
+  const labels: Record<NonNullable<AppOrder['serviceShareStatus']>, string> = {
+    confirmed: 'перевод подтвержден',
+    not_applicable: 'доля не начислена',
+    pending_transfer: 'ожидает перевод',
+    reported_transferred: 'водитель отметил перевод',
+  };
+
+  return labels[status ?? 'not_applicable'];
+}
 
 function PlanRow({ title, value }: PlanRowProps) {
   return (
@@ -432,8 +1063,14 @@ function PlanRow({ title, value }: PlanRowProps) {
 }
 
 function DocumentUploadSummary({
+  audit,
+  getAccessNotice,
+  onOpenDocument,
   uploads,
 }: {
+  audit?: DriverDocumentAuditEntry[];
+  getAccessNotice?: (kind: DriverDocumentKind) => string | undefined;
+  onOpenDocument?: (kind: DriverDocumentKind) => void;
   uploads?: Partial<Record<DriverDocumentKind, DriverDocumentUpload>>;
 }) {
   const uploadedItems = (Object.keys(documentLabels) as DriverDocumentKind[])
@@ -446,12 +1083,45 @@ function DocumentUploadSummary({
 
   return (
     <View style={styles.documentUploadBox}>
-      <Text style={styles.documentUploadTitle}>Загружено файлов: {uploadedItems.length}/4</Text>
+      <Text style={styles.documentUploadTitle}>
+        Загружено файлов: {uploadedItems.length}/{Object.keys(documentLabels).length}
+      </Text>
       {uploadedItems.map((item) => (
-        <Text key={item.kind} style={styles.documentUploadText}>
-          {documentLabels[item.kind]} · {item.fileName} · {item.status}
-        </Text>
+        <View key={item.kind} style={styles.documentUploadItem}>
+          <Text numberOfLines={1} style={styles.documentUploadText}>
+            {documentLabels[item.kind]} · {item.fileName} · {item.status}
+          </Text>
+          {onOpenDocument ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onOpenDocument(item.kind)}
+              style={({ pressed }) => [styles.documentAccessButton, pressed && styles.pressed]}
+            >
+              <Eye color="#D4A853" size={14} strokeWidth={2.4} />
+              <Text style={styles.documentAccessButtonText}>Открыть</Text>
+            </Pressable>
+          ) : null}
+          {getAccessNotice?.(item.kind) ? (
+            <Text numberOfLines={2} style={styles.documentMetaText}>{getAccessNotice(item.kind)}</Text>
+          ) : null}
+          {item.rejectionReason ? (
+            <Text numberOfLines={2} style={styles.documentRejectText}>{item.rejectionReason}</Text>
+          ) : null}
+          {item.checksum ? (
+            <Text style={styles.documentMetaText}>sha256: {item.checksum.slice(0, 12)}...</Text>
+          ) : null}
+        </View>
       ))}
+      {audit?.length ? (
+        <View style={styles.auditBox}>
+          <Text style={styles.documentUploadTitle}>Журнал проверки</Text>
+          {audit.slice(0, 3).map((entry) => (
+            <Text numberOfLines={1} key={entry.id} style={styles.documentMetaText}>
+              {entry.action} · {entry.actor.name || entry.actor.role} · {entry.reason || entry.note || entry.status}
+            </Text>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -479,7 +1149,7 @@ function CompliancePill({
 
 const styles = StyleSheet.create({
   adminLayout: {
-    gap: 14,
+    gap: 10,
   },
   complianceGrid: {
     flexDirection: 'row',
@@ -488,16 +1158,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   complianceLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 11,
     fontWeight: '800',
   },
   complianceLabelReady: {
-    color: '#146C5D',
+    color: '#D4A853',
   },
   compliancePill: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 2,
@@ -506,49 +1176,87 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   compliancePillReady: {
-    backgroundColor: '#E9F4F1',
-    borderColor: '#146C5D',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
   },
   complianceValue: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 11,
     fontWeight: '900',
   },
   complianceValueReady: {
-    color: '#146C5D',
+    color: '#D4A853',
   },
   dangerButton: {
-    backgroundColor: '#FFF1F0',
-    borderColor: '#D92D20',
+    backgroundColor: '#37322E',
+    borderColor: '#C17A70',
   },
   dangerButtonText: {
-    color: '#B42318',
+    color: '#C17A70',
     fontSize: 12,
     fontWeight: '900',
   },
+  auditBox: {
+    borderColor: '#37322E',
+    borderTopWidth: 1,
+    gap: 3,
+    marginTop: 6,
+    paddingTop: 8,
+  },
+  documentMetaText: {
+    color: '#81786B',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  documentAccessButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: 32,
+    paddingHorizontal: 9,
+  },
+  documentAccessButtonText: {
+    color: '#D4A853',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  documentRejectText: {
+    color: '#C17A70',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
   documentUploadBox: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 3,
     marginTop: 4,
     padding: 10,
   },
+  documentUploadItem: {
+    gap: 2,
+  },
   documentUploadText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   documentUploadTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '900',
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -557,12 +1265,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   errorText: {
-    color: '#B42318',
+    color: '#C17A70',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -570,125 +1278,161 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
-    padding: 18,
+    padding: 12,
   },
   helperText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 18,
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
-    height: 58,
+    height: 46,
     justifyContent: 'center',
-    width: 58,
+    width: 46,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#A89F91',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 16,
-    minHeight: 50,
-    paddingHorizontal: 14,
+    minHeight: 48,
+    paddingHorizontal: 12,
+  },
+  disabledButton: {
+    opacity: 0.45,
+  },
+  inlineForm: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  inlineInput: {
+    flex: 1,
+    minWidth: 220,
   },
   label: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   loginCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 16,
-    padding: 18,
+    gap: 12,
+    padding: 12,
   },
   orderRow: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 4,
-    padding: 12,
+    padding: 10,
   },
   orderText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 18,
   },
   orderTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
+  mutedButton: {
+    opacity: 0.48,
+  },
   page: {
-    backgroundColor: '#F4F7F5',
-    gap: 16,
+    backgroundColor: '#1E1C1A',
+    gap: 12,
     minHeight: '100%',
-    padding: 16,
+    padding: 14,
   },
   planRow: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 4,
-    padding: 12,
+    padding: 10,
   },
   planTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   planValue: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
+  },
+  reasonInput: {
+    backgroundColor: '#2C2926',
+    borderColor: '#A89F91',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#F5F0E8',
+    fontSize: 13,
+    minHeight: 42,
+    paddingHorizontal: 10,
+  },
+  reviewBox: {
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+    marginTop: 6,
+    padding: 10,
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 50,
     paddingHorizontal: 16,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 15,
     fontWeight: '900',
   },
   rowActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 10,
-    padding: 16,
+    gap: 8,
+    padding: 12,
   },
   sectionHeader: {
     alignItems: 'center',
@@ -696,24 +1440,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionText: {
-    color: '#20242A',
-    fontSize: 14,
-    lineHeight: 20,
+    color: '#F5F0E8',
+    fontSize: 13,
+    lineHeight: 18,
   },
   sectionTextMuted: {
-    color: '#59616C',
-    fontSize: 13,
-    lineHeight: 19,
+    color: '#A89F91',
+    fontSize: 12,
+    lineHeight: 17,
   },
   sectionTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 17,
     fontWeight: '900',
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#146C5D',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -723,14 +1467,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   secondaryButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   smallButton: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
-    borderColor: '#146C5D',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -738,50 +1482,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   smallButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 12,
     fontWeight: '900',
   },
   statCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     gap: 5,
-    minWidth: 150,
-    padding: 14,
+    minWidth: 132,
+    padding: 10,
   },
   statHelper: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   statLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
   },
   statValue: {
-    color: '#20242A',
-    fontSize: 26,
+    color: '#F5F0E8',
+    fontSize: 22,
     fontWeight: '900',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   subtitle: {
-    color: '#59616C',
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#A89F91',
+    fontSize: 14,
+    lineHeight: 20,
   },
   title: {
-    color: '#20242A',
-    fontSize: 30,
+    color: '#F5F0E8',
+    fontSize: 24,
     fontWeight: '900',
-    lineHeight: 36,
+    lineHeight: 30,
   },
   topBar: {
     alignItems: 'flex-start',

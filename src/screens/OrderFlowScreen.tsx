@@ -27,7 +27,12 @@ import {
 } from 'react-native';
 
 import { orderFlowConfig, OrderField, OrderOption, OrderTariff } from '../data/orderFlow';
-import { AccountRole, roleCopy } from '../data/registration';
+import {
+  AccountRole,
+  isDriverLikeRole,
+  isSelfEmployedDriverRole,
+  roleCopy,
+} from '../data/registration';
 import {
   findSalavatAddressSuggestions,
   formatSalavatAddress,
@@ -41,6 +46,11 @@ import {
   salavatPopularRoutes,
 } from '../data/salavatDistrict';
 import { RootStackParamList } from '../navigation/types';
+import {
+  ApiAddressSuggestion,
+  estimateRoutePrice,
+  searchAddressSuggestions,
+} from '../services/apiClient';
 import { requestUserLocation, reverseGeocodePoint } from '../services/locationService';
 import { useAppState } from '../state/AppState';
 
@@ -52,6 +62,7 @@ type RouteEstimate = {
   distancePrice: number;
   durationMin: number;
   note: string;
+  surgeCoefficient?: number;
   total: number;
 };
 
@@ -66,11 +77,17 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     currentUser,
     driverSubscription,
     drivers,
+    notifications,
     orders,
     refreshServerData,
+    realtimeMessage,
+    realtimeStatus,
+    realtimeUpdatedAt,
     savedHomeAddress,
     serverMessage,
     serverStatus,
+    setSimpleMode,
+    simpleMode,
   } = useAppState();
 
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -78,6 +95,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   );
   const [selectedTariffId, setSelectedTariffId] = useState(config.tariffs[0].id);
   const [paymentMethod, setPaymentMethod] = useState(config.paymentMethods[0]);
+  const [safetyPinRequired, setSafetyPinRequired] = useState(true);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(false);
   const [activeAddressFieldId, setActiveAddressFieldId] = useState<string | null>(null);
@@ -85,6 +103,11 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFeedOrderId, setSelectedFeedOrderId] = useState<string | null>(null);
+  const [serverAddressSuggestions, setServerAddressSuggestions] = useState<SalavatAddressSuggestion[]>([]);
+  const [serverRouteEstimate, setServerRouteEstimate] = useState<RouteEstimate | null>(null);
+  const [routeEstimateStatus, setRouteEstimateStatus] = useState<'local' | 'loading' | 'server'>('local');
+  const isDriverRole = isDriverLikeRole(role);
+  const isSelfEmployedDriver = isSelfEmployedDriverRole(role);
 
   const selectedTariff = useMemo(
     () => config.tariffs.find((tariff) => tariff.id === selectedTariffId) ?? config.tariffs[0],
@@ -94,9 +117,13 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     () => config.options.filter((option) => selectedOptions.includes(option.id)),
     [config.options, selectedOptions],
   );
+  const selectedOptionLabels = useMemo(
+    () => selectedOptionItems.map((option) => option.label),
+    [selectedOptionItems],
+  );
   const optionsTotal = selectedOptionItems.reduce((sum, option) => sum + option.price, 0);
   const canConfirm = Boolean(values.pickup?.trim()) && Boolean(values.destination?.trim());
-  const usesRegionalAddressBook = role !== 'driver';
+  const usesRegionalAddressBook = !isDriverRole;
   const availableCarsCount = drivers.filter(
     (driver) =>
       driver.status === 'approved' &&
@@ -108,18 +135,18 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     availableCarsCount === 0 ? 'none' : availableCarsCount <= 2 ? 'low' : 'ready';
   const currentDriver = useMemo(
     () =>
-      role === 'driver' && currentUser
+      isDriverRole && currentUser
         ? drivers.find((driver) => driver.userId === currentUser.id)
         : undefined,
-    [currentUser, drivers, role],
+    [currentUser, drivers, isDriverRole],
   );
   const driverNeedsApproval =
-    role === 'driver' && currentUser && currentDriver?.status !== 'approved';
+    isDriverRole && currentUser && currentDriver?.status !== 'approved';
   const driverCannotReceiveOrders =
-    role === 'driver' && currentUser && !currentDriver?.canReceiveOrders;
+    isDriverRole && currentUser && !currentDriver?.canReceiveOrders;
   const availableDriverOrders = useMemo(
     () =>
-      role === 'driver' && !driverCannotReceiveOrders
+      isDriverRole && !driverCannotReceiveOrders
         ? orders.filter(
             (order) =>
               order.role === 'client' &&
@@ -127,11 +154,11 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               ['created', 'searching'].includes(order.status),
           )
         : [],
-    [driverCannotReceiveOrders, orders, role],
+    [driverCannotReceiveOrders, isDriverRole, orders],
   );
   const selectedFeedOrder =
     availableDriverOrders.find((order) => order.id === selectedFeedOrderId) ?? availableDriverOrders[0];
-  const routeEstimate = useMemo(
+  const localRouteEstimate = useMemo(
     () =>
       buildRouteEstimate({
         destination: values.destination ?? '',
@@ -142,10 +169,102 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       }),
     [optionsTotal, role, selectedTariff, values.destination, values.pickup],
   );
-  const total = role === 'driver' && selectedFeedOrder ? selectedFeedOrder.total : routeEstimate.total;
+  const routeEstimate = serverRouteEstimate ?? localRouteEstimate;
+  const total = isDriverRole && selectedFeedOrder ? selectedFeedOrder.total : routeEstimate.total;
 
   useEffect(() => {
-    if (role !== 'driver' || !selectedFeedOrder) {
+    if (
+      !usesRegionalAddressBook ||
+      !activeAddressFieldId ||
+      !['pickup', 'destination'].includes(activeAddressFieldId)
+    ) {
+      setServerAddressSuggestions([]);
+      return;
+    }
+
+    const query = values[activeAddressFieldId]?.trim() ?? '';
+
+    if (query.length < 2) {
+      setServerAddressSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchAddressSuggestions(query, locationPoint)
+        .then((suggestions) => {
+          if (!cancelled) {
+            setServerAddressSuggestions(suggestions.map(mapApiAddressSuggestion));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setServerAddressSuggestions([]);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeAddressFieldId, locationPoint, usesRegionalAddressBook, values]);
+
+  useEffect(() => {
+    const pickup = values.pickup?.trim() ?? '';
+    const destination = values.destination?.trim() ?? '';
+
+    if (!usesRegionalAddressBook || !pickup || !destination) {
+      setServerRouteEstimate(null);
+      setRouteEstimateStatus('local');
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setRouteEstimateStatus('loading');
+      estimateRoutePrice({
+        destination,
+        minimumPrice: selectedTariff.price + optionsTotal,
+        options: selectedOptionLabels,
+        optionsTotal,
+        pickup,
+        role,
+        tariff: selectedTariff.title,
+        tariffId: selectedTariff.id,
+      })
+        .then((estimate) => {
+          if (!cancelled) {
+            setServerRouteEstimate(estimate);
+            setRouteEstimateStatus('server');
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setServerRouteEstimate(null);
+            setRouteEstimateStatus('local');
+          }
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    optionsTotal,
+    role,
+    selectedOptionLabels,
+    selectedTariff.id,
+    selectedTariff.price,
+    selectedTariff.title,
+    usesRegionalAddressBook,
+    values.destination,
+    values.pickup,
+  ]);
+
+  useEffect(() => {
+    if (!isDriverRole || !selectedFeedOrder) {
       return;
     }
 
@@ -158,7 +277,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     }));
     setSelectedTariffId(config.tariffs[0].id);
     setPaymentMethod(selectedFeedOrder.paymentMethod);
-  }, [config.tariffs, role, selectedFeedOrder, selectedFeedOrderId]);
+  }, [config.tariffs, isDriverRole, selectedFeedOrder, selectedFeedOrderId]);
 
   const updateValue = (id: string, nextValue: string) => {
     setConfirmed(false);
@@ -231,7 +350,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     }
 
     if (
-      role === 'driver' &&
+      isSelfEmployedDriver &&
       driverSubscription.status !== 'active' &&
       currentDriver?.subscriptionStatus !== 'active'
     ) {
@@ -249,7 +368,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (role === 'driver' && selectedFeedOrder) {
+    if (isDriverRole && selectedFeedOrder) {
       setIsSubmitting(true);
 
       try {
@@ -276,10 +395,14 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     const order = {
       destination: values.destination.trim(),
       id: `TX-${Date.now().toString().slice(-6)}`,
-      options: selectedOptionItems.map((option) => option.label),
+      options: selectedOptionLabels,
+      optionsTotal,
       paymentMethod,
       pickup: values.pickup.trim(),
+      routeEstimate,
+      safetyPinRequired,
       tariff: selectedTariff.title,
+      tariffId: selectedTariff.id,
       total,
     };
 
@@ -298,6 +421,174 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     }
   };
 
+  if (!isDriverRole) {
+    const favoriteRoutes = [
+      {
+        id: 'home',
+        title: 'Домой',
+        address: savedHomeAddress?.address || 'Малояз, центр',
+      },
+      {
+        id: 'work',
+        title: 'На работу',
+        address: 'Малояз, администрация',
+      },
+    ];
+
+    return (
+      <SafeAreaView style={styles.clientSafeArea}>
+        <View style={[styles.clientPage, simpleMode && styles.clientPageSimple]}>
+          <View style={styles.clientTopRow}>
+            <View>
+              <Text style={styles.clientBrand}>Kinetix</Text>
+              <Text style={styles.clientMeta}>Малояз · Эконом 120 ₽</Text>
+            </View>
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityState={{ checked: simpleMode }}
+              onPress={() => setSimpleMode(!simpleMode)}
+              style={({ pressed }) => [styles.clientModeButton, pressed && styles.pressed]}
+            >
+              <SlidersHorizontal color="#F6C600" size={18} strokeWidth={2.4} />
+              <Text style={styles.clientModeText}>Простой</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.clientDestinationBlock}>
+            <TextInput
+              autoCorrect={false}
+              autoFocus
+              onChangeText={(value) => updateValue('destination', value)}
+              onFocus={() => setActiveAddressFieldId('destination')}
+              placeholder="Куда едем?"
+              placeholderTextColor="#B0B0B0"
+              returnKeyType="done"
+              style={[styles.clientDestinationInput, simpleMode && styles.clientDestinationInputSimple]}
+              value={values.destination ?? ''}
+            />
+            {activeAddressFieldId === 'destination' && serverAddressSuggestions.length > 0 ? (
+              <View style={styles.clientSuggestions}>
+                {serverAddressSuggestions.slice(0, 4).map((suggestion) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    key={suggestion.id}
+                    onPress={() => selectAddressSuggestion('destination', suggestion)}
+                    style={({ pressed }) => [styles.clientSuggestion, pressed && styles.pressed]}
+                  >
+                    <Text numberOfLines={1} style={styles.clientSuggestionTitle}>
+                      {suggestion.title}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.clientSuggestionText}>
+                      {suggestion.subtitle}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.clientShortcutRow}>
+            {favoriteRoutes.map((item) => (
+              <Pressable
+                accessibilityRole="button"
+                key={item.id}
+                onPress={() => updateValue('destination', item.address)}
+                style={({ pressed }) => [
+                  styles.clientShortcutButton,
+                  simpleMode && styles.clientShortcutButtonSimple,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.clientShortcutText, simpleMode && styles.clientShortcutTextSimple]}>
+                  {item.title}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {!simpleMode ? (
+            <>
+              <ScrollView
+                contentContainerStyle={styles.clientTariffList}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {config.tariffs.map((tariff) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: tariff.id === selectedTariffId }}
+                    key={tariff.id}
+                    onPress={() => {
+                      setConfirmed(false);
+                      setSelectedTariffId(tariff.id);
+                    }}
+                    style={({ pressed }) => [
+                      styles.clientTariffCard,
+                      tariff.id === selectedTariffId && styles.clientTariffCardActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={styles.clientTariffTitle}>{tariff.title}</Text>
+                    <Text style={styles.clientTariffSubtitle}>
+                      {tariff.id === 'economy' ? 'Фикс по Малоязу' : tariff.subtitle}
+                    </Text>
+                    <Text style={styles.clientTariffPrice}>
+                      {tariff.id === selectedTariffId ? routeEstimate.total : tariff.price} ₽
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              <View style={styles.clientEstimate}>
+                <View>
+                  <Text style={styles.clientEstimateLabel}>Итого</Text>
+                  <Text style={styles.clientEstimateValue}>{total} ₽</Text>
+                </View>
+                <View style={styles.clientEstimateRight}>
+                  <Text style={styles.clientEstimateText}>
+                    {selectedTariff.id === 'economy'
+                      ? 'Эконом не зависит от surge'
+                      : `Коэффициент ${formatSurge(routeEstimate)}`}
+                  </Text>
+                  <Text style={styles.clientEstimateText}>
+                    {formatDistance(routeEstimate.distanceKm)} · {routeEstimate.durationMin} мин
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.clientRealtime}>
+                <View style={[styles.clientRealtimeDot, realtimeStatus === 'live' && styles.clientRealtimeDotLive]} />
+            <Text numberOfLines={1} style={styles.clientRealtimeText}>{realtimeMessage}</Text>
+              </View>
+            </>
+          ) : null}
+
+          {confirmed && !canConfirm ? (
+            <Text style={styles.clientError}>Укажите, куда едем.</Text>
+          ) : null}
+
+          <View style={styles.clientBottom}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isSubmitting}
+              onPress={handlePrimaryAction}
+              style={({ pressed }) => [
+                styles.clientCallButton,
+                simpleMode && styles.clientCallButtonSimple,
+                isSubmitting && styles.clientCallButtonDisabled,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.clientCallButtonText, simpleMode && styles.clientCallButtonTextSimple]}>
+                {isSubmitting ? 'Ищем машину' : 'Вызвать'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
@@ -307,29 +598,51 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#146C5D" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
 
           <View style={styles.rolePill}>
-            <UserRound color="#146C5D" size={17} strokeWidth={2.4} />
+            <UserRound color="#D4A853" size={17} strokeWidth={2.4} />
             <Text style={styles.rolePillText}>{roleCopy[role].title}</Text>
           </View>
         </View>
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Route color="#146C5D" size={30} strokeWidth={2.4} />
+            <Route color="#D4A853" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>{config.title}</Text>
-            <Text style={styles.subtitle}>{config.subtitle}</Text>
+            <Text numberOfLines={2} style={styles.title}>{config.title}</Text>
+            <Text numberOfLines={3} style={styles.subtitle}>{config.subtitle}</Text>
             <Text style={styles.userLine}>Профиль: {firstName?.trim() || 'пользователь'}</Text>
             {usesRegionalAddressBook ? (
               <Text style={styles.regionLine}>
                 Зона MVP: {salavatDistrictInfo.region}. Центр - {salavatDistrictInfo.center}
               </Text>
             ) : null}
+          </View>
+        </View>
+
+        <View style={styles.statusBox}>
+          <ShieldCheck
+            color={realtimeStatus === 'live' ? '#D4A853' : '#5C8D89'}
+            size={20}
+            strokeWidth={2.4}
+          />
+          <View style={styles.statusCopy}>
+            <Text style={styles.statusTitle}>
+              {realtimeStatus === 'live'
+                ? 'Лента заказов online'
+                : realtimeStatus === 'polling'
+                  ? 'Лента обновляется по таймеру'
+                  : 'Подключаем ленту заказов'}
+            </Text>
+            <Text numberOfLines={2} style={styles.statusText}>
+              {realtimeMessage}
+              {realtimeUpdatedAt ? ` · ${new Date(realtimeUpdatedAt).toLocaleTimeString('ru-RU')}` : ''}
+              {notifications[0] ? ` · последнее: ${notifications[0].title}` : ''}
+            </Text>
           </View>
         </View>
 
@@ -350,13 +663,13 @@ export function OrderFlowScreen({ navigation, route }: Props) {
           <View style={styles.mainColumn}>
             <View style={styles.panel}>
               <SectionHeader
-                icon={<MapPinned color="#146C5D" size={20} strokeWidth={2.4} />}
+                icon={<MapPinned color="#D4A853" size={20} strokeWidth={2.4} />}
                 title={config.routeTitle}
               />
               {usesRegionalAddressBook ? (
                 <View style={styles.regionBox}>
                   <Text style={styles.regionTitle}>{getCoverageTitle(locationPoint)}</Text>
-                  <Text style={styles.regionText}>{getCoverageText(locationPoint)}</Text>
+                  <Text numberOfLines={2} style={styles.regionText}>{getCoverageText(locationPoint)}</Text>
                   <Text style={styles.regionMeta}>
                     Зона MVP: {salavatDistrictInfo.region}. Загружено:{' '}
                     {salavatAddressSuggestions.length} адресных подсказок и{' '}
@@ -367,7 +680,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                     onPress={requestLocationRoutes}
                     style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
                   >
-                    <LocateFixed color="#146C5D" size={17} strokeWidth={2.4} />
+                    <LocateFixed color="#D4A853" size={17} strokeWidth={2.4} />
                     <Text style={styles.locationButtonText}>Определить мое место</Text>
                   </Pressable>
                   {locationMessage ? <Text style={styles.regionText}>{locationMessage}</Text> : null}
@@ -392,13 +705,13 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   ]}
                 >
                   <View style={styles.searchCarsTop}>
-                    <Car color="#146C5D" size={20} strokeWidth={2.4} />
+                    <Car color="#D4A853" size={20} strokeWidth={2.4} />
                     <Text style={styles.searchCarsTitle}>Поиск машины</Text>
                   </View>
                   <Text style={styles.searchCarsValue}>
                     {availableCarsCount} {formatCarsWord(availableCarsCount)} доступно
                   </Text>
-                  <Text style={styles.searchCarsText}>
+                  <Text numberOfLines={3} style={styles.searchCarsText}>
                     {availableCarsState === 'none'
                       ? 'Сейчас в зоне нет активных водителей. Заказ можно создать, админ и водители увидят его после выхода на смену.'
                       : availableCarsState === 'low'
@@ -417,7 +730,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 <>
                   <View style={styles.regionBox}>
                     <Text style={styles.regionTitle}>Открытые заказы</Text>
-                    <Text style={styles.regionText}>
+                    <Text numberOfLines={3} style={styles.regionText}>
                       {driverNeedsApproval
                         ? 'Заявка водителя создана. Администратор должен проверить автомобиль и открыть доступ.'
                         : driverCannotReceiveOrders
@@ -434,7 +747,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                       onPress={refreshServerData}
                       style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
                     >
-                      <Route color="#146C5D" size={17} strokeWidth={2.4} />
+                      <Route color="#D4A853" size={17} strokeWidth={2.4} />
                       <Text style={styles.locationButtonText}>Обновить ленту</Text>
                     </Pressable>
                     {availableDriverOrders.slice(0, 4).map((order) => (
@@ -485,7 +798,10 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                       usesRegionalAddressBook &&
                       ['pickup', 'destination'].includes(field.id) &&
                       activeAddressFieldId === field.id
-                        ? findSalavatAddressSuggestions(values[field.id] ?? '')
+                        ? mergeAddressSuggestions([
+                            ...findSalavatAddressSuggestions(values[field.id] ?? ''),
+                            ...serverAddressSuggestions,
+                          ])
                         : []
                     }
                     value={values[field.id] ?? ''}
@@ -496,7 +812,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
             <View style={styles.panel}>
               <SectionHeader
-                icon={<Car color="#146C5D" size={20} strokeWidth={2.4} />}
+                icon={<Car color="#D4A853" size={20} strokeWidth={2.4} />}
                 title={config.tariffTitle}
               />
               <View style={styles.tariffGrid}>
@@ -516,7 +832,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
             <View style={styles.panel}>
               <SectionHeader
-                icon={<SlidersHorizontal color="#146C5D" size={20} strokeWidth={2.4} />}
+                icon={<SlidersHorizontal color="#D4A853" size={20} strokeWidth={2.4} />}
                 title={config.detailsTitle}
               />
               <View style={styles.fields}>
@@ -549,13 +865,14 @@ export function OrderFlowScreen({ navigation, route }: Props) {
           <View style={[styles.summaryColumn, isWide && styles.summaryColumnWide]}>
             <View style={styles.summaryPanel}>
               <SectionHeader
-                icon={<ShieldCheck color="#146C5D" size={20} strokeWidth={2.4} />}
+                icon={<ShieldCheck color="#D4A853" size={20} strokeWidth={2.4} />}
                 title={config.summaryTitle}
               />
               <RouteEstimatePreview
                 destination={values.destination}
                 estimate={routeEstimate}
                 pickup={values.pickup}
+                status={routeEstimateStatus}
               />
               <View style={styles.summaryRows}>
                 <SummaryRow
@@ -565,7 +882,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 <SummaryRow label="Тариф" value={selectedTariff.title} />
                 <SummaryRow label="Подача" value={selectedTariff.eta} />
                 <SummaryRow label="Опции" value={`${optionsTotal} ₽`} />
-                <SummaryRow label={role === 'driver' ? 'Доход' : 'Итого'} value={`${total} ₽`} />
+                <SummaryRow label={isDriverRole ? 'Доход' : 'Итого'} value={`${total} ₽`} />
               </View>
 
               <View style={styles.paymentGroup}>
@@ -587,13 +904,13 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   >
                     {method.includes('Налич') ? (
                       <Banknote
-                        color={method === paymentMethod ? '#FFFFFF' : '#146C5D'}
+                        color={method === paymentMethod ? '#1E1C1A' : '#D4A853'}
                         size={18}
                         strokeWidth={2.4}
                       />
                     ) : (
                       <CreditCard
-                        color={method === paymentMethod ? '#FFFFFF' : '#146C5D'}
+                        color={method === paymentMethod ? '#1E1C1A' : '#D4A853'}
                         size={18}
                         strokeWidth={2.4}
                       />
@@ -610,8 +927,38 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 ))}
               </View>
 
+              {!isDriverRole ? (
+                <View style={styles.paymentGroup}>
+                  <Text style={styles.groupLabel}>Безопасность</Text>
+                  <Pressable
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: safetyPinRequired }}
+                    onPress={() => setSafetyPinRequired((current) => !current)}
+                    style={({ pressed }) => [
+                      styles.paymentButton,
+                      safetyPinRequired && styles.paymentButtonActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <ShieldCheck
+                      color={safetyPinRequired ? '#1E1C1A' : '#D4A853'}
+                      size={18}
+                      strokeWidth={2.4}
+                    />
+                    <Text
+                      style={[
+                        styles.paymentText,
+                        safetyPinRequired && styles.paymentTextActive,
+                      ]}
+                    >
+                      PIN начала поездки
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
               <View style={styles.statusBox}>
-                <Clock3 color="#146C5D" size={18} strokeWidth={2.4} />
+                <Clock3 color="#D4A853" size={18} strokeWidth={2.4} />
                 <View style={styles.statusCopy}>
                   <Text style={styles.statusTitle}>{config.statusTitle}</Text>
                   <Text style={styles.statusText}>{config.statusText}</Text>
@@ -640,7 +987,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                       ? 'Реальные заказы откроются после ручного одобрения администратора.'
                       : canConfirm
                       ? 'Следующий шаг - отправка на сервер и создание заказа.'
-                      : 'Заполните точку подачи и назначение, чтобы оформить заказ.'}
+                      : 'Заполните точку подачи и назначение, чтобы вызвать автомобиль.'}
                   </Text>
                 </View>
               ) : null}
@@ -651,7 +998,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   onPress={handlePrimaryAction}
                   style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
                 >
-                  <Navigation color="#FFFFFF" size={18} strokeWidth={2.4} />
+                  <Navigation color="#F5F0E8" size={18} strokeWidth={2.4} />
                   <Text style={styles.primaryButtonText}>
                     {isSubmitting ? 'Отправляем...' : config.primaryAction}
                   </Text>
@@ -672,7 +1019,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 }
 
 function createInitialOrderValues(role: AccountRole): Record<string, string> {
-  if (role === 'driver') {
+  if (isDriverLikeRole(role)) {
     return {
       clientComment: 'Ждать у центрального входа, нужна связь перед подачей',
       destination: 'Санаторий Янгантау, с. Янгантау',
@@ -681,7 +1028,9 @@ function createInitialOrderValues(role: AccountRole): Record<string, string> {
     };
   }
 
-  return {};
+  return {
+    pickup: 'Малояз, центр',
+  };
 }
 
 function formatCarsWord(count: number) {
@@ -697,6 +1046,46 @@ function formatCarsWord(count: number) {
   }
 
   return 'машин';
+}
+
+function mapApiAddressSuggestion(suggestion: ApiAddressSuggestion): SalavatAddressSuggestion {
+  return {
+    aliases: suggestion.aliases ?? [],
+    category: mapApiAddressCategory(suggestion.category),
+    coordinates: suggestion.coordinates,
+    id: `server-${suggestion.id}`,
+    settlement: suggestion.settlement || 'РФ',
+    source: 'manual',
+    subtitle: suggestion.subtitle || suggestion.displayAddress || 'Серверный адрес',
+    title: suggestion.title || suggestion.displayAddress,
+  };
+}
+
+function mapApiAddressCategory(category: string): SalavatAddressSuggestion['category'] {
+  if (
+    ['address', 'admin', 'education', 'health', 'landmark', 'market', 'settlement', 'street', 'transport'].includes(
+      category,
+    )
+  ) {
+    return category as SalavatAddressSuggestion['category'];
+  }
+
+  return 'address';
+}
+
+function mergeAddressSuggestions(suggestions: SalavatAddressSuggestion[]) {
+  const seen = new Set<string>();
+
+  return suggestions.filter((suggestion) => {
+    const key = `${suggestion.title}|${suggestion.subtitle}|${suggestion.settlement}`.toLowerCase();
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
 }
 
 function buildRouteEstimate({
@@ -729,6 +1118,18 @@ function buildRouteEstimate({
   const distanceKm = preset?.estimatedDistanceKm ?? estimateDistanceKm(pickup, destination);
   const durationMin =
     preset?.estimatedTime ? parseRouteTime(preset.estimatedTime) : estimateDurationMin(distanceKm);
+
+  if (!isDriverLikeRole(role) && tariff.id === 'economy') {
+    return {
+      confidence: preset ? 'preset' : 'estimated',
+      distanceKm,
+      distancePrice: 120,
+      durationMin,
+      note: 'фикс по Малоязу',
+      total: 120 + optionsTotal,
+    };
+  }
+
   const rate = getFareRate(tariff.id, role);
   const distancePrice = roundToTen(distanceKm * rate.perKm + durationMin * rate.perMin);
   const calculatedTotal = rate.base + distancePrice + optionsTotal;
@@ -811,7 +1212,7 @@ function estimateDurationMin(distanceKm: number) {
 }
 
 function getFareRate(tariffId: string, role: AccountRole) {
-  if (role === 'driver') {
+  if (isDriverLikeRole(role)) {
     return { base: 0, perKm: 22, perMin: 4 };
   }
 
@@ -841,6 +1242,14 @@ function formatDistance(distanceKm: number) {
   })} км`;
 }
 
+function formatSurge(estimate: RouteEstimate) {
+  const maybeEstimate = estimate as RouteEstimate & { surgeCoefficient?: number };
+  return `${(maybeEstimate.surgeCoefficient ?? 1).toLocaleString('ru-RU', {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })}x`;
+}
+
 type SectionHeaderProps = {
   icon: ReactNode;
   title: string;
@@ -859,11 +1268,16 @@ type RouteEstimatePreviewProps = {
   destination?: string;
   estimate: RouteEstimate;
   pickup?: string;
+  status: 'local' | 'loading' | 'server';
 };
 
-function RouteEstimatePreview({ destination, estimate, pickup }: RouteEstimatePreviewProps) {
+function RouteEstimatePreview({ destination, estimate, pickup, status }: RouteEstimatePreviewProps) {
   const confidenceText =
-    estimate.confidence === 'preset'
+    status === 'loading'
+      ? 'Считаем на сервере'
+      : status === 'server'
+      ? 'Серверный расчет'
+      : estimate.confidence === 'preset'
       ? 'Популярный маршрут'
       : estimate.confidence === 'estimated'
       ? 'MVP-оценка'
@@ -872,7 +1286,7 @@ function RouteEstimatePreview({ destination, estimate, pickup }: RouteEstimatePr
   return (
     <View style={styles.routeEstimateBox}>
       <View style={styles.routeEstimateHeader}>
-        <Route color="#146C5D" size={18} strokeWidth={2.4} />
+        <Route color="#D4A853" size={18} strokeWidth={2.4} />
         <Text style={styles.routeEstimateTitle}>{confidenceText}</Text>
       </View>
       <View style={styles.routeEstimateBody}>
@@ -886,7 +1300,7 @@ function RouteEstimatePreview({ destination, estimate, pickup }: RouteEstimatePr
             {pickup?.trim() || 'Точка подачи'}
           </Text>
           <Text numberOfLines={1} style={styles.routePointText}>
-            {destination?.trim() || 'Куда едем'}
+            {destination?.trim() || 'Куда едем?'}
           </Text>
         </View>
       </View>
@@ -936,7 +1350,7 @@ function OrderInput({
         onChangeText={onChangeText}
         onFocus={onFocus}
         placeholder={field.placeholder}
-        placeholderTextColor="#8A8F98"
+        placeholderTextColor="#A89F91"
         style={styles.input}
         value={value}
       />
@@ -977,7 +1391,7 @@ function RoutePresetCard({ onPress, route }: RoutePresetCardProps) {
       style={({ pressed }) => [styles.routePresetCard, pressed && styles.pressed]}
     >
       <View style={styles.routePresetTop}>
-        <Route color="#146C5D" size={18} strokeWidth={2.4} />
+        <Route color="#D4A853" size={18} strokeWidth={2.4} />
       <Text style={styles.routePresetTitle}>{route.title}</Text>
     </View>
     <Text style={styles.routePresetSubtitle}>{route.subtitle}</Text>
@@ -1008,12 +1422,16 @@ function TariffCard({ active, onPress, tariff }: TariffCardProps) {
     >
       <View style={styles.tariffTop}>
         <Text style={[styles.tariffTitle, active && styles.tariffTitleActive]}>{tariff.title}</Text>
-        {active ? <Check color="#146C5D" size={18} strokeWidth={2.8} /> : null}
+        {active ? <Check color="#F5F0E8" size={18} strokeWidth={2.8} /> : null}
       </View>
-      <Text style={styles.tariffSubtitle}>{tariff.subtitle}</Text>
+      <Text style={[styles.tariffSubtitle, active && styles.tariffSubtitleActive]}>
+        {tariff.subtitle}
+      </Text>
       <View style={styles.tariffMeta}>
-        <Text style={styles.tariffPrice}>{tariff.price} ₽</Text>
-        <Text style={styles.tariffEta}>{tariff.eta}</Text>
+        <Text style={[styles.tariffPrice, active && styles.tariffPriceActive]}>
+          {tariff.price} ₽
+        </Text>
+        <Text style={[styles.tariffEta, active && styles.tariffEtaActive]}>{tariff.eta}</Text>
       </View>
     </Pressable>
   );
@@ -1038,7 +1456,7 @@ function OptionToggle({ active, onPress, option }: OptionToggleProps) {
       ]}
     >
       <View style={[styles.optionCheck, active && styles.optionCheckActive]}>
-        {active ? <Check color="#FFFFFF" size={14} strokeWidth={3} /> : null}
+        {active ? <Check color="#F5F0E8" size={14} strokeWidth={3} /> : null}
       </View>
       <View style={styles.optionCopy}>
         <Text style={styles.optionLabel}>{option.label}</Text>
@@ -1066,10 +1484,242 @@ const styles = StyleSheet.create({
   actions: {
     gap: 10,
   },
+  clientBottom: {
+    marginTop: 'auto',
+    paddingTop: 18,
+  },
+  clientBrand: {
+    color: '#F5F5F5',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  clientCallButton: {
+    alignItems: 'center',
+    backgroundColor: '#F6C600',
+    borderRadius: 8,
+    justifyContent: 'center',
+    minHeight: 56,
+    paddingHorizontal: 18,
+  },
+  clientCallButtonDisabled: {
+    opacity: 0.58,
+  },
+  clientCallButtonSimple: {
+    minHeight: 82,
+  },
+  clientCallButtonText: {
+    color: '#0C0C0C',
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  clientCallButtonTextSimple: {
+    fontSize: 25,
+  },
+  clientDestinationBlock: {
+    gap: 8,
+    marginTop: 16,
+  },
+  clientDestinationInput: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#F6C600',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#F5F5F5',
+    fontSize: 22,
+    fontWeight: '800',
+    minHeight: 62,
+    paddingHorizontal: 16,
+  },
+  clientDestinationInputSimple: {
+    fontSize: 32,
+    minHeight: 92,
+  },
+  clientError: {
+    color: '#FF3B30',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  clientEstimate: {
+    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
+    borderColor: '#F6C600',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    padding: 12,
+  },
+  clientEstimateLabel: {
+    color: '#B0B0B0',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  clientEstimateRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  clientEstimateText: {
+    color: '#B0B0B0',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  clientEstimateValue: {
+    color: '#F5F5F5',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  clientMeta: {
+    color: '#B0B0B0',
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  clientModeButton: {
+    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
+    borderColor: '#F6C600',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  clientModeText: {
+    color: '#F6C600',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  clientPage: {
+    backgroundColor: '#0C0C0C',
+    flex: 1,
+    gap: 12,
+    padding: 14,
+  },
+  clientPageSimple: {
+    gap: 16,
+    padding: 16,
+  },
+  clientRealtime: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  clientRealtimeDot: {
+    backgroundColor: '#B0B0B0',
+    borderRadius: 5,
+    height: 10,
+    width: 10,
+  },
+  clientRealtimeDotLive: {
+    backgroundColor: '#4CD964',
+  },
+  clientRealtimeText: {
+    color: '#B0B0B0',
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  clientSafeArea: {
+    backgroundColor: '#0C0C0C',
+    flex: 1,
+  },
+  clientShortcutButton: {
+    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
+    borderColor: '#F6C600',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 12,
+  },
+  clientShortcutButtonSimple: {
+    minHeight: 70,
+  },
+  clientShortcutRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  clientShortcutText: {
+    color: '#F5F5F5',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  clientShortcutTextSimple: {
+    fontSize: 21,
+  },
+  clientSuggestion: {
+    backgroundColor: '#242426',
+    borderRadius: 8,
+    gap: 3,
+    padding: 10,
+  },
+  clientSuggestionText: {
+    color: '#B0B0B0',
+    fontSize: 12,
+  },
+  clientSuggestionTitle: {
+    color: '#F5F5F5',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  clientSuggestions: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#F6C600',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 8,
+  },
+  clientTariffCard: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#2E2E30',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 5,
+    minHeight: 104,
+    width: 138,
+    padding: 12,
+  },
+  clientTariffCardActive: {
+    borderColor: '#F6C600',
+    borderWidth: 2,
+  },
+  clientTariffList: {
+    gap: 10,
+    paddingVertical: 2,
+  },
+  clientTariffPrice: {
+    color: '#F6C600',
+    fontSize: 20,
+    fontWeight: '900',
+    marginTop: 'auto',
+  },
+  clientTariffSubtitle: {
+    color: '#B0B0B0',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  clientTariffTitle: {
+    color: '#F5F5F5',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  clientTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   addressSuggestion: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1082,38 +1732,38 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   addressSuggestionDot: {
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 6,
     height: 10,
     width: 10,
   },
   addressSuggestionSettlement: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 11,
     fontWeight: '900',
   },
   addressSuggestions: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
     padding: 8,
   },
   addressSuggestionSubtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   addressSuggestionTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1122,7 +1772,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1133,24 +1783,24 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   groupLabel: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   helper: {
-    color: '#68717D',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 14,
-    padding: 18,
+    gap: 12,
+    padding: 12,
   },
   heroCopy: {
     flex: 1,
@@ -1159,42 +1809,42 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
-    height: 58,
+    height: 46,
     justifyContent: 'center',
-    width: 58,
+    width: 46,
   },
   homeAddressButton: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 3,
     padding: 10,
   },
   homeAddressText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   homeAddressTitle: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#A89F91',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 16,
-    minHeight: 50,
+    minHeight: 56,
     paddingHorizontal: 14,
   },
   label: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1207,8 +1857,8 @@ const styles = StyleSheet.create({
   },
   locationButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#146C5D',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1218,7 +1868,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   locationButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -1229,8 +1879,8 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     alignItems: 'center',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1241,13 +1891,13 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   optionButtonActive: {
-    backgroundColor: '#E9F4F1',
-    borderColor: '#146C5D',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
   },
   optionCheck: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#AEB8C4',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 6,
     borderWidth: 1.5,
     height: 24,
@@ -1255,8 +1905,8 @@ const styles = StyleSheet.create({
     width: 24,
   },
   optionCheckActive: {
-    backgroundColor: '#146C5D',
-    borderColor: '#146C5D',
+    backgroundColor: '#D4A853',
+    borderColor: '#D4A853',
   },
   optionCopy: {
     flex: 1,
@@ -1269,33 +1919,33 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   optionLabel: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   optionPrice: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 16,
   },
   page: {
-    backgroundColor: '#F4F7F5',
-    gap: 16,
+    backgroundColor: '#1E1C1A',
+    gap: 12,
     minHeight: '100%',
-    padding: 16,
+    padding: 14,
   },
   panel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 16,
-    padding: 16,
+    gap: 12,
+    padding: 12,
   },
   paymentButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1304,85 +1954,86 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   paymentButtonActive: {
-    backgroundColor: '#146C5D',
-    borderColor: '#146C5D',
+    backgroundColor: '#D4A853',
+    borderColor: '#D4A853',
   },
   paymentGroup: {
     gap: 9,
   },
   paymentText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flex: 1,
     fontSize: 14,
     fontWeight: '900',
   },
   paymentTextActive: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 56,
     paddingHorizontal: 16,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 15,
     fontWeight: '900',
     textAlign: 'center',
   },
   resultBox: {
-    backgroundColor: '#FFF3E5',
-    borderColor: '#F3C38A',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 12,
   },
   resultBoxSuccess: {
-    backgroundColor: '#EAF6EA',
-    borderColor: '#B9DDBB',
+    backgroundColor: '#37322E',
+    borderColor: '#7A9A7E',
   },
   resultText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   resultTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   searchCarsBox: {
-    backgroundColor: '#FFF3E5',
-    borderColor: '#F3C38A',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 6,
     padding: 12,
   },
   searchCarsBoxEmpty: {
-    backgroundColor: '#FFF1F0',
-    borderColor: '#F4A6A0',
+    backgroundColor: '#37322E',
+    borderColor: '#C17A70',
   },
   searchCarsBoxReady: {
-    backgroundColor: '#EAF6EA',
-    borderColor: '#B9DDBB',
+    backgroundColor: '#37322E',
+    borderColor: '#7A9A7E',
   },
   searchCarsText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 19,
   },
   searchCarsTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flex: 1,
     fontSize: 15,
     fontWeight: '900',
@@ -1393,42 +2044,42 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchCarsValue: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 22,
     fontWeight: '900',
   },
   regionBox: {
-    backgroundColor: '#EEF5F3',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 12,
   },
   regionLine: {
-    color: '#0B4C42',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   regionMeta: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 12,
     fontWeight: '900',
   },
   regionText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 19,
   },
   regionTitle: {
-    color: '#0B4C42',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   rolePill: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 7,
@@ -1436,7 +2087,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   rolePillText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -1446,7 +2097,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   routeEstimateBox: {
-    backgroundColor: '#F8FAF9',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     gap: 12,
     padding: 12,
@@ -1457,7 +2108,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   routeEstimateTitle: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -1467,12 +2118,12 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   routeMetricLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 11,
     lineHeight: 15,
   },
   routeMetricValue: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1482,12 +2133,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   routePointText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   routePointTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '900',
     lineHeight: 18,
@@ -1498,8 +2149,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   routePresetCard: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1513,17 +2164,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   routePresetMeta: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 12,
     fontWeight: '900',
   },
   routePresetSubtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   routePresetTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flex: 1,
     fontSize: 14,
     fontWeight: '900',
@@ -1538,28 +2189,28 @@ const styles = StyleSheet.create({
     width: 16,
   },
   routeTrackDot: {
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 5,
     height: 10,
     width: 10,
   },
   routeTrackDotFinish: {
-    backgroundColor: '#B7791F',
+    backgroundColor: '#5C8D89',
   },
   routeTrackLine: {
-    backgroundColor: '#C5DDD7',
+    backgroundColor: '#D4A853',
     flex: 1,
     marginVertical: 3,
     width: 2,
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -1567,7 +2218,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1577,15 +2228,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flex: 1,
     fontSize: 18,
     fontWeight: '900',
   },
   statusBox: {
     alignItems: 'flex-start',
-    backgroundColor: '#E9F4F1',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1597,19 +2248,19 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statusText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   statusTitle: {
-    color: '#0B4C42',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#59616C',
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#A89F91',
+    fontSize: 14,
+    lineHeight: 20,
   },
   suggestions: {
     flexDirection: 'row',
@@ -1617,14 +2268,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   suggestionChip: {
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     minHeight: 36,
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
   suggestionText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -1636,21 +2287,21 @@ const styles = StyleSheet.create({
     width: 350,
   },
   summaryLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     fontWeight: '800',
   },
   summaryPanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 16,
-    padding: 16,
+    gap: 12,
+    padding: 12,
   },
   summaryRow: {
     alignItems: 'center',
-    borderBottomColor: '#E7EBEF',
+    borderBottomColor: '#37322E',
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1661,15 +2312,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   summaryValue: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flexShrink: 1,
     fontSize: 15,
     fontWeight: '900',
     textAlign: 'right',
   },
   tariffCard: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1678,13 +2329,16 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   tariffCardActive: {
-    backgroundColor: '#E9F4F1',
-    borderColor: '#146C5D',
+    backgroundColor: '#D4A853',
+    borderColor: '#D4A853',
   },
   tariffEta: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
+  },
+  tariffEtaActive: {
+    color: '#1E1C1A',
   },
   tariffGrid: {
     flexDirection: 'row',
@@ -1698,23 +2352,29 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   tariffPrice: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 18,
     fontWeight: '900',
   },
+  tariffPriceActive: {
+    color: '#1E1C1A',
+  },
   tariffSubtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
+  tariffSubtitleActive: {
+    color: '#1E1C1A',
+  },
   tariffTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flex: 1,
     fontSize: 16,
     fontWeight: '900',
   },
   tariffTitleActive: {
-    color: '#0B4C42',
+    color: '#1E1C1A',
   },
   tariffTop: {
     alignItems: 'center',
@@ -1722,33 +2382,33 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   timeline: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    padding: 12,
+    gap: 8,
+    padding: 10,
   },
   timelineDot: {
     alignItems: 'center',
-    backgroundColor: '#EEF2F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 28,
     justifyContent: 'center',
     width: 28,
   },
   timelineDotActive: {
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
   },
   timelineIndex: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '900',
   },
   timelineIndexActive: {
-    color: '#FFFFFF',
+    color: '#F5F0E8',
   },
   timelineStep: {
     alignItems: 'center',
@@ -1756,15 +2416,15 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   timelineText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '800',
   },
   title: {
-    color: '#20242A',
-    fontSize: 30,
+    color: '#F5F0E8',
+    fontSize: 24,
     fontWeight: '900',
-    lineHeight: 36,
+    lineHeight: 30,
   },
   topBar: {
     alignItems: 'center',
@@ -1774,7 +2434,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   userLine: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },

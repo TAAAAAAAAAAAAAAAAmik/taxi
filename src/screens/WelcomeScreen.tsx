@@ -2,29 +2,32 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Car, LockKeyhole, LogIn, UserPlus } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { driverAccessPlans } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
 export function WelcomeScreen({ navigation }: Props) {
+  const driverCommissionPercent = driverAccessPlans.commission.commissionPercent;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page}>
         <View style={styles.brandRow}>
           <View style={styles.brandMark}>
-            <Car color="#FFFFFF" size={28} strokeWidth={2.4} />
+            <Car color="#F5F0E8" size={28} strokeWidth={2.4} />
           </View>
-          <View>
-            <Text style={styles.appName}>Такси Партнер</Text>
+          <View style={styles.brandCopy}>
+            <Text style={styles.appName}>Такси Салават</Text>
             <Text style={styles.appMeta}>Клиенты и водители напрямую</Text>
           </View>
         </View>
 
         <View style={styles.hero}>
           <Text style={styles.title}>Добро пожаловать</Text>
-          <Text style={styles.subtitle}>
-            Клиенты заказывают поездки, а водители выбирают модель работы: 5000 ₽ в месяц без
-            комиссии или 12% с каждой выполненной поездки.
+          <Text numberOfLines={4} style={styles.subtitle}>
+            Клиенты заказывают поездки, самозанятые водители получают оплату напрямую и
+            выбирают: 3000 ₽ в месяц без комиссии или {driverCommissionPercent}% с поездки.
           </Text>
         </View>
 
@@ -34,7 +37,7 @@ export function WelcomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Registration')}
             style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
           >
-            <UserPlus color="#FFFFFF" size={20} strokeWidth={2.4} />
+            <UserPlus color="#1E1C1A" size={20} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>Зарегистрироваться</Text>
           </Pressable>
 
@@ -43,7 +46,7 @@ export function WelcomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Login')}
             style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
           >
-            <LogIn color="#146C5D" size={20} strokeWidth={2.4} />
+            <LogIn color="#D4A853" size={20} strokeWidth={2.4} />
             <Text style={styles.secondaryButtonText}>Войти</Text>
           </Pressable>
 
@@ -52,7 +55,7 @@ export function WelcomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('AdminPanel')}
             style={({ pressed }) => [styles.adminButton, pressed && styles.pressed]}
           >
-            <LockKeyhole color="#20242A" size={20} strokeWidth={2.4} />
+            <LockKeyhole color="#F5F0E8" size={20} strokeWidth={2.4} />
             <Text style={styles.adminButtonText}>Админ-панель</Text>
           </Pressable>
         </View>
@@ -60,15 +63,24 @@ export function WelcomeScreen({ navigation }: Props) {
         <View style={styles.infoGrid}>
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>Клиент</Text>
-            <Text style={styles.infoText}>Заказ поездок, история, оплата и поддержка.</Text>
+            <Text numberOfLines={2} style={styles.infoText}>Заказ поездок, история, оплата и поддержка.</Text>
           </View>
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Водитель-партнер</Text>
-            <Text style={styles.infoText}>Месячный доступ или комиссия 12%, выплаты и рейтинг.</Text>
+            <Text style={styles.infoTitle}>Самозанятый водитель</Text>
+            <Text numberOfLines={2} style={styles.infoText}>
+              Подписка 3000 ₽ или {driverCommissionPercent}% к вечернему переводу,
+              документы и рейтинг.
+            </Text>
+          </View>
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Две модели</Text>
+            <Text numberOfLines={2} style={styles.infoText}>
+              Модель можно сменить, изменение применяется со следующего расчетного периода.
+            </Text>
           </View>
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>Админ</Text>
-            <Text style={styles.infoText}>Вход только по личному паролю без логина и телефона.</Text>
+            <Text numberOfLines={2} style={styles.infoText}>Вход только по личному паролю без логина и телефона.</Text>
           </View>
         </View>
       </ScrollView>
@@ -78,70 +90,80 @@ export function WelcomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   adminButton: {
     alignItems: 'center',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
+    flexGrow: 1,
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 50,
+    minWidth: 148,
     paddingHorizontal: 16,
   },
   adminButtonText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 15,
     fontWeight: '900',
   },
   appMeta: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     marginTop: 2,
   },
   appName: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 20,
     fontWeight: '900',
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
-    height: 52,
+    height: 46,
     justifyContent: 'center',
-    width: 52,
+    width: 46,
+  },
+  brandCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   brandRow: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    padding: 16,
+    justifyContent: 'space-between',
+    padding: 12,
   },
   hero: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
-    padding: 18,
+    padding: 16,
   },
   infoCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     gap: 6,
-    minWidth: 180,
-    padding: 14,
+    minHeight: 82,
+    minWidth: 150,
+    padding: 12,
   },
   infoGrid: {
     flexDirection: 'row',
@@ -149,69 +171,74 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   infoText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 19,
   },
   infoTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 15,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#F4F7F5',
-    gap: 16,
+    backgroundColor: '#1E1C1A',
+    gap: 12,
     minHeight: '100%',
-    padding: 16,
+    padding: 14,
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     flexDirection: 'row',
+    flexGrow: 1,
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 50,
+    minWidth: 190,
     paddingHorizontal: 16,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 15,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#146C5D',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
+    flexGrow: 1,
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 50,
+    minWidth: 148,
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 15,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#59616C',
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#A89F91',
+    fontSize: 14,
+    lineHeight: 20,
   },
   title: {
-    color: '#20242A',
-    fontSize: 34,
+    color: '#F5F0E8',
+    fontSize: 30,
     fontWeight: '900',
-    lineHeight: 40,
+    lineHeight: 34,
   },
 });

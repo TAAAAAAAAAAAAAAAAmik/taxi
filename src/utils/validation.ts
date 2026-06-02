@@ -1,4 +1,11 @@
-import { AccountRole, ConsentId, consentItems, getFieldsForRole } from '../data/registration';
+import {
+  AccountRole,
+  ConsentId,
+  consentItems,
+  getFieldsForRole,
+  isParkDriverRole,
+  isSelfEmployedDriverRole,
+} from '../data/registration';
 
 export type FormValues = Record<string, string>;
 export type ConsentValues = Record<ConsentId, boolean>;
@@ -40,8 +47,12 @@ export function validateRegistration(
     errors.push('Пароль для приложения должен быть не короче 8 символов.');
   }
 
-  if (role === 'driver') {
+  if (isSelfEmployedDriverRole(role)) {
     validateDriverLegalFields(values, errors);
+  }
+
+  if (isParkDriverRole(role)) {
+    validateParkDriverFields(values, errors);
   }
 
   const missingConsent = consentItems.find((item) => !consents[item.id]);
@@ -51,6 +62,29 @@ export function validateRegistration(
   }
 
   return errors;
+}
+
+function validateParkDriverFields(values: FormValues, errors: string[]) {
+  const experienceYear = Number(values.drivingExperienceSince);
+  const currentYear = new Date().getFullYear();
+
+  if (values.drivingExperienceSince?.trim()) {
+    if (
+      !digitsOnlyPattern.test(values.drivingExperienceSince.trim()) ||
+      experienceYear < 1950 ||
+      experienceYear > currentYear
+    ) {
+      errors.push('Укажите корректный год начала водительского стажа.');
+    } else if (currentYear - experienceYear < 3) {
+      errors.push('Для работы в легковом такси нужен водительский стаж не менее 3 лет.');
+    }
+  }
+
+  requireAffirmation(
+    values.taxiParkDriverAgreement,
+    'Подтвердите работу через таксопарк.',
+    errors,
+  );
 }
 
 function validateDriverLegalFields(values: FormValues, errors: string[]) {

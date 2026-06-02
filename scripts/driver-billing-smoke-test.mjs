@@ -29,8 +29,11 @@ try {
 
   await waitForBackend();
 
-  const driver = await createReadyDriver();
-  const initialBilling = await api(`/drivers/${encodeURIComponent(driver.id)}/billing`);
+  const admin = await loginAdmin();
+  const driver = await createReadyDriver(admin.session.token);
+  const initialBilling = await api(`/drivers/${encodeURIComponent(driver.id)}/billing`, {
+    token: admin.session.token,
+  });
 
   assert(initialBilling.payments.length === 0, 'New driver should not have subscription payments');
 
@@ -40,6 +43,7 @@ try {
       paymentMethod: 'Smoke demo card',
     },
     method: 'POST',
+    token: admin.session.token,
   });
 
   assert(paid.driver.subscriptionStatus === 'active', 'Paid driver should have active access');
@@ -49,12 +53,20 @@ try {
   assert(paid.payments[0].receipt, 'Paid subscription should have receipt');
   assert(paid.payments[0].provider.name === 'smoke-demo-acquiring', 'Payment should store provider');
 
+  const synced = await api(`/driver-payments/${encodeURIComponent(paid.payments[0].id)}/sync`, {
+    method: 'POST',
+    token: admin.session.token,
+  });
+
+  assert(synced.payments[0].status === 'paid', 'Sync should keep paid demo payment active');
+
   const renewed = await api(`/drivers/${encodeURIComponent(driver.id)}/billing/pay`, {
     body: {
       billingMode: 'monthly',
       paymentMethod: 'Smoke demo card',
     },
     method: 'POST',
+    token: admin.session.token,
   });
 
   assert(renewed.payments.length === 2, 'Renewal should add second payment');
@@ -68,11 +80,30 @@ try {
       reason: 'Smoke refund',
     },
     method: 'POST',
+    token: admin.session.token,
   });
 
   assert(refund.payments[0].status === 'refunded', 'Refunded payment should stay in history');
   assert(refund.payments[0].refundReceipt, 'Refunded payment should have refund receipt');
   assert(refund.driver.subscriptionStatus === 'active', 'Previous paid period should keep access active');
+
+  const commissionAccess = await api(`/drivers/${encodeURIComponent(driver.id)}/billing/pay`, {
+    body: {
+      billingMode: 'commission',
+      paymentMethod: 'Smoke commission mode',
+    },
+    method: 'POST',
+    token: admin.session.token,
+  });
+
+  assert(commissionAccess.driver.subscriptionStatus === 'active', 'Commission mode should keep active access');
+  assert(commissionAccess.driver.billingMode === 'commission', 'Driver billing mode should switch to commission');
+  assert(!commissionAccess.driver.accessExpiresAt, 'Commission mode should not set monthly access expiry');
+  assert(commissionAccess.payments[0].amount === 0, 'Commission mode should not create monthly charge');
+  assert(
+    commissionAccess.driver.canReceiveOrders,
+    'Commission driver should still receive orders after compliance',
+  );
 
   console.log('Driver billing smoke test passed');
 } finally {
@@ -83,10 +114,19 @@ try {
   await rm(dbPath, { force: true });
 }
 
-async function createReadyDriver() {
+async function loginAdmin() {
+  return api('/auth/admin-login', {
+    body: {
+      password: 'smoke-admin',
+    },
+    method: 'POST',
+  });
+}
+
+async function createReadyDriver(adminToken) {
   const created = await api('/drivers', {
     body: {
-      billingMode: 'commission',
+      billingMode: 'monthly',
       name: 'Billing Smoke Driver',
       phone: '+79001009999',
       plate: 'B909BB102',
@@ -95,6 +135,7 @@ async function createReadyDriver() {
       vehicle: 'Lada Vesta',
     },
     method: 'POST',
+    token: adminToken,
   });
 
   const compliant = await api(`/drivers/${encodeURIComponent(created.driver.id)}/compliance`, {
@@ -106,6 +147,7 @@ async function createReadyDriver() {
       vehiclePermitStatus: 'approved',
     },
     method: 'PATCH',
+    token: adminToken,
   });
 
   assert(
@@ -134,6 +176,7 @@ async function api(path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: options.method || 'GET',
     headers: {
+      ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
       accept: 'application/json',
       'content-type': 'application/json',
     },

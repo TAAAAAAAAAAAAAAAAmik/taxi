@@ -1,4 +1,12 @@
-export type AccountRole = 'client' | 'driver' | 'fleet';
+import { driverAccessPlans } from './subscription';
+
+export type CanonicalAccountRole =
+  | 'client'
+  | 'self_employed_driver'
+  | 'park_admin'
+  | 'park_driver';
+export type LegacyAccountRole = 'driver' | 'fleet';
+export type AccountRole = CanonicalAccountRole | LegacyAccountRole;
 
 export type RegistrationSection =
   | 'account'
@@ -51,15 +59,34 @@ export const roleCopy: Record<
     submitLabel: 'Создать аккаунт клиента',
     reviewStatus: 'Профиль готов к подтверждению телефона и почты',
   },
+  self_employed_driver: {
+    title: 'Водитель-самозанятый',
+    subtitle: `Частный водитель получает оплату от клиента напрямую и переводит сервису ${driverAccessPlans.commission.commissionPercent}% с завершенных поездок в конце рабочего дня.`,
+    submitLabel: 'Отправить заявку самозанятого водителя',
+    reviewStatus:
+      `После проверки документов будет доступна модель расчетов: 0 ₽/мес и ${driverAccessPlans.commission.commissionPercent}% к дневному переводу.`,
+  },
+  park_admin: {
+    title: 'Таксопарк',
+    subtitle: 'Юрлицо или ИП управляет своими водителями, автомобилями, заказами и финансами.',
+    submitLabel: 'Отправить заявку таксопарка',
+    reviewStatus: 'Анкета уйдет на проверку юридических данных и расчетного счета',
+  },
+  park_driver: {
+    title: 'Водитель таксопарка',
+    subtitle: 'Работает по приглашению таксопарка без собственной оплаты доступа.',
+    submitLabel: 'Присоединиться к таксопарку',
+    reviewStatus: 'Доступ откроется после активации таксопарком и проверки документов',
+  },
   driver: {
-    title: 'Водитель-партнер',
-    subtitle: 'Быстрая заявка, автомобиль и ручной допуск к заказам.',
+    title: 'Водитель-самозанятый',
+    subtitle: 'Устаревшая роль, будет сохранена как самозанятый водитель.',
     submitLabel: 'Отправить заявку водителя',
     reviewStatus:
       'После проверки автомобиля администратор открывает доступ к заказам',
   },
   fleet: {
-    title: 'Партнер-автопарк',
+    title: 'Таксопарк',
     subtitle: 'Подключение водителей, автомобилей и выплат автопарка.',
     submitLabel: 'Отправить заявку автопарка',
     reviewStatus: 'Анкета уйдет на проверку юридических данных',
@@ -273,6 +300,41 @@ const fleetFields: RegistrationField[] = [
   },
 ];
 
+const parkDriverFields: RegistrationField[] = [
+  {
+    id: 'parkInviteCode',
+    label: 'Код приглашения таксопарка',
+    placeholder: 'Например, PARK-12345',
+    section: 'account',
+    required: true,
+    helper: 'Водитель таксопарка регистрируется только по приглашению парка.',
+  },
+  {
+    id: 'driverLicense',
+    label: 'Водительское удостоверение',
+    placeholder: '00 00 000000',
+    section: 'identity',
+    required: true,
+    helper: 'После отправки понадобится фото документа.',
+  },
+  {
+    id: 'drivingExperienceSince',
+    label: 'Водительский стаж с года',
+    placeholder: '2020',
+    section: 'identity',
+    required: true,
+    keyboardType: 'number-pad',
+  },
+  {
+    id: 'taxiParkDriverAgreement',
+    label: 'Подтверждение привязки',
+    placeholder: 'Подтверждаю работу через таксопарк',
+    section: 'legal',
+    required: true,
+    helper: 'Доступ к заказам оплачивает и контролирует таксопарк.',
+  },
+];
+
 export const consentItems = [
   {
     id: 'terms',
@@ -300,6 +362,28 @@ export type ConsentId = (typeof consentItems)[number]['id'];
 
 export const verificationSteps: Record<AccountRole, string[]> = {
   client: ['Подтверждение телефона', 'Подтверждение почты', 'Готов к заказу'],
+  self_employed_driver: [
+    'Проверка телефона и почты',
+    'Проверка паспорта, ИНН и ВУ',
+    'Проверка налогового статуса',
+    'Проверка автомобиля, СТС, ОСАГО и ОСГОП',
+    `Клиентская оплата поступает водителю напрямую`,
+    `Доля сервиса ${driverAccessPlans.commission.commissionPercent}% с завершенной поездки к дневному переводу`,
+  ],
+  park_admin: [
+    'Проверка контакта',
+    'Проверка юрлица или ИП',
+    'Проверка расчетного счета',
+    'Ручная B2B-активация после договора',
+    'Подключение водителей и автомобилей',
+  ],
+  park_driver: [
+    'Проверка приглашения таксопарка',
+    'Проверка телефона и почты',
+    'Проверка водительских документов',
+    'Активация водителя таксопарком',
+    'Доступ к заказам через активный таксопарк',
+  ],
   driver: [
     'Проверка телефона и почты',
     'Проверка паспорта, ИНН и ВУ',
@@ -318,13 +402,62 @@ export const verificationSteps: Record<AccountRole, string[]> = {
 };
 
 export function getFieldsForRole(role: AccountRole) {
-  if (role === 'driver') {
+  const canonicalRole = normalizeAccountRole(role);
+
+  if (canonicalRole === 'self_employed_driver') {
     return [...commonFields, ...driverFields];
   }
 
-  if (role === 'fleet') {
+  if (canonicalRole === 'park_admin') {
     return [...commonFields, ...fleetFields];
   }
 
+  if (canonicalRole === 'park_driver') {
+    return [...commonFields, ...parkDriverFields];
+  }
+
   return commonFields;
+}
+
+export function normalizeAccountRole(role: AccountRole | string | undefined): CanonicalAccountRole {
+  if (role === 'driver') {
+    return 'self_employed_driver';
+  }
+
+  if (role === 'fleet') {
+    return 'park_admin';
+  }
+
+  if (
+    role === 'client' ||
+    role === 'self_employed_driver' ||
+    role === 'park_admin' ||
+    role === 'park_driver'
+  ) {
+    return role;
+  }
+
+  return 'client';
+}
+
+export function isSelfEmployedDriverRole(role: AccountRole | string | undefined) {
+  return normalizeAccountRole(role) === 'self_employed_driver';
+}
+
+export function isParkAdminRole(role: AccountRole | string | undefined) {
+  return normalizeAccountRole(role) === 'park_admin';
+}
+
+export function isParkDriverRole(role: AccountRole | string | undefined) {
+  return normalizeAccountRole(role) === 'park_driver';
+}
+
+export function isDriverLikeRole(role: AccountRole | string | undefined) {
+  const canonicalRole = normalizeAccountRole(role);
+  return canonicalRole === 'self_employed_driver' || canonicalRole === 'park_driver';
+}
+
+export function isParkRole(role: AccountRole | string | undefined) {
+  const canonicalRole = normalizeAccountRole(role);
+  return canonicalRole === 'park_admin' || canonicalRole === 'park_driver';
 }

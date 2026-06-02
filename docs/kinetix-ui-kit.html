@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kinetix UI Kit · Тёплый графит</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+      :root {
+        --bg: #1e1c1a;
+        --card: #2c2926;
+        --raised: #37322e;
+        --text: #f5f0e8;
+        --muted: #a89f91;
+        --amber: #d4a853;
+        --amber-bright: #e5c87b;
+        --teal: #5c8d89;
+        --danger: #c17a70;
+        --success: #7a9a7e;
+        --line: rgba(212, 168, 83, 0.6);
+        --font: Inter, "SF Pro Text", "SF Pro Display", Arial, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.45 var(--font);
+        letter-spacing: 0;
+      }
+      button, input { font: inherit; }
+      .page { width: min(1480px, 100%); margin: 0 auto; padding: 28px 20px 56px; }
+      .topline {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 20px;
+        align-items: end;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+      .brand-mark, .avatar, .mini-avatar, .icon-box {
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+      }
+      .brand-mark {
+        width: 48px;
+        height: 48px;
+        background: var(--amber);
+        color: var(--bg);
+        font-size: 25px;
+        font-weight: 800;
+      }
+      h1, h2, h3, p { margin: 0; }
+      h1 { max-width: 760px; font-size: 36px; line-height: 1.12; }
+      .subtitle { max-width: 720px; margin-top: 10px; color: var(--muted); font-size: 17px; }
+      .spec-card {
+        display: grid;
+        gap: 8px;
+        min-width: 280px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+      }
+      .spec-line { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 13px; }
+      .spec-line strong, strong { color: var(--text); }
+      section { padding-top: 38px; }
+      .section-title { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+      .section-title h2 { font-size: 26px; }
+      .section-title p { max-width: 650px; color: var(--muted); }
+      .phone-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; align-items: start; }
+      .mockup-card { display: grid; gap: 10px; }
+      .mockup-title { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); font-size: 13px; }
+      .mockup-title strong { font-size: 17px; }
+      .phone {
+        position: relative;
+        overflow: hidden;
+        width: 360px;
+        height: 780px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        background: #11100f;
+      }
+      .phone::before {
+        content: "";
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        z-index: 9;
+        width: 92px;
+        height: 24px;
+        transform: translateX(-50%);
+        border-radius: 0 0 14px 14px;
+        background: #050504;
+      }
+      .screen { position: relative; overflow: hidden; width: 100%; height: 100%; border-radius: 24px; background: var(--bg); }
+      .statusbar {
+        position: absolute;
+        top: 13px;
+        left: 18px;
+        right: 18px;
+        z-index: 8;
+        display: flex;
+        justify-content: space-between;
+        color: rgba(245, 240, 232, 0.9);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .map { position: absolute; inset: 0; background: var(--bg); }
+      .road {
+        position: absolute;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(92, 141, 137, 0.55);
+        box-shadow: 0 0 12px rgba(92, 141, 137, 0.42);
+        transform-origin: left center;
+      }
+      .road.a { left: -24px; top: 170px; width: 290px; transform: rotate(-18deg); }
+      .road.b { left: 76px; top: 314px; width: 280px; transform: rotate(31deg); }
+      .road.c { left: 38px; top: 454px; width: 310px; transform: rotate(-8deg); }
+      .road.d { left: 202px; top: 120px; width: 300px; transform: rotate(72deg); }
+      .route {
+        position: absolute;
+        z-index: 2;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--teal);
+        box-shadow: 0 0 16px rgba(92, 141, 137, 0.75);
+        transform-origin: left center;
+      }
+      .route.one { left: 72px; top: 285px; width: 160px; transform: rotate(-25deg); }
+      .route.two { left: 185px; top: 250px; width: 130px; transform: rotate(48deg); }
+      .route.three { left: 112px; top: 465px; width: 160px; transform: rotate(9deg); }
+      .pin, .car-pin {
+        position: absolute;
+        z-index: 3;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+      }
+      .pin { width: 28px; height: 28px; border: 3px solid var(--amber); background: var(--text); }
+      .car-pin {
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--amber);
+        background: var(--card);
+        color: var(--amber);
+        box-shadow: 0 0 16px rgba(212, 168, 83, 0.28);
+      }
+      .glass-address, .top-status, .sheet, .base-card, .order-card, .metric-card, .driver-row, .quest-card, .history-card, .driver-card, .stage-sheet, .rating-card, .kit-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+      }
+      .glass-address {
+        position: absolute;
+        top: 52px;
+        left: 16px;
+        right: 16px;
+        z-index: 5;
+        display: grid;
+        grid-template-columns: 34px 1fr 42px;
+        gap: 10px;
+        align-items: center;
+        min-height: 72px;
+        padding: 12px;
+        background: rgba(44, 41, 38, 0.84);
+      }
+      .amber, .glass-address i, .chip i, .icon-btn i { color: var(--amber); }
+      .muted, .small, .address-copy span { color: var(--muted); }
+      .address-copy strong { display: block; font-size: 18px; line-height: 1.15; }
+      .icon-btn {
+        display: grid;
+        min-width: 42px;
+        height: 42px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--raised);
+        color: var(--amber);
+      }
+      .saved-row { position: absolute; top: 134px; left: 16px; z-index: 5; display: flex; gap: 10px; }
+      .chip, .tab, .status-pill, .option {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 12px;
+        border: 1px solid rgba(168, 159, 145, 0.75);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text);
+        font-size: 13px;
+      }
+      .sheet {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 14px;
+        z-index: 6;
+        display: grid;
+        gap: 13px;
+        padding: 16px;
+      }
+      .sheet-header, .row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .sheet h3, .base-card h3, .cabinet-title h3 { font-size: 22px; line-height: 1.15; }
+      .tariffs { display: grid; grid-auto-flow: column; grid-auto-columns: 118px; gap: 10px; overflow: hidden; }
+      .tariff { display: grid; gap: 6px; min-height: 102px; padding: 12px; border: 1px solid rgba(168, 159, 145, 0.85); border-radius: 8px; background: transparent; }
+      .tariff.selected, .tab.active { border-color: var(--amber); background: var(--amber); color: var(--bg); }
+      .tariff.selected .muted { color: var(--bg); }
+      .primary-btn, .secondary-btn, .danger-btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        min-height: 56px;
+        padding: 0 18px;
+        overflow: hidden;
+        border-radius: 8px;
+        font-weight: 800;
+        transition: transform 140ms ease-out;
+      }
+      .primary-btn { border: 1px solid var(--amber); background: var(--amber); color: var(--bg); }
+      .secondary-btn { border: 1px solid var(--amber); background: transparent; color: var(--amber); }
+      .danger-btn { border: 1px solid var(--danger); background: transparent; color: var(--danger); }
+      .primary-btn:active, .secondary-btn:active, .danger-btn:active, .icon-btn:active { transform: scale(0.95); }
+      .primary-btn::after {
+        content: "";
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(229, 200, 123, 0.36);
+        transform: scale(0);
+        opacity: 0;
+      }
+      .primary-btn:active::after { animation: ripple 420ms ease-out; }
+      .top-status {
+        position: absolute;
+        top: 52px;
+        left: 16px;
+        right: 16px;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 58px;
+        padding: 12px 14px;
+        animation: fadeSlide 380ms ease-out both;
+      }
+      .status-pill .dot, .live-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--success); box-shadow: 0 0 10px var(--success); }
+      .pulse-wrap { position: absolute; left: 50%; top: 42%; z-index: 4; width: 140px; height: 140px; transform: translate(-50%, -50%); }
+      .pulse-dot {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 18px;
+        height: 18px;
+        transform: translate(-50%, -50%);
+        border-radius: 999px;
+        background: var(--amber);
+        box-shadow: 0 0 18px rgba(212, 168, 83, 0.7);
+        animation: dotPulse 1.2s ease-in-out infinite;
+      }
+      .pulse-ring {
+        position: absolute;
+        left: 10px;
+        top: 10px;
+        width: 120px;
+        height: 120px;
+        border: 3px solid var(--amber);
+        border-radius: 999px;
+        box-shadow: 0 0 18px rgba(212, 168, 83, 0.42);
+        animation: ringBreathe 1.2s ease-in-out infinite;
+      }
+      .scanner {
+        position: absolute;
+        left: 10px;
+        top: 10px;
+        width: 120px;
+        height: 120px;
+        border-top: 3px solid var(--teal);
+        border-right: 3px solid transparent;
+        border-radius: 999px;
+        animation: rotate 1.5s linear infinite;
+      }
+      .particle, .spark { position: absolute; width: 4px; height: 4px; border-radius: 999px; background: var(--amber); }
+      .particle { left: 50%; top: 50%; opacity: 0; animation: burst 1.4s ease-out infinite; }
+      .driver-card, .stage-sheet, .rating-card {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 14px;
+        z-index: 6;
+        display: grid;
+        gap: 13px;
+        padding: 16px;
+        animation: springUp 560ms ease-out both;
+      }
+      .pin-code { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+      .pin-code b { display: grid; min-height: 54px; place-items: center; border-radius: 8px; background: var(--raised); color: var(--amber); font-size: 28px; }
+      .finish-overlay { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; background: rgba(30, 28, 26, 0.72); }
+      .farewell-car { position: absolute; top: 235px; left: 156px; color: var(--amber); font-size: 42px; animation: carFarewell 1.6s ease-out infinite; }
+      .thanks { max-width: 260px; color: var(--amber); text-align: center; font-size: 28px; font-weight: 800; line-height: 1.16; text-shadow: 0 0 18px rgba(212, 168, 83, 0.42); animation: glow 2s ease-in-out infinite; }
+      .rating-card { z-index: 8; animation: springUp 700ms ease-out 1.1s both; }
+      .stars { display: flex; gap: 8px; color: var(--amber); font-size: 26px; }
+      .cabinet { display: grid; align-content: start; gap: 12px; padding: 52px 16px 16px; }
+      .cabinet-title { display: grid; gap: 4px; }
+      .cabinet-title span { color: var(--amber); font-size: 13px; font-weight: 800; }
+      .metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .metric-card, .base-card, .order-card, .driver-row, .quest-card, .history-card { padding: 13px; }
+      .metric-card strong { display: block; margin-top: 4px; font-size: 25px; line-height: 1.05; }
+      .metric-card span, .order-card span, .driver-row span, .quest-card span, .history-card span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+      .order-feed, .history-list, .driver-list, .quest-list { display: grid; gap: 10px; }
+      .order-card { display: grid; gap: 9px; animation: springDown 520ms ease-out both; }
+      .order-card h3 { font-size: 17px; }
+      .order-price { color: var(--text); font-size: 24px; font-weight: 800; }
+      .driver-row { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; }
+      .avatar, .mini-avatar { background: var(--raised); color: var(--amber); border: 1px solid var(--line); font-weight: 800; }
+      .avatar { width: 54px; height: 54px; }
+      .mini-avatar { width: 44px; height: 44px; }
+      .indicator { width: 10px; height: 10px; border-radius: 999px; background: var(--success); }
+      .indicator.blocked { background: var(--danger); }
+      .chart { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 112px; padding: 12px; border: 1px solid rgba(168, 159, 145, 0.35); border-radius: 8px; background: var(--raised); }
+      .bar { border-radius: 6px 6px 2px 2px; background: var(--teal); }
+      .bar.peak { background: var(--amber); }
+      .progress-track { overflow: hidden; height: 10px; border: 1px solid rgba(168, 159, 145, 0.55); border-radius: 999px; background: var(--raised); }
+      .progress-fill { width: 68%; height: 100%; border-radius: inherit; background: var(--amber); }
+      .kit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+      .kit-panel { display: grid; gap: 14px; padding: 16px; }
+      .swatches, .stack { display: grid; gap: 10px; }
+      .swatch { display: grid; grid-template-columns: 42px 1fr auto; gap: 10px; align-items: center; }
+      .swatch-color { width: 42px; height: 42px; border: 1px solid rgba(245, 240, 232, 0.18); border-radius: 8px; }
+      code { color: var(--muted); }
+      .sample-input { display: grid; grid-template-columns: 30px 1fr 30px; gap: 8px; align-items: center; min-height: 56px; padding: 0 12px; border: 1px solid var(--muted); border-radius: 8px; background: var(--card); color: var(--text); }
+      .sample-input.focused { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.13); }
+      .onboarding-strip { display: grid; gap: 10px; }
+      .onboarding-card { display: grid; grid-template-columns: 58px 1fr; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+      .illustration { display: grid; width: 58px; height: 58px; place-items: center; border-radius: 8px; background: var(--raised); color: var(--amber); font-size: 28px; }
+      @keyframes ripple { 0% { opacity: 0.7; transform: scale(0); } 100% { opacity: 0; transform: scale(18); } }
+      @keyframes fadeSlide { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes ringBreathe { 50% { width: 128px; height: 128px; left: 6px; top: 6px; border-color: var(--amber-bright); box-shadow: 0 0 26px rgba(229, 200, 123, 0.62); } }
+      @keyframes dotPulse { 50% { transform: translate(-50%, -50%) scale(1.28); } }
+      @keyframes rotate { to { transform: rotate(360deg); } }
+      @keyframes burst { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(0.2); } }
+      @keyframes springUp { 0% { opacity: 0; transform: translateY(44px); } 70% { transform: translateY(-4px); } 100% { opacity: 1; transform: translateY(0); } }
+      @keyframes springDown { 0% { opacity: 0; transform: translateY(-36px); } 75% { transform: translateY(4px); } 100% { opacity: 1; transform: translateY(0); } }
+      @keyframes carFarewell { 0% { opacity: 0; transform: translate(0, 0) scale(0.2); } 22%, 55% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(88px, -92px) scale(0.3); } }
+      @keyframes glow { 50% { opacity: 0.82; text-shadow: 0 0 28px rgba(229, 200, 123, 0.68); } }
+      @media (max-width: 760px) {
+        .topline, .section-title { display: grid; grid-template-columns: 1fr; }
+        .phone { width: min(360px, 100%); }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topline">
+        <div>
+          <div class="brand"><div class="brand-mark">K</div><div><strong>Kinetix</strong><p class="muted">Тёплый графит · чистый премиум</p></div></div>
+          <h1>Уверенность без крика</h1>
+          <p class="subtitle">Обновлённые мобильные макеты для клиента, водителя, таксопарка и маркетолога: спокойная карта, аккуратные карточки, янтарный CTA и бирюзовый маршрут.</p>
+        </div>
+        <div class="spec-card">
+          <div class="spec-line"><span>Фон</span><strong>#1E1C1A</strong></div>
+          <div class="spec-line"><span>Карточки</span><strong>#2C2926</strong></div>
+          <div class="spec-line"><span>Акцент</span><strong>#D4A853</strong></div>
+          <div class="spec-line"><span>Маршрут</span><strong>#5C8D89</strong></div>
+          <div class="spec-line"><span>Шрифт</span><strong>Inter</strong></div>
+        </div>
+      </header>
+
+      <section>
+        <div class="section-title"><h2>Клиент</h2><p>Главный экран, ожидание/поездка, завершение и профиль в чистой премиальной логике.</p></div>
+        <div class="phone-grid">
+          <article class="mockup-card">
+            <div class="mockup-title"><strong>Экран 1 · Клиент — Главный</strong><span>карта, адрес, тарифы</span></div>
+            <div class="phone"><div class="screen">
+              <div class="statusbar"><span>09:41</span><span>LTE 92%</span></div>
+              <div class="map"><div class="road a"></div><div class="road b"></div><div class="road c"></div><div class="road d"></div><div class="pin" style="left:72px; top:334px"></div><div class="pin" style="right:82px; top:232px"></div></div>
+              <div class="glass-address"><i class="ph ph-map-pin"></i><div class="address-copy"><span>Назначение</span><strong>Куда едем?</strong></div><button class="icon-btn" aria-label="Голосовой ввод"><i class="ph ph-microphone"></i></button></div>
+              <div class="saved-row"><div class="chip"><i class="ph ph-house"></i>Дом</div><div class="chip"><i class="ph ph-buildings"></i>Работа</div></div>
+              <div class="sheet"><div class="sheet-header"><h3>Выберите тариф</h3><span class="small">4 мин</span></div><div class="tariffs"><div class="tariff selected"><i class="ph ph-car"></i><strong>Комфорт</strong><span class="muted">590 ₽ · 6 мин</span></div><div class="tariff"><i class="ph ph-car-profile"></i><strong>Бизнес</strong><span class="muted">980 ₽ · 9 мин</span></div><div class="tariff"><i class="ph ph-package"></i><strong>Доставка</strong><span class="muted">от 240 ₽</span></div></div><button class="primary-btn"><i class="ph ph-phone-call"></i>Вызвать</button></div>
+            </div></div>
+          </article>
+
+          <article class="mockup-card">
+            <div class="mockup-title"><strong>Экран 2 · Ожидание и Поездка</strong><span>импульс, водитель, маршрут</span></div>
+            <div class="phone"><div class="screen">
+              <div class="statusbar"><span>09:44</span><span>LTE 91%</span></div>
+              <div class="map"><div class="road a"></div><div class="road b"></div><div class="road c"></div><div class="road d"></div><div class="route one"></div><div class="route two"></div><div class="car-pin" style="left:118px; top:258px"><i class="ph ph-car-profile"></i></div></div>
+              <div class="top-status"><div><strong>Водитель назначается</strong><br><span class="small">Бирюзовый маршрут обновляется плавно</span></div><span class="status-pill"><span class="dot"></span>online</span></div>
+              <div class="pulse-wrap"><div class="pulse-ring"></div><div class="scanner"></div><div class="pulse-dot"></div><span class="particle" style="--x:-90px; --y:-42px"></span><span class="particle" style="--x:88px; --y:-54px"></span><span class="particle" style="--x:-60px; --y:94px"></span><span class="particle" style="--x:100px; --y:70px"></span></div>
+              <div class="driver-card"><div class="row-between"><div class="row-between" style="justify-content:flex-start"><div class="avatar">А</div><div><strong>Алексей</strong><br><span class="small">4.92 · Toyota Camry</span></div></div><div class="row-between"><button class="icon-btn"><i class="ph ph-chat-circle"></i></button><button class="icon-btn"><i class="ph ph-phone"></i></button></div></div><div><span class="small">PIN для начала поездки</span><div class="pin-code"><b>4</b><b>8</b><b>2</b><b>1</b></div></div></div>
+            </div></div>
+          </article>
+
+          <article class="mockup-card">
+            <div class="mockup-title"><strong>Экран 3 · Завершение поездки</strong><span>добрая дорога, оценка</span></div>
+            <div class="phone"><div class="screen">
+              <div class="statusbar"><span>10:21</span><span>LTE 88%</span></div>
+              <div class="map"><div class="road a"></div><div class="road b"></div><div class="road c"></div><div class="route three"></div></div>
+              <div class="finish-overlay"><i class="ph ph-car-profile farewell-car"></i><div class="thanks">Спасибо, что вы с Kinetix</div><span class="spark" style="left:68px; top:180px"></span><span class="spark" style="right:78px; top:220px"></span><span class="spark" style="left:92px; bottom:210px"></span><span class="spark" style="right:110px; bottom:176px"></span></div>
+              <div class="rating-card"><h3>Оцените поездку</h3><div class="stars">★ ★ ★ ★ ★</div><button class="primary-btn">Готово</button></div>
+            </div></div>
+          </article>
+
+          <article class="mockup-card">
+            <div class="mockup-title"><strong>Экран 4 · Профиль и История</strong><span>статистика, адреса, поездки</span></div>
+            <div class="phone"><div class="screen cabinet">
+              <div class="statusbar"><span>11:08</span><span>Wi‑Fi 86%</span></div>
+              <div class="cabinet-title"><span>Профиль</span><h3>Анна</h3></div>
+              <div class="metrics"><div class="metric-card"><i class="ph ph-route amber"></i><strong>24</strong><span>поездки</span></div><div class="metric-card"><i class="ph ph-wallet amber"></i><strong>18 420 ₽</strong><span>сумма</span></div></div>
+              <div class="base-card"><div class="row-between"><strong>Любимые адреса</strong><i class="ph ph-star amber"></i></div><div class="chip" style="margin-top:10px"><i class="ph ph-house"></i>Дом · Коммунистическая, 65</div><div class="chip" style="margin-top:8px"><i class="ph ph-briefcase"></i>Работа · Центральная площадь</div></div>
+              <div class="history-list"><article class="history-card"><div class="row-between"><strong>Янгантау</strong><span class="amber">590 ₽</span></div><span><i class="ph ph-check-circle" style="color:var(--success)"></i> Оплачено · сегодня</span></article><article class="history-card"><div class="row-between"><strong>Кургазак</strong><span>420 ₽</span></div><span><i class="ph ph-check-circle" style="color:var(--success)"></i> Завершена · вчера</span></article><article class="history-card"><div class="row-between"><strong>Малояз</strong><span>0 ₽</span></div><span><i class="ph ph-x-circle" style="color:var(--danger)"></i> Отменена</span></article></div>
+            </div></div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title"><h2>Водитель</h2><p>Лента заказов и выполнение заказа остаются функциональными, но визуально становятся спокойнее и точнее.</p></div>
+        <div class="phone-grid">
+          <article class="mockup-card">
+            <div class="mockup-title"><strong>Экран 5 · Водитель — Главный</strong><span>баланс, линия, заказы</span></div>
+            <div class="phone"><div class="screen cabinet">
+              <div class="statusbar"><span>08:16</span><span>LTE 96%</span></div>
+              <div class="base-card"><div class="row-between"><div><span class="small">Баланс</span><h3>6 820 ₽</h3></div><button class="primary-btn" style="min-height:44px"><span class="live-dot"></span>На линию</button></div></div>
+              <div class="order-feed"><article class="order-card"><div class="row-between"><h3>Коммунистическая, 65</h3><strong class="order-price">590 ₽</strong></div><span>Комфорт · 2.4 км до подачи</span><div class="row-between"><span class="option"><i class="ph ph-suitcase amber"></i>багаж</span><span class="option"><i class="ph ph-credit-card amber"></i>карта</span></div><div class="row-between"><button class="primary-btn" style="flex:1">Принять</button><button class="danger-btn" style="flex:1">Пропустить</button></div></article><article class="order-card" style="animation-delay:120ms"><div class="row-between"><h3>Санаторий Янгантау</h3><strong class="order-price">980 ₽</strong></div><span>Бизнес · 6 мин до клиента</span></article></div>
+            </div></div>
+          </article>
+
+          <article class="mockup-card">
+            <div class="mockup-title"><strong>Экран 6 · Выполнение заказа</strong><span>маршрут, статусы, итог</span></div>
+            <div class="phone"><div class="screen">
+              <div class="statusbar"><span>08:34</span><span>LTE 92%</span></div>
+              <div class="map"><div class="road a"></div><div class="road b"></div><div class="road c"></div><div class="route one"></div><div class="route two"></div><div class="car-pin" style="left:176px; top:276px"><i class="ph ph-car-profile"></i></div></div>
+              <div class="top-status"><div><strong>Едете к клиенту</strong><br><span class="small">Плавное движение по GPS-меткам</span></div><span class="status-pill"><span class="dot"></span>4 мин</span></div>
+              <div class="stage-sheet"><div class="row-between"><h3>Коммунистическая, 65</h3><span class="amber">PIN 4821</span></div><button class="primary-btn"><i class="ph ph-map-pin"></i>На месте</button><button class="primary-btn"><i class="ph ph-play"></i>Начать</button><button class="primary-btn"><i class="ph ph-check"></i>Завершить</button><div class="metrics"><div class="metric-card"><strong>590 ₽</strong><span>за заказ</span></div><div class="metric-card"><strong>6 820 ₽</strong><span>за смену</span></div></div></div>
+            </div></div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title"><h2>Кабинеты</h2><p>Таксопарк и маркетолог используют те же компоненты: карточки с янтарной обводкой, крупные цифры и спокойные статусы.</p></div>
+        <div class="phone-grid">
+          <article class="mockup-card">
+            <div class="mockup-title"><strong>Экран 7 · Таксопарк — Дашборд</strong><span>метрики, водители, финансы</span></div>
+            <div class="phone"><div class="screen cabinet">
+              <div class="statusbar"><span>09:58</span><span>Wi‑Fi 94%</span></div>
+              <div class="cabinet-title"><span>Таксопарк</span><h3>Парк Северный</h3></div>
+              <div class="metrics"><div class="metric-card"><i class="ph ph-steering-wheel amber"></i><strong>18</strong><span>активные водители</span></div><div class="metric-card"><i class="ph ph-list-checks amber"></i><strong>64</strong><span>заказов сегодня</span></div><div class="metric-card"><i class="ph ph-wallet amber"></i><strong>72K</strong><span>выручка</span></div><div class="metric-card"><i class="ph ph-warning-circle amber"></i><strong>2</strong><span>требуют внимания</span></div></div>
+              <div class="chart"><div class="bar" style="height:42%"></div><div class="bar" style="height:58%"></div><div class="bar peak" style="height:86%"></div><div class="bar" style="height:64%"></div><div class="bar" style="height:72%"></div><div class="bar peak" style="height:96%"></div><div class="bar" style="height:52%"></div></div>
+              <div class="driver-list"><div class="driver-row"><div class="mini-avatar">Р</div><div><strong>Рустам А.</strong><br><span>на линии · 4.91</span></div><span class="indicator"></span></div><div class="driver-row"><div class="mini-avatar">И</div><div><strong>Ильдар Н.</strong><br><span>документы на проверке</span></div><span class="indicator" style="background:var(--amber)"></span></div><div class="driver-row"><div class="mini-avatar">Л</div><div><strong>Лилия С.</strong><br><span>заблокирована</span></div><span class="indicator blocked"></span></div></div>
+            </div></div>
+          </article>
+
+          <article class="mockup-card">
+            <div class="mockup-title"><strong>Экран 8 · Маркетолог — Кабинет</strong><span>уровень, ПО, выплаты</span></div>
+            <div class="phone"><div class="screen cabinet">
+              <div class="statusbar"><span>10:02</span><span>LTE 89%</span></div>
+              <div class="cabinet-title"><span>Маркетолог</span><h3>Рост района</h3></div>
+              <div class="metrics"><div class="metric-card"><i class="ph ph-wallet amber"></i><strong>12 450</strong><span>баланс ПО</span></div><div class="metric-card"><i class="ph ph-chart-line-up amber"></i><strong>3</strong><span>уровень</span></div></div>
+              <div class="base-card"><div class="row-between"><strong>До уровня 4</strong><span class="amber">68%</span></div><div class="progress-track" style="margin-top:10px"><div class="progress-fill"></div></div><span class="small">Осталось 5 800 ПО</span></div>
+              <div class="quest-list"><article class="quest-card"><div class="row-between"><h3>Привести 5 водителей</h3><span class="amber">+3 000 ПО</span></div><span>3 из 5 активны</span><div class="progress-track"><div class="progress-fill" style="width:60%"></div></div></article><article class="quest-card"><div class="row-between"><h3>100 заказов в посёлке</h3><span class="amber">+2 500 ПО</span></div><span>82 из 100 выполнены</span><div class="progress-track"><div class="progress-fill" style="width:82%"></div></div></article><article class="quest-card" style="border-color:var(--success)"><div class="row-between"><h3>Подключить магазин</h3><i class="ph ph-check-circle" style="color:var(--success)"></i></div><span>Задача выполнена</span></article></div>
+              <button class="primary-btn" style="position:absolute; left:16px; right:16px; bottom:16px">Запросить выплату</button>
+            </div></div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title"><h2>UI Kit</h2><p>Компоненты тёмной темы: Inter, Phosphor Icons, прямоугольные кнопки 8px, янтарный ripple, поля с фокусом и режим доступности.</p></div>
+        <div class="kit-grid">
+          <article class="kit-panel"><h3>Цветовые токены</h3><div class="swatches"><div class="swatch"><div class="swatch-color" style="background:var(--bg)"></div><div><strong>Warm Onyx</strong><br><span class="small">фон</span></div><code>#1E1C1A</code></div><div class="swatch"><div class="swatch-color" style="background:var(--card)"></div><div><strong>Coffee Surface</strong><br><span class="small">карточки</span></div><code>#2C2926</code></div><div class="swatch"><div class="swatch-color" style="background:var(--text)"></div><div><strong>Ivory Text</strong><br><span class="small">текст</span></div><code>#F5F0E8</code></div><div class="swatch"><div class="swatch-color" style="background:var(--amber)"></div><div><strong>Soft Amber</strong><br><span class="small">CTA</span></div><code>#D4A853</code></div><div class="swatch"><div class="swatch-color" style="background:var(--teal)"></div><div><strong>Muted Teal</strong><br><span class="small">маршрут</span></div><code>#5C8D89</code></div></div></article>
+          <article class="kit-panel"><h3>Кнопки</h3><div class="stack"><button class="primary-btn"><i class="ph ph-phone-call"></i>Вызвать</button><button class="secondary-btn"><i class="ph ph-pencil-simple"></i>Изменить адрес</button><button class="danger-btn"><i class="ph ph-x"></i>Отмена</button><p class="small">Pressed: scale 0.95 + янтарный ripple, 120-400 мс.</p></div></article>
+          <article class="kit-panel"><h3>Поля и фокус</h3><div class="stack"><label class="sample-input"><i class="ph ph-map-pin amber"></i><span>Введите адрес</span><i class="ph ph-microphone amber"></i></label><label class="sample-input focused"><i class="ph ph-navigation-arrow amber"></i><span>Куда едем?</span><i class="ph ph-microphone amber"></i></label><p class="small">Фон поля #2C2926, обычная обводка тауп, фокус янтарный со спокойным свечением.</p></div></article>
+          <article class="kit-panel"><h3>Типографика</h3><div class="stack"><div><span class="small">Headline 28 Bold</span><h2>590 ₽ · 4 мин</h2></div><div><span class="small">Title 22 Bold</span><h3>Водитель подъезжает</h3></div><p class="small">Inter Regular/Bold. Базовый размер 16px. Декоративные шрифты не используются.</p></div></article>
+          <article class="kit-panel"><h3>Карточки</h3><div class="stack"><div class="order-card"><div class="row-between"><strong>Заказ</strong><span class="amber">590 ₽</span></div><span>Комфорт · карта · багаж</span></div><div class="history-card"><div class="row-between"><strong>Поездка завершена</strong><i class="ph ph-check-circle" style="color:var(--success)"></i></div><span>Чек и оценка доступны</span></div><p class="small">Без теней, радиус 8px, обводка янтарём opacity 0.6.</p></div></article>
+          <article class="kit-panel"><h3>Доступность</h3><div class="stack"><p><strong>Для слабовидящих:</strong> шрифт и touch targets увеличиваются, контраст усиливается, spring отключается.</p><p><strong>Голосовой ввод:</strong> микрофон закреплён в адресном поле.</p><p><strong>Анимации:</strong> в доступном режиме замедляются в 1.5 раза.</p></div></article>
+          <article class="kit-panel"><h3>Онбординг</h3><div class="onboarding-strip"><article class="onboarding-card"><div class="illustration"><i class="ph ph-map-trifold"></i></div><div><strong>Маршрут под рукой</strong><br><span class="small">Адрес, тариф и вызов на первом экране.</span></div></article><article class="onboarding-card"><div class="illustration"><i class="ph ph-car-profile"></i></div><div><strong>Водитель виден сразу</strong><br><span class="small">Маршрут, PIN, связь и авто.</span></div></article><article class="onboarding-card"><div class="illustration"><i class="ph ph-microphone"></i></div><div><strong>Можно голосом</strong><br><span class="small">Крупный режим и диктовка адреса.</span></div></article></div></article>
+          <article class="kit-panel"><h3>Motion</h3><div class="stack"><p><strong>Импульс:</strong> янтарная точка, кольцо 120↔128px, бирюзовый сканер 1.5 сек.</p><p><strong>Новые карточки:</strong> slide/spring 300-400 мс.</p><p><strong>Статусы:</strong> fade + slide, без резких скачков.</p></div></article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

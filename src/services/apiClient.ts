@@ -1,3 +1,5 @@
+import RNEventSource from 'react-native-sse';
+
 import { AccountRole } from '../data/registration';
 import {
   DriverBillingMode,
@@ -7,12 +9,21 @@ import {
 import { OrderStatusSummary } from '../navigation/types';
 import type {
   AppOrder,
+  DriverDocumentKind,
+  DriverDocumentUpload,
   DriverDocumentUploadInput,
   DriverProfile,
+  DriverServiceShareStatus,
   PaymentStatus,
+  SupportThread,
 } from '../state/AppState';
+import {
+  getPublicEnv,
+  isProductionApp,
+  isReleaseUnsafePublicValue,
+} from '../utils/runtimeFlags';
 
-const fallbackApiUrl = 'http://localhost:3100';
+const developmentApiUrl = 'http://localhost:3100';
 let apiAuthToken: string | undefined;
 
 export type ApiHealth = {
@@ -32,6 +43,8 @@ export type AuthUser = {
   emailVerifiedAt?: string;
   phone?: string;
   phoneVerifiedAt?: string;
+  parkId?: string;
+  parkName?: string;
   verificationStatus?: string;
   referralCode?: string;
   referredByCode?: string;
@@ -44,6 +57,7 @@ export type AuthSession = {
   userId: string;
   role: AuthRole;
   createdAt: string;
+  expiresAt?: string;
 };
 
 export type AuthResult = {
@@ -51,19 +65,75 @@ export type AuthResult = {
   user: AuthUser;
 };
 
+export type PushTokenPayload = {
+  appOwnership?: string;
+  deviceName?: string;
+  deviceType?: string;
+  platform: 'android' | 'ios' | 'web' | string;
+  role: AuthRole;
+  token: string;
+  tokenType: 'fcm' | 'apns' | 'expo' | string;
+  userId: string;
+};
+
 export type VerificationChannel = 'email' | 'phone';
+export type AuthDeliveryChannel = 'email' | 'max' | 'sms' | 'telegram';
 
 export type VerificationCodeResult = {
   channel: VerificationChannel;
-  code: string;
-  deliveryMode: 'mvp-returned-code';
+  code?: string;
+  deliveryChannel?: AuthDeliveryChannel;
+  deliveryMode: 'accepted' | 'mvp-returned-code' | 'provider-sent';
   expiresAt: string;
+  messageId?: string;
+  provider?: string;
   target: string;
 };
 
 export type VerifyCodeResult = {
   channel: VerificationChannel;
   user: AuthUser;
+};
+
+export type PasswordResetCodeResult = {
+  code?: string;
+  deliveryChannel?: AuthDeliveryChannel;
+  deliveryMode: 'accepted' | 'mvp-returned-code' | 'provider-sent';
+  expiresAt?: string;
+  messageId?: string;
+  ok: boolean;
+  provider?: string;
+  target?: string;
+};
+
+export type SmsLoginCodeResult = {
+  code?: string;
+  deliveryChannel?: Extract<AuthDeliveryChannel, 'max' | 'sms' | 'telegram'>;
+  deliveryMode: 'accepted' | 'mvp-returned-code' | 'provider-sent';
+  expiresAt?: string;
+  messageId?: string;
+  ok: boolean;
+  provider?: string;
+  target?: string;
+};
+
+export type AccountDeletionResult = {
+  deletedAt: string;
+  ok: boolean;
+  removed: {
+    account: number;
+    driverDocuments: number;
+    driverPayments: number;
+    drivers: number;
+    notifications: number;
+    ordersAnonymized: number;
+    passwordResetTokens: number;
+    referrals: number;
+    sessions: number;
+    supportThreads: number;
+    verificationCodes: number;
+    walletLedger: number;
+  };
 };
 
 export type RegisterAccountPayload = {
@@ -76,6 +146,22 @@ export type RegisterAccountPayload = {
   carBrand?: string;
   carModel?: string;
   carPlate?: string;
+  companyName?: string;
+  driverInn?: string;
+  driverLicense?: string;
+  drivingExperienceSince?: string;
+  fleetContact?: string;
+  fleetPayoutAccount?: string;
+  inn?: string;
+  legalAddress?: string;
+  noLegalRestrictionsDeclaration?: string;
+  ogrn?: string;
+  parkInviteCode?: string;
+  passportSeriesNumber?: string;
+  payoutAccount?: string;
+  stsNumber?: string;
+  taxiParkDriverAgreement?: string;
+  taxStatus?: string;
   vehicleDocumentsReady?: string;
   referralCode?: string;
 };
@@ -84,6 +170,10 @@ export type CreateOrderPayload = OrderStatusSummary & {
   role: AccountRole;
   clientName?: string;
   clientPhone?: string;
+  optionsTotal?: number;
+  routeEstimate?: ApiRouteEstimate;
+  safetyPinRequired?: boolean;
+  tariffId?: string;
   userId?: string;
 };
 
@@ -104,12 +194,60 @@ export type DriverBillingDashboard = {
   activePayment?: DriverSubscriptionPayment;
 };
 
+export type DriverServiceShareSummaryDriver = {
+  confirmedAmount: number;
+  driverId: string;
+  driverName: string;
+  ordersCount: number;
+  pendingTransferAmount: number;
+  reportedTransferAmount: number;
+  totalCollectedAmount: number;
+  totalServiceShareAmount: number;
+};
+
+export type DriverServiceShareSummaryOrder = {
+  driverId?: string;
+  driverName?: string;
+  id: string;
+  serviceShareAmount: number;
+  status: DriverServiceShareStatus;
+  total: number;
+};
+
+export type DriverServiceShareSummary = {
+  date: string;
+  drivers: DriverServiceShareSummaryDriver[];
+  orders: DriverServiceShareSummaryOrder[];
+  summary: {
+    confirmedAmount: number;
+    ordersCount: number;
+    pendingTransferAmount: number;
+    reportedTransferAmount: number;
+    totalCollectedAmount: number;
+    totalServiceShareAmount: number;
+  };
+};
+
 export type DriverCompliancePatch = {
   contractStatus?: DriverProfile['contractStatus'];
   documentsStatus?: DriverProfile['documentsStatus'];
   registryStatus?: DriverProfile['registryStatus'];
   taxProfileStatus?: DriverProfile['taxProfileStatus'];
   vehiclePermitStatus?: DriverProfile['vehiclePermitStatus'];
+};
+
+export type DriverDocumentReviewPayload = {
+  note?: string;
+  reason?: string;
+  rejectedKinds?: Array<DriverDocumentUploadInput['kind']>;
+  status: DriverProfile['documentsStatus'];
+};
+
+export type DriverDocumentFileResult = {
+  blob: Blob;
+  contentType: string;
+  fileName?: string;
+  size: number;
 };
 
 export type ReferralStatus = 'registered' | 'qualified' | 'rewarded' | 'blocked';
@@ -162,7 +300,8 @@ export type ReferralDashboard = {
   inviteUrl: string;
   inviteUrls?: {
     client: string;
-    driver: string;
+    driver?: string;
+    self_employed_driver?: string;
   };
   bonusBalance: number;
   referrals: ReferralRecord[];
@@ -195,6 +334,194 @@ export type AdminReferralDashboard = {
   walletLedger: WalletLedgerEntry[];
 };
 
+export type Park = {
+  id: string;
+  organisationName: string;
+  inn: string;
+  ogrn: string;
+  legalAddress: string;
+  contactPhone: string;
+  settlementAccount: string;
+  ownerUserId: string;
+  subscriptionExpiresAt?: string;
+  status: 'active' | 'blocked' | 'pending';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ParkDriverLink = {
+  id: string;
+  userId: string;
+  driverId: string;
+  parkId: string;
+  contact: string;
+  inviteCode: string;
+  invitedAt: string;
+  invitedByUserId: string;
+  status: 'active' | 'blocked' | 'invited';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ParkVehicle = {
+  id: string;
+  parkId: string;
+  driverId?: string;
+  brand: string;
+  model: string;
+  plate: string;
+  stsNumber: string;
+  status: 'active' | 'disabled' | 'maintenance';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ParkVehiclePayload = {
+  brand?: string;
+  carBrand?: string;
+  carModel?: string;
+  carPlate?: string;
+  driverId?: string;
+  model?: string;
+  plate?: string;
+  status?: ParkVehicle['status'];
+  stsNumber?: string;
+};
+
+export type ParkSubscriptionSummary = {
+  amount: number;
+  commissionPercent: number;
+  expiresAt?: string;
+  status: 'active' | 'expired';
+  type: 'park_monthly';
+};
+
+export type ParkSubscriptionRecord = {
+  id: string;
+  userId?: string;
+  parkId?: string;
+  type: 'driver_monthly' | 'park_monthly';
+  amount: number;
+  startsAt: string;
+  expiresAt: string;
+  status: 'active' | 'cancelled' | 'expired';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ParkDashboard = {
+  activeDrivers: number;
+  commission: number;
+  orders: number;
+  park: Park;
+  revenue: number;
+  subscription: ParkSubscriptionSummary;
+};
+
+export type ParkDriversResult = {
+  drivers: DriverProfile[];
+  invites: ParkDriverLink[];
+};
+
+export type ParkInviteResult = {
+  invite: ParkDriverLink;
+  inviteUrl: string;
+};
+
+export type ParkFinance = {
+  commission: number;
+  payouts: number;
+  revenue: number;
+  subscription: ParkSubscriptionSummary;
+  subscriptionPayments: ParkSubscriptionRecord[];
+};
+
+export type ParkDriverDocumentSummary = {
+  driverId: string;
+  documentsStatus: DriverProfile['documentsStatus'];
+  osago?: DriverDocumentUpload;
+  permitStatus: DriverProfile['vehiclePermitStatus'];
+  license?: DriverDocumentUpload;
+};
+
+export type ApiGeoPoint = {
+  latitude: number;
+  longitude: number;
+};
+
+export type ApiGeoProvider = {
+  mode: 'local' | 'provider' | string;
+  name: string;
+  url?: string;
+};
+
+export type ApiAddressSuggestion = {
+  id: string;
+  title: string;
+  subtitle: string;
+  settlement: string;
+  category: string;
+  aliases: string[];
+  source: string;
+  displayAddress: string;
+  coordinates?: ApiGeoPoint;
+};
+
+export type AdminAddressPoint = {
+  aliases?: string[];
+  category: string;
+  coordinates?: ApiGeoPoint;
+  createdAt?: string;
+  displayAddress?: string;
+  id: string;
+  settlement: string;
+  source: string;
+  subtitle: string;
+  title: string;
+  updatedAt?: string;
+};
+
+export type AdminAddressPointPayload = {
+  aliases?: string[];
+  category?: string;
+  coordinates?: ApiGeoPoint;
+  displayAddress?: string;
+  settlement?: string;
+  subtitle?: string;
+  title: string;
+};
+
+export type ApiRouteEstimate = {
+  calculatedAt?: string;
+  confidence: 'draft' | 'estimated' | 'preset';
+  currency?: 'RUB' | string;
+  distanceKm: number;
+  distancePrice: number;
+  durationMin: number;
+  eta?: string;
+  note: string;
+  provider?: ApiGeoProvider;
+  tariffId?: string;
+  total: number;
+};
+
+export type ApiRouteEstimateRequest = {
+  destination: string;
+  minimumPrice?: number;
+  options?: string[];
+  optionsTotal?: number;
+  pickup: string;
+  role: AccountRole;
+  tariff?: string;
+  tariffId?: string;
+};
+
+export type ReverseGeocodeAddress = ApiAddressSuggestion & {
+  latitude: number;
+  longitude: number;
+  region?: string;
+};
+
 export type ReferralCodeValidation = {
   code: string;
   error?: string;
@@ -202,22 +529,373 @@ export type ReferralCodeValidation = {
   valid: boolean;
 };
 
+export type RealtimeNotification = {
+  audience: 'admin' | 'all' | 'client' | 'driver';
+  body: string;
+  createdAt: string;
+  driverId?: string;
+  id: string;
+  kind: string;
+  orderId?: string;
+  readAt?: string;
+  title: string;
+  userId?: string;
+};
+
+export type RealtimeSnapshot = {
+  drivers: DriverProfile[];
+  generatedAt: string;
+  notifications: RealtimeNotification[];
+  orders: AppOrder[];
+  supportThreads?: SupportThread[];
+};
+
+export type RealtimeEventPayload = {
+  clientId?: string;
+  driver?: DriverProfile;
+  notification?: RealtimeNotification;
+  order?: AppOrder;
+  sentAt: string;
+  snapshot: RealtimeSnapshot;
+  type: string;
+};
+
+export type RealtimeConnectionMode = 'websocket' | 'event-stream' | 'polling';
+
+type EventSourceLike = {
+  addEventListener?: (event: string, listener: (event: { data?: string }) => void) => void;
+  close: () => void;
+  onopen?: unknown;
+  onerror?: unknown;
+  onmessage?: unknown;
+};
+
+type WebSocketLike = {
+  close: () => void;
+  onclose?: unknown;
+  onerror?: unknown;
+  onmessage?: unknown;
+  onopen?: unknown;
+  readyState?: number;
+};
+
 export function setApiAuthToken(token?: string) {
   apiAuthToken = token;
 }
 
 export function getApiBaseUrl() {
-  const value = getPublicEnv('EXPO_PUBLIC_API_URL');
+  const value = String(getPublicEnv('EXPO_PUBLIC_API_URL') || '').trim().replace(/\/+$/, '');
 
-  if (!value || value.includes('api.example.com')) {
-    return fallbackApiUrl;
+  if (value && !isReleaseUnsafePublicValue(value)) {
+    if (isProductionApp() && !/^https:\/\//i.test(value)) {
+      throw new Error('EXPO_PUBLIC_API_URL must use HTTPS in production.');
+    }
+
+    return value;
   }
 
-  return value.replace(/\/+$/, '');
+  if (isProductionApp()) {
+    throw new Error('EXPO_PUBLIC_API_URL must point to the production API domain.');
+  }
+
+  return developmentApiUrl;
 }
 
 export async function fetchApiHealth() {
   return request<ApiHealth>('/health');
+}
+
+export async function fetchRealtimeSnapshot() {
+  return request<RealtimeSnapshot>('/realtime/snapshot');
+}
+
+function getRealtimeWebSocketUrl() {
+  const url = new URL('/realtime/ws', getApiBaseUrl());
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+
+  return url.toString();
+}
+
+function getRealtimeDelay(attempt: number) {
+  return Math.min(30000, 1000 * 2 ** Math.max(0, attempt - 1));
+}
+
+function logRealtime(message: string, details?: unknown) {
+  if (details) {
+    console.info(`[realtime] ${message}`, details);
+    return;
+  }
+
+  console.info(`[realtime] ${message}`);
+}
+
+export function subscribeRealtime({
+  onError,
+  onMessage,
+  onModeChange,
+  pollingMs = 5000,
+}: {
+  onError?: (error: Error) => void;
+  onMessage: (payload: RealtimeEventPayload) => void;
+  onModeChange?: (mode: RealtimeConnectionMode) => void;
+  pollingMs?: number;
+}) {
+  const wsUrl = getRealtimeWebSocketUrl();
+  const streamUrl = `${getApiBaseUrl()}/realtime/stream`;
+  const WebSocketCtor = (
+    globalThis as {
+      WebSocket?: new (url: string) => WebSocketLike;
+    }
+  ).WebSocket;
+  const EventSourceCtor = (
+    globalThis as {
+      EventSource?: new (url: string) => unknown;
+    }
+  ).EventSource ?? RNEventSource;
+  let closed = false;
+  let eventSource: EventSourceLike | undefined;
+  let pollingId: ReturnType<typeof setInterval> | undefined;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let websocket: WebSocketLike | undefined;
+  let websocketAttempt = 0;
+
+  const handlePayload = (payload: RealtimeEventPayload, channel: RealtimeConnectionMode) => {
+    logRealtime(`status received via ${channel}`, { type: payload.type, sentAt: payload.sentAt });
+    onMessage(payload);
+  };
+
+  const emitSnapshot = async (type = 'poll') => {
+    try {
+      const snapshot = await fetchRealtimeSnapshot();
+
+      if (!closed) {
+        handlePayload({
+          sentAt: new Date().toISOString(),
+          snapshot,
+          type,
+        }, 'polling');
+      }
+    } catch (error) {
+      if (!closed) {
+        onError?.(error instanceof Error ? error : new Error('Realtime snapshot failed'));
+      }
+    }
+  };
+
+  const stopPolling = () => {
+    if (!pollingId) {
+      return;
+    }
+
+    clearInterval(pollingId);
+    pollingId = undefined;
+  };
+
+  const stopEventStream = () => {
+    if (!eventSource) {
+      return;
+    }
+
+    eventSource.close();
+    eventSource = undefined;
+  };
+
+  const stopWebSocket = () => {
+    if (!websocket) {
+      return;
+    }
+
+    websocket.close();
+    websocket = undefined;
+  };
+
+  const startPolling = () => {
+    if (pollingId) {
+      return;
+    }
+
+    logRealtime('fallback channel enabled: polling');
+    onModeChange?.('polling');
+    void emitSnapshot('snapshot');
+    pollingId = setInterval(() => {
+      void emitSnapshot('poll');
+    }, pollingMs);
+  };
+
+  const scheduleWebSocketRetry = () => {
+    if (closed || retryTimer || !WebSocketCtor) {
+      return;
+    }
+
+    websocketAttempt += 1;
+    const delay = getRealtimeDelay(websocketAttempt);
+    logRealtime(`websocket reconnect scheduled in ${delay} ms`);
+    retryTimer = setTimeout(() => {
+      retryTimer = undefined;
+      startWebSocket();
+    }, delay);
+  };
+
+  const startEventStream = () => {
+    if (closed || eventSource) {
+      return;
+    }
+
+    if (!EventSourceCtor) {
+      startPolling();
+      scheduleWebSocketRetry();
+      return;
+    }
+
+    try {
+      logRealtime('fallback channel connecting: sse');
+      onModeChange?.('event-stream');
+      stopPolling();
+      const source = new EventSourceCtor(streamUrl) as EventSourceLike;
+      eventSource = source;
+
+      const handleEvent = (event: { data?: string | null }) => {
+        if (!event.data) {
+          return;
+        }
+
+        try {
+          const payload = JSON.parse(event.data) as RealtimeEventPayload;
+          handlePayload(payload, 'event-stream');
+        } catch (error) {
+          onError?.(error instanceof Error ? error : new Error('Realtime event parse failed'));
+        }
+      };
+
+      source.onmessage = handleEvent;
+      source.onopen = () => {
+        logRealtime('fallback channel connected: sse');
+      };
+      for (const eventName of [
+        'driver_access',
+        'driver_availability',
+        'driver_compliance',
+        'driver_created',
+        'driver_documents',
+        'driver_documents_review',
+        'driver_payment',
+        'driver_payment_refund',
+        'driver_status',
+        'dispatch_offer',
+        'notification',
+        'order_assigned',
+        'order_created',
+        'order_payment',
+        'order_status',
+        'snapshot',
+      ]) {
+        source.addEventListener?.(eventName, handleEvent);
+      }
+      source.onerror = () => {
+        onError?.(new Error('Realtime stream disconnected, polling enabled'));
+        logRealtime('fallback channel disconnected: sse');
+        source.close();
+        eventSource = undefined;
+        startPolling();
+        scheduleWebSocketRetry();
+      };
+    } catch (error) {
+      onError?.(error instanceof Error ? error : new Error('Realtime stream failed'));
+      startPolling();
+      scheduleWebSocketRetry();
+    }
+  };
+
+  const handleWebSocketMessage = (event: { data?: unknown }) => {
+    if (!event.data || typeof event.data !== 'string') {
+      return;
+    }
+
+    try {
+      const payload = JSON.parse(event.data) as RealtimeEventPayload;
+      handlePayload(payload, 'websocket');
+    } catch (error) {
+      onError?.(error instanceof Error ? error : new Error('Realtime websocket event parse failed'));
+    }
+  };
+
+  function startWebSocket() {
+    if (closed || websocket) {
+      return;
+    }
+
+    if (!WebSocketCtor) {
+      logRealtime('websocket unavailable in this runtime');
+      startEventStream();
+      return;
+    }
+
+    let socket: WebSocketLike | undefined;
+    let connectTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      logRealtime('primary channel connecting: websocket');
+      socket = new WebSocketCtor(wsUrl);
+      websocket = socket;
+      connectTimeout = setTimeout(() => {
+        if (websocket === socket) {
+          logRealtime('websocket connect timeout');
+          socket?.close();
+          websocket = undefined;
+          startEventStream();
+          scheduleWebSocketRetry();
+        }
+      }, 5000);
+
+      socket.onopen = () => {
+        if (connectTimeout) {
+          clearTimeout(connectTimeout);
+        }
+        websocketAttempt = 0;
+        logRealtime('primary channel connected: websocket');
+        stopEventStream();
+        stopPolling();
+        onModeChange?.('websocket');
+      };
+      socket.onmessage = handleWebSocketMessage;
+      socket.onerror = () => {
+        onError?.(new Error('Realtime websocket error'));
+      };
+      socket.onclose = () => {
+        if (connectTimeout) {
+          clearTimeout(connectTimeout);
+        }
+        if (websocket === socket) {
+          websocket = undefined;
+        }
+        if (!closed) {
+          logRealtime('primary channel disconnected: websocket');
+          startEventStream();
+          scheduleWebSocketRetry();
+        }
+      };
+    } catch (error) {
+      if (connectTimeout) {
+        clearTimeout(connectTimeout);
+      }
+      websocket = undefined;
+      onError?.(error instanceof Error ? error : new Error('Realtime websocket failed'));
+      startEventStream();
+      scheduleWebSocketRetry();
+    }
+  }
+
+  startWebSocket();
+
+  return () => {
+    closed = true;
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+    }
+    stopWebSocket();
+    stopEventStream();
+    stopPolling();
+  };
 }
 
 export async function registerAccount(payload: RegisterAccountPayload) {
@@ -234,6 +912,24 @@ export async function loginAccount(identifier: string, password: string, role: A
   });
 }
 
+export async function requestSmsLoginCode(
+  phone: string,
+  role: AccountRole,
+  deliveryChannel?: Extract<AuthDeliveryChannel, 'max' | 'sms' | 'telegram'>,
+) {
+  return request<SmsLoginCodeResult>('/auth/sms-login/request', {
+    body: JSON.stringify({ deliveryChannel, phone, role }),
+    method: 'POST',
+  });
+}
+
+export async function confirmSmsLoginCode(phone: string, code: string, role: AccountRole) {
+  return request<AuthResult>('/auth/sms-login/confirm', {
+    body: JSON.stringify({ code, phone, role }),
+    method: 'POST',
+  });
+}
+
 export async function loginAdmin(password: string) {
   return request<AuthResult>('/auth/admin-login', {
     body: JSON.stringify({ password }),
@@ -241,9 +937,39 @@ export async function loginAdmin(password: string) {
   });
 }
 
-export async function requestVerificationCode(channel: VerificationChannel, target?: string) {
+export async function logoutAccount() {
+  return request<{ ok: boolean }>('/auth/logout', {
+    method: 'POST',
+  });
+}
+
+export async function logoutAllAccountSessions() {
+  return request<{ ok: boolean }>('/auth/logout-all', {
+    method: 'POST',
+  });
+}
+
+export async function registerPushToken(payload: PushTokenPayload) {
+  return request<{ ok: boolean }>('/push-tokens', {
+    body: JSON.stringify(payload),
+    method: 'POST',
+  });
+}
+
+export async function deleteAccount(reason?: string) {
+  return request<AccountDeletionResult>('/account/delete', {
+    body: JSON.stringify({ reason }),
+    method: 'POST',
+  });
+}
+
+export async function requestVerificationCode(
+  channel: VerificationChannel,
+  target?: string,
+  deliveryChannel?: AuthDeliveryChannel,
+) {
   return request<VerificationCodeResult>('/auth/verification-code', {
-    body: JSON.stringify({ channel, target }),
+    body: JSON.stringify({ channel, deliveryChannel, target }),
     method: 'POST',
   });
 }
@@ -251,6 +977,23 @@ export async function requestVerificationCode(channel: VerificationChannel, targ
 export async function verifyContactCode(channel: VerificationChannel, code: string, target?: string) {
   return request<VerifyCodeResult>('/auth/verify-code', {
     body: JSON.stringify({ channel, code, target }),
+    method: 'POST',
+  });
+}
+
+export async function requestPasswordResetCode(
+  identifier: string,
+  deliveryChannel?: AuthDeliveryChannel,
+) {
+  return request<PasswordResetCodeResult>('/auth/password-reset/request', {
+    body: JSON.stringify({ deliveryChannel, identifier }),
+    method: 'POST',
+  });
+}
+
+export async function confirmPasswordReset(identifier: string, code: string, password: string) {
+  return request<AuthResult>('/auth/password-reset/confirm', {
+    body: JSON.stringify({ code, identifier, password }),
     method: 'POST',
   });
 }
@@ -265,6 +1008,77 @@ export async function fetchOrders() {
   return payload.orders;
 }
 
+export async function searchAddressSuggestions(query: string, point?: ApiGeoPoint, limit = 8) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    query,
+  });
+
+  if (point) {
+    params.set('latitude', String(point.latitude));
+    params.set('longitude', String(point.longitude));
+  }
+
+  const payload = await request<{ suggestions: ApiAddressSuggestion[] }>(
+    `/geo/address-search?${params.toString()}`,
+  );
+
+  return payload.suggestions;
+}
+
+export async function reverseGeocodeAddress(point: ApiGeoPoint) {
+  const params = new URLSearchParams({
+    latitude: String(point.latitude),
+    longitude: String(point.longitude),
+  });
+  const payload = await request<{ address: ReverseGeocodeAddress; status: 'resolved' }>(
+    `/geo/reverse?${params.toString()}`,
+  );
+
+  return payload.address;
+}
+
+export async function fetchAdminAddresses() {
+  const payload = await request<{ addresses: AdminAddressPoint[] }>('/admin/addresses');
+  return payload.addresses;
+}
+
+export async function createAdminAddress(payload: AdminAddressPointPayload) {
+  const response = await request<{ address: AdminAddressPoint }>('/admin/addresses', {
+    body: JSON.stringify(payload),
+    method: 'POST',
+  });
+
+  return response.address;
+}
+
+export async function updateAdminAddress(addressId: string, payload: AdminAddressPointPayload) {
+  const response = await request<{ address: AdminAddressPoint }>(
+    `/admin/addresses/${encodeURIComponent(addressId)}`,
+    {
+      body: JSON.stringify(payload),
+      method: 'PATCH',
+    },
+  );
+
+  return response.address;
+}
+
+export async function deleteAdminAddress(addressId: string) {
+  return request<{ ok: boolean }>(`/admin/addresses/${encodeURIComponent(addressId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function estimateRoutePrice(payload: ApiRouteEstimateRequest) {
+  const response = await request<{ estimate: ApiRouteEstimate }>('/geo/routes', {
+    body: JSON.stringify(payload),
+    method: 'POST',
+  });
+
+  return response.estimate;
+}
+
 export async function createOrder(payload: CreateOrderPayload) {
   const response = await request<{ order: AppOrder }>('/orders', {
     body: JSON.stringify(payload),
@@ -274,9 +1088,9 @@ export async function createOrder(payload: CreateOrderPayload) {
   return response.order;
 }
 
-export async function updateOrderStatus(orderId: string, status: string) {
+export async function updateOrderStatus(orderId: string, status: string, pinCode?: string) {
   const response = await request<{ order: AppOrder }>(`/orders/${encodeURIComponent(orderId)}/status`, {
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ pinCode, status }),
     method: 'PATCH',
   });
 
@@ -297,6 +1111,29 @@ export async function updateOrderPaymentStatus(
   );
 
   return response.order;
+}
+
+export async function fetchServiceShareSummary(date?: string) {
+  const query = date ? `?date=${encodeURIComponent(date)}` : '';
+  const response = await request<{ summary: DriverServiceShareSummary }>(
+    `/service-share/summary${query}`,
+  );
+
+  return response.summary;
+}
+
+export async function updateOrderServiceShareStatus(
+  orderId: string,
+  status: DriverServiceShareStatus,
+  note?: string,
+) {
+  return request<{
+    order: AppOrder;
+    summary?: DriverServiceShareSummary;
+  }>(`/orders/${encodeURIComponent(orderId)}/service-share`, {
+    body: JSON.stringify({ note, status }),
+    method: 'PATCH',
+  });
 }
 
 export async function assignOrder(orderId: string, driverId: string) {
@@ -351,6 +1188,129 @@ export async function fetchDrivers() {
   return payload.drivers;
 }
 
+export async function fetchParkDashboard(parkId: string) {
+  const payload = await request<{ dashboard: ParkDashboard }>(
+    `/parks/${encodeURIComponent(parkId)}/dashboard`,
+  );
+
+  return payload.dashboard;
+}
+
+export async function fetchParkDrivers(parkId: string) {
+  return request<ParkDriversResult>(`/parks/${encodeURIComponent(parkId)}/drivers`);
+}
+
+export async function inviteParkDriver(
+  parkId: string,
+  payload: {
+    email?: string;
+    phone?: string;
+  },
+) {
+  return request<ParkInviteResult>(`/parks/${encodeURIComponent(parkId)}/drivers/invite`, {
+    body: JSON.stringify(payload),
+    method: 'POST',
+  });
+}
+
+export async function updateParkDriverStatus(
+  parkId: string,
+  driverId: string,
+  status: ParkDriverLink['status'],
+) {
+  return request<{ driver: DriverProfile; link: ParkDriverLink }>(
+    `/parks/${encodeURIComponent(parkId)}/drivers/${encodeURIComponent(driverId)}`,
+    {
+      body: JSON.stringify({ status }),
+      method: 'PATCH',
+    },
+  );
+}
+
+export async function fetchParkVehicles(parkId: string) {
+  const payload = await request<{ vehicles: ParkVehicle[] }>(
+    `/parks/${encodeURIComponent(parkId)}/vehicles`,
+  );
+
+  return payload.vehicles;
+}
+
+export async function createParkVehicle(parkId: string, payload: ParkVehiclePayload) {
+  const response = await request<{ vehicle: ParkVehicle }>(
+    `/parks/${encodeURIComponent(parkId)}/vehicles`,
+    {
+      body: JSON.stringify(payload),
+      method: 'POST',
+    },
+  );
+
+  return response.vehicle;
+}
+
+export async function fetchParkOrders(parkId: string) {
+  const payload = await request<{ orders: AppOrder[] }>(`/parks/${encodeURIComponent(parkId)}/orders`);
+
+  return payload.orders;
+}
+
+export async function fetchParkFinance(parkId: string) {
+  const payload = await request<{ finance: ParkFinance }>(
+    `/parks/${encodeURIComponent(parkId)}/finance`,
+  );
+
+  return payload.finance;
+}
+
+export async function activateParkSubscription(parkId: string) {
+  return request<{ park: Park; subscription: ParkSubscriptionRecord }>(
+    `/parks/${encodeURIComponent(parkId)}/subscription/activate`,
+    {
+      method: 'POST',
+    },
+  );
+}
+
+export async function fetchParkDriverDocuments(parkId: string) {
+  const payload = await request<{ documents: ParkDriverDocumentSummary[] }>(
+    `/parks/${encodeURIComponent(parkId)}/documents`,
+  );
+
+  return payload.documents;
+}
+
+export async function fetchSupportThreads(role?: AccountRole, userId?: string) {
+  const params = new URLSearchParams();
+
+  if (role) {
+    params.set('role', role);
+  }
+
+  if (userId) {
+    params.set('userId', userId);
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  const payload = await request<{ threads: SupportThread[] }>(`/support/threads${suffix}`);
+
+  return payload.threads;
+}
+
+export async function sendSupportMessageToServer(payload: {
+  category: string;
+  role: AccountRole;
+  text: string;
+  threadId?: string;
+  title?: string;
+  userId?: string;
+}) {
+  const response = await request<{ thread: SupportThread }>('/support/messages', {
+    body: JSON.stringify(payload),
+    method: 'POST',
+  });
+
+  return response.thread;
+}
+
 export async function createDriver(payload: CreateDriverPayload) {
   const response = await request<{ driver: DriverProfile }>('/drivers', {
     body: JSON.stringify(payload),
@@ -399,6 +1359,54 @@ export async function submitDriverDocuments(
   return response.driver;
 }
 
+export async function reviewDriverDocuments(driverId: string, payload: DriverDocumentReviewPayload) {
+  const response = await request<{ driver: DriverProfile }>(
+    `/drivers/${encodeURIComponent(driverId)}/documents/review`,
+    {
+      body: JSON.stringify(payload),
+      method: 'PATCH',
+    },
+  );
+
+  return response.driver;
+}
+
+export async function fetchDriverDocumentFile(
+  driverId: string,
+  kind: DriverDocumentKind,
+): Promise<DriverDocumentFileResult> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/drivers/${encodeURIComponent(driverId)}/documents/${encodeURIComponent(kind)}/file`,
+    {
+      headers: {
+        ...(apiAuthToken ? { authorization: `Bearer ${apiAuthToken}` } : {}),
+        accept: 'image/*',
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload && typeof payload === 'object' && 'error' in payload
+        ? String((payload as { error: unknown }).error)
+        : `Driver document request failed: ${response.status}`;
+
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get('content-disposition') || '';
+  const fileName = contentDisposition.match(/filename="([^"]+)"/i)?.[1];
+
+  return {
+    blob,
+    contentType: response.headers.get('content-type') || 'application/octet-stream',
+    fileName,
+    size: blob.size,
+  };
+}
+
 export async function updateDriverAvailability(driverId: string, isOnline: boolean) {
   const response = await request<{ driver: DriverProfile }>(
     `/drivers/${encodeURIComponent(driverId)}/availability`,
@@ -415,11 +1423,12 @@ export async function updateDriverAccess(
   driverId: string,
   billingMode: DriverBillingMode,
   subscriptionStatus: DriverProfile['subscriptionStatus'] = 'active',
+  paymentMethod = 'Пилотная ручная активация',
 ) {
   const response = await request<{ driver: DriverProfile }>(
     `/drivers/${encodeURIComponent(driverId)}/access`,
     {
-      body: JSON.stringify({ accessDays: 30, billingMode, subscriptionStatus }),
+      body: JSON.stringify({ accessDays: 30, billingMode, paymentMethod, subscriptionStatus }),
       method: 'PATCH',
     },
   );
@@ -449,6 +1458,12 @@ export async function refundDriverSubscriptionPayment(paymentId: string, reason?
   });
 }
 
+export async function syncDriverSubscriptionPayment(paymentId: string) {
+  return request<DriverBillingDashboard>(`/driver-payments/${encodeURIComponent(paymentId)}/sync`, {
+    method: 'POST',
+  });
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
@@ -472,12 +1487,4 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload as T;
-}
-
-function getPublicEnv(key: string) {
-  const env = globalThis as typeof globalThis & {
-    process?: { env?: Record<string, string | undefined> };
-  };
-
-  return env.process?.env?.[key];
 }

@@ -1,5 +1,5 @@
-import { AccountRole } from './registration';
 import { DashboardMetric, MenuActionTarget, MenuIconName, QuickAction } from './menu';
+import { driverAccessPlans } from './subscription';
 
 export type PageActionTarget = MenuActionTarget;
 
@@ -28,7 +28,7 @@ export type SectionPage = {
   note: string;
 };
 
-export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
+export const sectionPages: Record<string, Record<string, SectionPage>> = {
   client: {
     home: {
       title: 'Главная',
@@ -207,7 +207,6 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
       metrics: [
         { label: 'За клиента', value: '60 ₽', helper: 'После 5 поездок' },
         { label: 'За водителя', value: '300 ₽', helper: 'После 10 заказов' },
-        { label: 'Другу', value: '300 ₽', helper: 'На первую поездку' },
       ],
       quickActions: [
         {
@@ -316,9 +315,10 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
       subtitle: 'Личные данные, безопасность аккаунта и управление данными.',
       icon: 'shield',
       statusTitle: 'Профиль создан',
-      statusText: 'Для публикации в магазинах здесь нужен сценарий удаления аккаунта и данных.',
+      statusText: 'Можно управлять базовыми данными и удалить аккаунт через backend-сценарий.',
       primaryAction: 'Редактировать профиль',
       secondaryAction: 'Удалить аккаунт',
+      secondaryTarget: 'deleteAccount',
       metrics: [
         { label: 'Телефон', value: 'На проверке', helper: 'Нужен код' },
         { label: 'Почта', value: 'На проверке', helper: 'Нужна ссылка' },
@@ -340,8 +340,9 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
         {
           id: 'delete',
           title: 'Удаление аккаунта',
-          subtitle: 'Обязательный сценарий для магазинов.',
+          subtitle: 'Удалить профиль и связанные персональные данные.',
           icon: 'shield',
+          target: 'deleteAccount',
         },
       ],
       listTitle: 'Настройки профиля',
@@ -357,35 +358,35 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
           id: 'delete',
           title: 'Удаление аккаунта',
           subtitle: 'Запрос на удаление профиля и данных.',
-          value: 'Нужно API',
-          status: 'Важно',
+          value: 'API',
+          status: 'Доступно',
         },
       ],
-      note: 'Удаление аккаунта нужно реализовать до публикации, если регистрация остается в приложении.',
+      note: 'Удаление аккаунта вызывает backend, отзывает сессии и очищает связанные персональные данные пользователя.',
     },
   },
   driver: {
     subscription: {
-      title: 'Подписка',
-      subtitle: 'Главная модель сервиса: водитель платит за месяц доступа и работает без автопарка.',
+      title: 'Расчеты',
+      subtitle: 'Главная модель сервиса: клиент платит водителю напрямую, а водитель переводит долю сервиса в конце дня.',
       icon: 'wallet',
-      statusTitle: 'Доступ к заказам открывается подпиской',
+      statusTitle: 'Доступ к заказам открывается после допуска',
       statusText:
-        'После проверки документов водитель оплачивает месяц доступа. Дальше он принимает заказы в приложении без комиссии сервиса с каждой поездки.',
-      primaryAction: 'Оформить подписку',
+        `После проверки документов водитель работает по модели ${driverAccessPlans.commission.commissionPercent}% к переводу с каждой завершенной поездки.`,
+      primaryAction: 'Открыть расчеты',
       primaryTarget: 'subscription',
       secondaryAction: 'Посмотреть ленту',
       secondaryTarget: 'order',
       metrics: [
-        { label: 'Стоимость', value: '4 990 ₽', helper: '30 дней доступа' },
-        { label: 'Комиссия', value: '0%', helper: 'С заказа не удерживаем' },
+        { label: 'Доля сервиса', value: `${driverAccessPlans.commission.commissionPercent}%`, helper: 'К переводу за день' },
+        { label: 'Оплата клиента', value: 'Водителю', helper: 'Деньги сначала получает водитель' },
         { label: 'Фокус сервиса', value: 'Трафик', helper: 'Привести клиентов водителю' },
       ],
       quickActions: [
         {
           id: 'pay',
-          title: 'Оплатить месяц',
-          subtitle: 'Открыть доступ к ленте заказов.',
+          title: 'Расчеты',
+          subtitle: 'Посмотреть долю сервиса к переводу.',
           icon: 'wallet',
           target: 'subscription',
         },
@@ -415,10 +416,10 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
         },
         {
           id: 'pay',
-          title: 'Оплата месяца',
-          subtitle: 'Фиксированная подписка заменяет комиссию и выплаты автопарку.',
-          value: '4 990 ₽',
-          status: 'Доступ',
+          title: 'Дневная сверка',
+          subtitle: `Клиент платит водителю напрямую, сервис считает ${driverAccessPlans.commission.commissionPercent}% к вечернему переводу.`,
+          value: `${driverAccessPlans.commission.commissionPercent}%`,
+          status: 'Расчет',
         },
         {
           id: 'traffic',
@@ -428,20 +429,20 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
           status: 'Работа',
         },
       ],
-      note: 'Ключевой риск модели: если сервис не дает водителю достаточно заказов, подписка быстро теряет ценность.',
+      note: 'Расчеты и допуск работают отдельно: водитель сначала проходит проверку документов, затем получает заказы и закрывает дневную сверку.',
     },
     orders: {
       title: 'Лента заказов',
-      subtitle: 'Доступные заказы, фильтры, текущая смена и история выполнения после подписки.',
+      subtitle: 'Доступные заказы, фильтры, текущая смена и история выполнения после допуска.',
       icon: 'briefcase',
-      statusTitle: 'Заказы закрыты до подписки',
-      statusText: 'Сначала нужно подтвердить документы и оплатить месяц доступа. После этого водитель принимает заказы без комиссии сервиса.',
-      primaryAction: 'Оформить подписку',
+      statusTitle: 'Заказы закрыты до допуска',
+      statusText: 'Сначала нужно подтвердить документы, договор, реестр, налоговый профиль и активировать подписку. После этого водитель принимает заказы.',
+      primaryAction: 'Оплатить подписку',
       primaryTarget: 'subscription',
       secondaryAction: 'Открыть демо-заказ',
       secondaryTarget: 'order',
       metrics: [
-        { label: 'Доступ', value: 'Нет', helper: 'Нужна подписка' },
+        { label: 'Доступ', value: 'Нет', helper: 'Нужен допуск' },
         { label: 'Смена', value: 'Закрыта', helper: 'Включится после допуска' },
         { label: 'Заказы', value: '0', helper: 'Лента пустая' },
       ],
@@ -469,9 +470,9 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
       listTitle: 'Доступ к заказам',
       rows: [
         {
-          id: 'subscription',
-          title: 'Подписка на месяц',
-          subtitle: 'Фиксированная оплата открывает ленту заказов без комиссии.',
+          id: 'access',
+          title: 'Модель доступа',
+          subtitle: `3000 ₽ в месяц без комиссии или ${driverAccessPlans.commission.commissionPercent}% с поездки.`,
           value: '0/1',
           status: 'Нужно',
         },
@@ -615,29 +616,29 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
       note: 'Позже можно добавить классы авто: эконом, комфорт, бизнес, минивэн.',
     },
     payouts: {
-      title: 'Выплаты',
-      subtitle: 'Баланс, банковские реквизиты, история выплат и удержания.',
+      title: 'Сверка дня',
+      subtitle: 'Сколько водитель собрал с клиентов, сколько должен перевести сервису и что уже подтверждено.',
       icon: 'wallet',
-      statusTitle: 'Реквизиты ожидают проверки',
-      statusText: 'Выплаты включаются после проверки личности и банковских данных.',
-      primaryAction: 'Добавить реквизиты',
-      secondaryAction: 'История выплат',
+      statusTitle: 'Доля сервиса ожидает закрытия',
+      statusText: 'После завершения поездок водитель переводит начисленную долю сервиса в конце рабочего дня.',
+      primaryAction: 'Открыть расчеты',
+      secondaryAction: 'История заказов',
       metrics: [
-        { label: 'Баланс', value: '0 ₽', helper: 'Нет поездок' },
-        { label: 'К выплате', value: '0 ₽', helper: 'Появится после заказов' },
-        { label: 'Реквизиты', value: 'Черновик', helper: 'Нужна проверка' },
+        { label: 'Собрано', value: '0 ₽', helper: 'Нет поездок' },
+        { label: 'К переводу', value: '0 ₽', helper: 'Появится после заказов' },
+        { label: 'Статус', value: 'Открыто', helper: 'Сверка дня' },
       ],
       quickActions: [
         {
           id: 'bank',
-          title: 'Банк',
-          subtitle: 'БИК, счет и получатель.',
+          title: 'Перевод',
+          subtitle: 'Отметить перевод доли сервиса.',
           icon: 'wallet',
         },
         {
           id: 'history',
           title: 'История',
-          subtitle: 'Начисления, удержания, переводы.',
+          subtitle: 'Заказы, начисления и статусы сверки.',
           icon: 'file',
         },
         {
@@ -1057,5 +1058,99 @@ export const sectionPages: Record<AccountRole, Record<string, SectionPage>> = {
       ],
       note: 'Push-уведомления нужно подключать отдельно для iOS и Android через Expo Notifications или нативный сервис.',
     },
+  },
+};
+
+sectionPages.driver.profile = {
+  ...sectionPages.client.profile,
+  subtitle: 'Личные данные, безопасность аккаунта и удаление профиля водителя.',
+  statusText: 'Водитель может управлять профилем и удалить аккаунт через backend-сценарий.',
+};
+sectionPages.fleet.profile = {
+  ...sectionPages.client.profile,
+  subtitle: 'Данные владельца таксопарка, безопасность аккаунта и управление данными.',
+  statusText: 'Таксопарк может управлять профилем владельца и удалить аккаунт через backend-сценарий.',
+};
+sectionPages.self_employed_driver = sectionPages.driver;
+sectionPages.park_admin = sectionPages.fleet;
+sectionPages.park_driver = {
+  ...sectionPages.driver,
+  subscription: {
+    ...sectionPages.driver.subscription,
+    title: 'Таксопарк',
+    subtitle: 'Привязка к парку, статус доступа и условия работы.',
+    statusTitle: 'Оплата на стороне таксопарка',
+    statusText: 'Собственная модель доступа не нужна: доступ зависит от ручной B2B-активации таксопарка.',
+    primaryAction: 'Открыть заказы',
+    primaryTarget: 'order',
+    secondaryAction: 'Связаться с парком',
+    secondaryTarget: 'supportChat',
+    metrics: [
+      { label: 'B2B-доступ', value: 'Ручной', helper: 'Активирует администратор' },
+      { label: 'Статус', value: 'Активен', helper: 'После допуска парком' },
+      { label: 'Комиссия', value: '0%', helper: 'По подписке парка' },
+    ],
+    quickActions: [
+      {
+        id: 'orders',
+        title: 'Лента заказов',
+        subtitle: 'Заказы доступны через активный таксопарк.',
+        icon: 'briefcase',
+        target: 'order',
+      },
+      {
+        id: 'documents',
+        title: 'Документы',
+        subtitle: 'Проверить статус допуска к линии.',
+        icon: 'file',
+        target: 'documents',
+      },
+      {
+        id: 'support',
+        title: 'Связаться с парком',
+        subtitle: 'Вопросы по доступу, машине и выплатам.',
+        icon: 'headphones',
+        target: 'supportChat',
+      },
+    ],
+    note: 'Водитель таксопарка не оплачивает доступ самостоятельно.',
+  },
+  orders: {
+    ...sectionPages.driver.orders,
+    statusTitle: 'Лента доступна через таксопарк',
+    statusText:
+      'Доступ к заказам открывается, когда таксопарк активен, водитель допущен и документы проверены.',
+    primaryAction: 'Открыть ленту',
+    primaryTarget: 'order',
+    secondaryAction: 'Документы',
+    secondaryTarget: 'documents',
+    metrics: [
+      { label: 'Оплата', value: 'Парк', helper: 'Водитель не платит собственный доступ' },
+      { label: 'Комиссия', value: '0%', helper: 'По подписке парка' },
+      { label: 'Допуск', value: 'Проверка', helper: 'Документы и статус парка' },
+    ],
+    quickActions: [
+      {
+        id: 'orders',
+        title: 'Лента заказов',
+        subtitle: 'Перейти к доступным заказам.',
+        icon: 'briefcase',
+        target: 'order',
+      },
+      {
+        id: 'documents',
+        title: 'Документы',
+        subtitle: 'Статус проверки водителя и автомобиля.',
+        icon: 'file',
+        target: 'documents',
+      },
+      {
+        id: 'support',
+        title: 'Поддержка',
+        subtitle: 'Написать по вопросу доступа к линии.',
+        icon: 'headphones',
+        target: 'supportChat',
+      },
+    ],
   },
 };

@@ -13,13 +13,14 @@ import {
 } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
-import { roleCopy } from '../data/registration';
+import { isSelfEmployedDriverRole, roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { ReferralDashboard, ReferralRecord } from '../services/apiClient';
 import { useAppState } from '../state/AppState';
+import { getPublicEnv, normalizePublicOrigin } from '../utils/runtimeFlags';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Referral'>;
-type InviteRole = 'client' | 'driver';
+type InviteRole = 'client' | 'self_employed_driver';
 
 const referralStatusLabels = {
   blocked: 'Заблокировано',
@@ -30,7 +31,11 @@ const referralStatusLabels = {
 
 export function ReferralScreen({ navigation, route }: Props) {
   const { firstName, role } = route.params;
-  const { currentUser, referralDashboard, refreshReferralDashboard } = useAppState();
+  const {
+    currentUser,
+    referralDashboard,
+    refreshReferralDashboard,
+  } = useAppState();
   const [activeInviteRole, setActiveInviteRole] = useState<InviteRole>('client');
   const [copyStatus, setCopyStatus] = useState('');
 
@@ -44,16 +49,19 @@ export function ReferralScreen({ navigation, route }: Props) {
   const visibleReferrals = useMemo(
     () =>
       (referralDashboard?.referrals ?? []).filter(
-        (referral) => referral.inviteeRole === activeInviteRole,
+        (referral) =>
+          activeInviteRole === 'self_employed_driver'
+            ? isSelfEmployedDriverRole(referral.inviteeRole)
+            : referral.inviteeRole === activeInviteRole,
       ),
     [activeInviteRole, referralDashboard?.referrals],
   );
   const activeRule =
-    activeInviteRole === 'driver'
+    activeInviteRole === 'self_employed_driver'
       ? {
-          icon: <Car color="#146C5D" size={20} strokeWidth={2.4} />,
+          icon: <Car color="#D4A853" size={20} strokeWidth={2.4} />,
           reward: rewards?.driverReward ?? 300,
-          title: 'Пригласить водителя',
+          title: 'Пригласить самозанятого водителя',
           text: `Вы получите ${rewards?.driverReward ?? 300} ₽ после первых ${
             rewards?.driverQualificationOrders ?? 10
           } завершенных заказов водителя. Водитель получает ${
@@ -61,7 +69,7 @@ export function ReferralScreen({ navigation, route }: Props) {
           } дней доступа после одобрения.`,
         }
       : {
-          icon: <UserRound color="#146C5D" size={20} strokeWidth={2.4} />,
+          icon: <UserRound color="#D4A853" size={20} strokeWidth={2.4} />,
           reward: rewards?.clientReward ?? 60,
           title: 'Пригласить клиента',
           text: `Вы получите ${rewards?.clientReward ?? 60} ₽ после первых ${
@@ -78,7 +86,7 @@ export function ReferralScreen({ navigation, route }: Props) {
 
   const handleShare = async () => {
     await Share.share({
-      message: `Такси Партнер: ${inviteUrl}\nКод приглашения: ${inviteCode}`,
+      message: `Такси Салават: ${inviteUrl}\nКод приглашения: ${inviteCode}`,
     });
   };
 
@@ -91,7 +99,7 @@ export function ReferralScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#146C5D" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
           <Text style={styles.roleText}>{roleCopy[role].title}</Text>
@@ -99,10 +107,10 @@ export function ReferralScreen({ navigation, route }: Props) {
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Share2 color="#146C5D" size={30} strokeWidth={2.4} />
+            <Share2 color="#D4A853" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>Пригласить в Такси Партнер</Text>
+            <Text style={styles.title}>Пригласить в Такси Салават</Text>
             <Text style={styles.subtitle}>
               Одна ссылка подходит для клиентов и водителей. Бонус становится доступен только
               после нужного количества завершенных поездок.
@@ -117,17 +125,17 @@ export function ReferralScreen({ navigation, route }: Props) {
           <Text style={styles.linkText}>{inviteUrl}</Text>
           <View style={styles.codeActions}>
             <ActionButton
-              icon={<Copy color="#FFFFFF" size={16} strokeWidth={2.4} />}
+              icon={<Copy color="#F5F0E8" size={16} strokeWidth={2.4} />}
               label="Код"
               onPress={() => handleCopy('Код', inviteCode)}
             />
             <ActionButton
-              icon={<Copy color="#FFFFFF" size={16} strokeWidth={2.4} />}
+              icon={<Copy color="#F5F0E8" size={16} strokeWidth={2.4} />}
               label="Ссылка"
               onPress={() => handleCopy('Ссылка', inviteUrl)}
             />
             <ActionButton
-              icon={<Send color="#FFFFFF" size={16} strokeWidth={2.4} />}
+              icon={<Send color="#F5F0E8" size={16} strokeWidth={2.4} />}
               label="Поделиться"
               onPress={handleShare}
             />
@@ -137,17 +145,17 @@ export function ReferralScreen({ navigation, route }: Props) {
 
         <View style={styles.statsGrid}>
           <StatCard
-            icon={<Wallet color="#146C5D" size={20} strokeWidth={2.4} />}
+            icon={<Wallet color="#D4A853" size={20} strokeWidth={2.4} />}
             label="Бонусный баланс"
             value={`${referralDashboard?.bonusBalance ?? currentUser?.bonusBalance ?? 0} ₽`}
           />
           <StatCard
-            icon={<UsersRound color="#146C5D" size={20} strokeWidth={2.4} />}
+            icon={<UsersRound color="#D4A853" size={20} strokeWidth={2.4} />}
             label="Приглашения"
             value={String(referralDashboard?.referrals.length ?? 0)}
           />
           <StatCard
-            icon={<Gift color="#146C5D" size={20} strokeWidth={2.4} />}
+            icon={<Gift color="#D4A853" size={20} strokeWidth={2.4} />}
             label="Выбрано"
             value={`${activeRule.reward} ₽`}
           />
@@ -162,9 +170,9 @@ export function ReferralScreen({ navigation, route }: Props) {
               onPress={() => setActiveInviteRole('client')}
             />
             <SegmentButton
-              active={activeInviteRole === 'driver'}
-              label="Водитель"
-              onPress={() => setActiveInviteRole('driver')}
+              active={activeInviteRole === 'self_employed_driver'}
+              label="Самозанятый водитель"
+              onPress={() => setActiveInviteRole('self_employed_driver')}
             />
           </View>
           <View style={styles.ruleRow}>
@@ -234,10 +242,17 @@ function createInviteUrl(
     return dashboard.inviteUrls[inviteRole];
   }
 
-  const baseUrl = dashboard?.inviteUrl ?? `https://links.example.com/invite/${inviteCode}`;
+  const baseUrl = dashboard?.inviteUrl ?? createFallbackInviteUrl(inviteCode);
   const separator = baseUrl.includes('?') ? '&' : '?';
 
   return `${baseUrl}${separator}role=${inviteRole}`;
+}
+
+function createFallbackInviteUrl(inviteCode: string) {
+  const linksOrigin = normalizePublicOrigin(getPublicEnv('EXPO_PUBLIC_LINKS_DOMAIN'));
+  const encodedCode = encodeURIComponent(inviteCode);
+
+  return linksOrigin ? `${linksOrigin}/invite/${encodedCode}` : `taxipartner://invite/${encodedCode}`;
 }
 
 function StatCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
@@ -282,7 +297,7 @@ function SegmentButton({ active, label, onPress }: { active: boolean; label: str
 function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
   const progress = referral.progress;
   const completed = progress?.completedOrders ?? 0;
-  const required = progress?.requiredOrders ?? (referral.inviteeRole === 'driver' ? 10 : 5);
+  const required = progress?.requiredOrders ?? (isSelfEmployedDriverRole(referral.inviteeRole) ? 10 : 5);
   const percent = progress?.percent ?? 0;
   const relation = referral.viewerRelation === 'invitee' ? 'Вас пригласили' : 'Вы пригласили';
 
@@ -291,10 +306,10 @@ function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
       <View style={styles.referralTop}>
         <View style={styles.referralCopy}>
           <Text style={styles.referralTitle}>
-            {relation}: {referral.inviteeName ?? (referral.inviteeRole === 'driver' ? 'водитель' : 'клиент')}
+            {relation}: {referral.inviteeName ?? (isSelfEmployedDriverRole(referral.inviteeRole) ? 'водитель' : 'клиент')}
           </Text>
           <Text style={styles.referralText}>
-            {referral.inviteeRole === 'driver' ? 'Водитель' : 'Клиент'} · {referral.code}
+            {isSelfEmployedDriverRole(referral.inviteeRole) ? 'Самозанятый водитель' : 'Клиент'} · {referral.code}
           </Text>
         </View>
         <View style={styles.referralMeta}>
@@ -318,7 +333,7 @@ function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
 const styles = StyleSheet.create({
   actionButton: {
     alignItems: 'center',
-    borderColor: '#DCEFEB',
+    borderColor: '#F5F0E8',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -328,14 +343,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   actionButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 12,
     fontWeight: '900',
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -344,7 +359,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -355,38 +370,38 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   codeCard: {
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     gap: 6,
     padding: 18,
   },
   codeLabel: {
-    color: '#DCEFEB',
+    color: '#F5F0E8',
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   codeValue: {
-    color: '#FFFFFF',
+    color: '#F5F0E8',
     fontSize: 36,
     fontWeight: '900',
     lineHeight: 42,
   },
   copyStatus: {
-    color: '#FFFFFF',
+    color: '#F5F0E8',
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
   },
   emptyText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 19,
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -400,19 +415,19 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
   ledgerAmount: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   ledgerReason: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flex: 1,
     fontSize: 13,
     fontWeight: '800',
@@ -420,8 +435,8 @@ const styles = StyleSheet.create({
   },
   ledgerRow: {
     alignItems: 'center',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -429,51 +444,52 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   linkText: {
-    color: '#DCEFEB',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   metaLine: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   panel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
     padding: 16,
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
   },
   progressFill: {
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 999,
     height: '100%',
   },
   progressText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 12,
     fontWeight: '900',
   },
   progressTrack: {
-    backgroundColor: '#E6EBEA',
+    backgroundColor: '#37322E',
     borderRadius: 999,
     height: 8,
     overflow: 'hidden',
   },
   referralAmount: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
     textAlign: 'right',
@@ -488,17 +504,17 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   referralRow: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
     padding: 12,
   },
   referralStatus: {
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 6,
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 11,
     fontWeight: '900',
     overflow: 'hidden',
@@ -506,12 +522,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   referralText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   referralTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -521,7 +537,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   roleText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -531,34 +547,34 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   ruleRow: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 7,
     padding: 12,
   },
   ruleText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 19,
   },
   ruleTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   sectionTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 18,
     fontWeight: '900',
   },
   segment: {
-    backgroundColor: '#EEF5F3',
+    backgroundColor: '#2C2926',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 6,
@@ -573,19 +589,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   segmentButtonActive: {
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
   },
   segmentButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   segmentButtonTextActive: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
   },
   statCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -594,7 +610,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   statLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -604,17 +620,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   statValue: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 22,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 15,
     lineHeight: 22,
   },
   title: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 30,
     fontWeight: '900',
     lineHeight: 36,

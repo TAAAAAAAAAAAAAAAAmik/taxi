@@ -28,6 +28,8 @@ import {
   AccountRole,
   consentItems,
   getFieldsForRole,
+  isSelfEmployedDriverRole,
+  normalizeAccountRole,
   roleCopy,
   sectionTitles,
   verificationSteps,
@@ -41,16 +43,20 @@ import {
 } from '../utils/validation';
 import { validateReferralCode } from '../services/apiClient';
 import { useAppState } from '../state/AppState';
+import { getPublicEnv, isPhoneVerificationSkipped, normalizePublicOrigin } from '../utils/runtimeFlags';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Registration'>;
 
 const roleIcons = {
   client: UserRound,
+  self_employed_driver: Car,
+  park_admin: Building2,
+  park_driver: Car,
   driver: Car,
   fleet: Building2,
 };
 
-const orderedRoles: AccountRole[] = ['client', 'driver'];
+const orderedRoles: AccountRole[] = ['client', 'self_employed_driver', 'park_admin'];
 const sectionOrder = ['account', 'identity', 'legal', 'vehicle', 'business', 'payments'] as const;
 
 export function RegistrationScreen({ navigation, route }: Props) {
@@ -80,6 +86,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
   );
   const canSubmit = validationErrors.length === 0;
   const isWide = width >= 720;
+  const skipPhoneVerification = isPhoneVerificationSkipped();
 
   useEffect(() => {
     if (!referralCodeFromLink) {
@@ -154,13 +161,29 @@ export function RegistrationScreen({ navigation, route }: Props) {
       carBrand: values.carBrand,
       carModel: values.carModel,
       carPlate: values.carPlate,
+      companyName: values.companyName,
+      driverInn: values.driverInn,
+      driverLicense: values.driverLicense,
+      drivingExperienceSince: values.drivingExperienceSince,
       email: values.email,
       firstName: values.firstName,
+      fleetContact: values.fleetContact,
+      fleetPayoutAccount: values.fleetPayoutAccount,
+      inn: values.inn,
       lastName: values.lastName,
+      legalAddress: values.legalAddress,
+      noLegalRestrictionsDeclaration: values.noLegalRestrictionsDeclaration,
+      ogrn: values.ogrn,
+      parkInviteCode: values.parkInviteCode,
       password: values.appPassword ?? '',
       phone: values.phone,
+      passportSeriesNumber: values.passportSeriesNumber,
+      payoutAccount: values.payoutAccount,
       referralCode: normalizedReferralCode,
-      role,
+      role: normalizeAccountRole(role),
+      stsNumber: values.stsNumber,
+      taxiParkDriverAgreement: values.taxiParkDriverAgreement,
+      taxStatus: values.taxStatus,
       vehicleDocumentsReady: values.vehicleDocumentsReady,
     });
 
@@ -171,17 +194,31 @@ export function RegistrationScreen({ navigation, route }: Props) {
       return;
     }
 
+    const canonicalRole = normalizeAccountRole(role);
     setServerNotice(
-      role === 'driver'
+      isSelfEmployedDriverRole(canonicalRole)
         ? 'Аккаунт и заявка водителя созданы на backend со статусом проверки.'
-        : 'Аккаунт клиента создан на backend.',
+        : canonicalRole === 'park_admin'
+          ? 'Аккаунт таксопарка создан на backend и отправлен на проверку.'
+          : canonicalRole === 'park_driver'
+            ? 'Аккаунт водителя таксопарка создан и привязан к приглашению.'
+            : 'Аккаунт клиента создан на backend.',
     );
 
-    navigation.navigate('VerifyPhone', {
+    const nextRouteParams = {
       email: values.email,
       firstName: values.firstName,
+      role: normalizeAccountRole(role),
+    };
+
+    if (skipPhoneVerification) {
+      navigation.navigate('VerifyEmail', nextRouteParams);
+      return;
+    }
+
+    navigation.navigate('VerifyPhone', {
+      ...nextRouteParams,
       phone: values.phone,
-      role,
     });
   };
 
@@ -191,19 +228,19 @@ export function RegistrationScreen({ navigation, route }: Props) {
         <View style={styles.headerBand}>
           <View style={styles.brandRow}>
             <View style={styles.brandMark}>
-              <Car color="#FFFFFF" size={24} strokeWidth={2.4} />
+              <Car color="#F5F0E8" size={24} strokeWidth={2.4} />
             </View>
-            <View>
-              <Text style={styles.appName}>Такси Партнер</Text>
+            <View style={styles.brandCopy}>
+              <Text style={styles.appName}>Такси Салават</Text>
               <Text style={styles.appMeta}>Регистрация и проверка профиля</Text>
             </View>
           </View>
 
           <View style={styles.heroCopy}>
-            <Text style={styles.heroTitle}>Создание аккаунта</Text>
-              <Text style={styles.heroText}>
-              Выберите роль, заполните анкету и подтвердите телефон с почтой. Водитель получает
-              доступ к заказам после проверки документов и оплаты месячной подписки.
+            <Text numberOfLines={2} style={styles.heroTitle}>Создание аккаунта</Text>
+            <Text numberOfLines={3} style={styles.heroText}>
+              Выберите роль, заполните анкету и подтвердите {skipPhoneVerification ? 'почту' : 'телефон с почтой'}.
+              Водитель получает доступ к заказам после проверки документов и выбора модели: подписка 3000 ₽ или комиссия 7%.
             </Text>
           </View>
         </View>
@@ -212,43 +249,71 @@ export function RegistrationScreen({ navigation, route }: Props) {
           <View style={[styles.sidebar, isWide && styles.sidebarWide]}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Тип аккаунта</Text>
-              <Text style={styles.sectionHint}>Роль определяет поля анкеты и будущий кабинет.</Text>
+              <Text numberOfLines={2} style={styles.sectionHint}>Роль определяет поля анкеты и будущий кабинет.</Text>
             </View>
 
-            <View style={styles.roleList}>
-              {orderedRoles.map((item) => {
-                const copy = roleCopy[item];
-                const Icon = roleIcons[item];
+            {isWide ? (
+              <View style={styles.roleList}>
+                {orderedRoles.map((item) => {
+                  const copy = roleCopy[item];
+                  const Icon = roleIcons[item];
 
-                return (
-                  <RoleCard
-                    Icon={Icon}
-                    active={item === role}
-                    key={item}
-                    onPress={() => {
-                      setSubmitted(false);
-                      setRole(item);
-                    }}
-                    subtitle={copy.subtitle}
-                    title={copy.title}
-                  />
-                );
-              })}
-            </View>
+                  return (
+                    <RoleCard
+                      Icon={Icon}
+                      active={item === role}
+                      key={item}
+                      onPress={() => {
+                        setSubmitted(false);
+                        setRole(item);
+                      }}
+                      subtitle={copy.subtitle}
+                      title={copy.title}
+                    />
+                  );
+                })}
+              </View>
+            ) : (
+              <ScrollView
+                contentContainerStyle={styles.roleRail}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              >
+                {orderedRoles.map((item) => {
+                  const copy = roleCopy[item];
+                  const Icon = roleIcons[item];
+
+                  return (
+                    <View key={item} style={styles.roleRailItem}>
+                      <RoleCard
+                        Icon={Icon}
+                        active={item === role}
+                        onPress={() => {
+                          setSubmitted(false);
+                          setRole(item);
+                        }}
+                        subtitle={copy.subtitle}
+                        title={copy.title}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
 
             <InfoPanel Icon={ShieldCheck} title="Безопасность данных">
-              <Text style={styles.panelText}>
+              <Text numberOfLines={2} style={styles.panelText}>
                 Используется отдельный пароль для приложения. Пароль от почты не запрашивается.
               </Text>
             </InfoPanel>
 
             <InfoPanel Icon={LinkIcon} title="Инвайт-ссылка">
-              <Text style={styles.panelText}>
+              <Text numberOfLines={2} style={styles.panelText}>
                 {referralCodeFromLink
                   ? `Код из приглашения: ${referralCodeFromLink}`
-                  : 'https://links.example.com/invite/{code}'}
+                  : getInviteLinkTemplate()}
               </Text>
-              <Text style={styles.panelTextMuted}>
+              <Text numberOfLines={2} style={styles.panelTextMuted}>
                 Ссылка открывает регистрацию и автоматически подставляет реферальный код.
               </Text>
             </InfoPanel>
@@ -257,7 +322,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
           <View style={styles.formArea}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{roleCopy[role].title}</Text>
-              <Text style={styles.sectionHint}>{roleCopy[role].reviewStatus}</Text>
+              <Text numberOfLines={2} style={styles.sectionHint}>{roleCopy[role].reviewStatus}</Text>
             </View>
 
             <View style={styles.steps}>
@@ -266,7 +331,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
                   <View style={styles.stepBadge}>
                     <Text style={styles.stepBadgeText}>{index + 1}</Text>
                   </View>
-                  <Text style={styles.stepText}>{step}</Text>
+                  <Text numberOfLines={2} style={styles.stepText}>{step}</Text>
                 </View>
               ))}
             </View>
@@ -274,17 +339,18 @@ export function RegistrationScreen({ navigation, route }: Props) {
             {fieldsBySection.map((group) => (
               <View key={group.section} style={styles.formSection}>
                 <View style={styles.formSectionHeader}>
-                  <FileText color="#146C5D" size={18} strokeWidth={2.4} />
+                  <FileText color="#D4A853" size={18} strokeWidth={2.4} />
                   <Text style={styles.formSectionTitle}>{sectionTitles[group.section]}</Text>
                 </View>
                 <View style={styles.fieldGrid}>
                   {group.fields.map((field) => (
-                    <FieldInput
-                      field={field}
-                      key={field.id}
-                      onChangeText={(nextValue) => updateValue(field.id, nextValue)}
-                      value={values[field.id] ?? ''}
-                    />
+                    <View key={field.id} style={styles.fieldSlot}>
+                      <FieldInput
+                        field={field}
+                        onChangeText={(nextValue) => updateValue(field.id, nextValue)}
+                        value={values[field.id] ?? ''}
+                      />
+                    </View>
                   ))}
                 </View>
               </View>
@@ -292,7 +358,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
 
             <View style={styles.formSection}>
               <View style={styles.formSectionHeader}>
-                <ClipboardCheck color="#146C5D" size={18} strokeWidth={2.4} />
+                <ClipboardCheck color="#D4A853" size={18} strokeWidth={2.4} />
                 <Text style={styles.formSectionTitle}>Согласия</Text>
               </View>
               <View>
@@ -361,7 +427,13 @@ function normalizeReferralCodeParam(value?: string) {
 }
 
 function normalizeRoleParam(value?: AccountRole) {
-  return value === 'driver' ? 'driver' : 'client';
+  return normalizeAccountRole(value);
+}
+
+function getInviteLinkTemplate() {
+  const linksOrigin = normalizePublicOrigin(getPublicEnv('EXPO_PUBLIC_LINKS_DOMAIN'));
+
+  return linksOrigin ? `${linksOrigin}/invite/{code}` : 'taxipartner://invite/{code}';
 }
 
 const styles = StyleSheet.create({
@@ -369,18 +441,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   appMeta: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     marginTop: 2,
   },
   appName: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 18,
     fontWeight: '900',
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
@@ -391,28 +463,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
+  brandCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   contentGrid: {
-    gap: 20,
+    gap: 12,
   },
   contentGridWide: {
     alignItems: 'flex-start',
     flexDirection: 'row',
   },
   fieldGrid: {
-    gap: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  fieldSlot: {
+    flex: 1,
+    minWidth: 230,
   },
   formArea: {
     flex: 1,
-    gap: 16,
+    gap: 12,
     minWidth: 0,
   },
   formSection: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 16,
-    padding: 16,
+    gap: 12,
+    padding: 12,
   },
   formSectionHeader: {
     alignItems: 'center',
@@ -420,46 +502,46 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   formSectionTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 17,
     fontWeight: '900',
   },
   headerBand: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 24,
-    padding: 18,
+    gap: 12,
+    padding: 12,
   },
   heroCopy: {
     gap: 8,
   },
   heroText: {
-    color: '#59616C',
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#A89F91',
+    fontSize: 14,
+    lineHeight: 20,
     maxWidth: 640,
   },
   heroTitle: {
-    color: '#20242A',
-    fontSize: 32,
+    color: '#F5F0E8',
+    fontSize: 26,
     fontWeight: '900',
-    lineHeight: 38,
+    lineHeight: 30,
   },
   page: {
-    backgroundColor: '#F4F7F5',
-    gap: 20,
+    backgroundColor: '#1E1C1A',
+    gap: 12,
     minHeight: '100%',
-    padding: 16,
+    padding: 14,
   },
   panelText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 13,
     lineHeight: 19,
   },
   panelTextMuted: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
@@ -467,16 +549,23 @@ const styles = StyleSheet.create({
     opacity: 0.78,
   },
   roleList: {
-    gap: 10,
+    gap: 8,
+  },
+  roleRail: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  roleRailItem: {
+    width: 210,
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -484,7 +573,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -492,18 +581,18 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   sectionHint: {
-    color: '#59616C',
-    fontSize: 14,
-    lineHeight: 20,
+    color: '#A89F91',
+    fontSize: 13,
+    lineHeight: 18,
   },
   sectionTitle: {
-    color: '#20242A',
-    fontSize: 22,
+    color: '#F5F0E8',
+    fontSize: 18,
     fontWeight: '900',
   },
   sidebar: {
     flexShrink: 0,
-    gap: 14,
+    gap: 10,
     width: '100%',
   },
   sidebarWide: {
@@ -511,14 +600,14 @@ const styles = StyleSheet.create({
   },
   stepBadge: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 28,
     justifyContent: 'center',
     width: 28,
   },
   stepBadgeText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -528,33 +617,33 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stepText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 18,
   },
   steps: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 10,
-    padding: 14,
+    gap: 8,
+    padding: 10,
   },
   submitButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 56,
     paddingHorizontal: 16,
   },
   submitButtonMuted: {
-    backgroundColor: '#89958F',
+    backgroundColor: '#5A544E',
   },
   submitText: {
-    color: '#FFFFFF',
+    color: '#F5F0E8',
     flexShrink: 1,
     fontSize: 15,
     fontWeight: '900',

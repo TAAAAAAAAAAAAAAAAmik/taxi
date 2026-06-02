@@ -1,4 +1,5 @@
 export type DriverBillingMode = 'monthly' | 'commission';
+export type SubscriptionOwnerType = 'self_employed_driver';
 
 export type DriverSubscriptionPaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
@@ -8,6 +9,27 @@ export type DriverPaymentProvider = {
   name: string;
   mode: DriverPaymentProviderMode;
   shopId?: string;
+};
+
+export const driverCommissionPercent = 7;
+export const driverServiceSharePercent = driverCommissionPercent;
+
+export type MonthlySubscriptionPlan = {
+  accessDays: number;
+  amount: number;
+  currency: '₽';
+  ownerType: SubscriptionOwnerType;
+  type: 'driver_monthly';
+};
+
+export const monthlySubscriptionPlans: Record<SubscriptionOwnerType, MonthlySubscriptionPlan> = {
+  self_employed_driver: {
+    accessDays: 30,
+    amount: 3000,
+    currency: '₽',
+    ownerType: 'self_employed_driver',
+    type: 'driver_monthly',
+  },
 };
 
 export type DriverSubscriptionReceipt = {
@@ -37,6 +59,10 @@ export type DriverSubscriptionPayment = {
   paymentMethod: string;
   provider: DriverPaymentProvider;
   providerPaymentId?: string;
+  providerPaymentStatus?: string;
+  providerOrderId?: string;
+  providerRebillId?: string;
+  providerError?: string;
   confirmationUrl?: string;
   status: DriverSubscriptionPaymentStatus;
   accessStartsAt?: string;
@@ -44,6 +70,8 @@ export type DriverSubscriptionPayment = {
   paidAt?: string;
   refundedAt?: string;
   refundReason?: string;
+  providerRefundId?: string;
+  providerRefundStatus?: string;
   receipt?: DriverSubscriptionReceipt;
   refundReceipt?: DriverSubscriptionReceipt;
   createdAt: string;
@@ -70,60 +98,61 @@ export const driverAccessPlans: Record<
     commissionPercent: 0,
     currency: '₽',
     description:
-      'Водитель оплачивает месяц доступа к заказам и оставляет себе всю стоимость поездки без комиссии сервиса.',
-    headline: '5000 ₽ в месяц и 0% с поездок',
+      'Водитель платит 3000 ₽ в месяц и работает без комиссии с поездок до конца расчетного периода.',
+    headline: '3000 ₽/мес, без комиссии',
     id: 'monthly',
-    monthlyPrice: 5000,
-    name: 'Месячный доступ к заказам',
-    primaryAction: 'Оплатить 5000 ₽ за 30 дней',
-    shortName: '5000 ₽/мес',
+    monthlyPrice: monthlySubscriptionPlans.self_employed_driver.amount,
+    name: 'Ежемесячная подписка',
+    primaryAction: 'Оплатить подписку',
+    shortName: 'Подписка',
   },
   commission: {
-    commissionPercent: 12,
+    commissionPercent: driverCommissionPercent,
     currency: '₽',
     description:
-      'Водитель ничего не платит заранее, но с каждой выполненной поездки сервис удерживает 12%.',
-    headline: '0 ₽ заранее и 12% с каждой поездки',
+      'Клиент платит водителю напрямую. Сервис считает 7% с завершенной поездки как долю к переводу в конце рабочего дня.',
+    headline: `0 ₽/мес, ${driverCommissionPercent}% к переводу`,
     id: 'commission',
     monthlyPrice: 0,
-    name: 'Комиссия с поездок',
-    primaryAction: 'Подключить 12% с поездки',
-    shortName: '12%/поездка',
+    name: 'Доля сервиса с поездки',
+    primaryAction: 'Подключить долю сервиса',
+    shortName: 'Доля сервиса',
   },
 };
 
 export const driverSubscriptionPlan = driverAccessPlans.monthly;
 
 export const driverSubscriptionBenefits = [
-  'Водитель сам выбирает модель: фиксированный месяц или процент с поездок',
-  'При оплате месяца комиссия сервиса с каждого заказа: 0%',
-  'При модели 12% водитель не платит заранее и рассчитывается только с выполненных поездок',
-  'Не нужно платить автопарку ежедневные удержания',
-  'Выплаты идут на собственные реквизиты водителя',
+  'Подписка: 3000 ₽ в месяц без комиссии с поездок.',
+  `Доля сервиса: ${driverCommissionPercent}% с каждой завершенной поездки без ежемесячной оплаты.`,
+  'Клиентская оплата поступает водителю, а приложение считает сумму к вечернему переводу сервису.',
+  'Водитель может поменять модель, изменение применяется со следующего расчетного периода.',
+  'Водитель сам получает оплату за поездку и подтверждает перевод доли сервиса.',
 ];
 
 export const driverSubscriptionRules = [
-  'Доступ к заказам открывается только после проверки документов',
-  'Сервис не становится работодателем водителя',
-  'Заказы распределяются по спросу, рейтингу, географии и доступности',
-  'Выбранную модель оплаты можно менять перед новым расчетным периодом',
-  'Возвраты, безопасность и спорные поездки остаются под правилами сервиса',
+  'Доступ к заказам открывается только после проверки документов.',
+  'Сервис не становится работодателем водителя.',
+  'Заказы распределяются по спросу, рейтингу, географии и доступности.',
+  `Доля сервиса начисляется только в режиме комиссии: ${driverCommissionPercent}% с поездки.`,
+  'В конце рабочего дня водитель переводит начисленную долю сервиса и администратор подтверждает сверку.',
+  'Возвраты, безопасность и спорные поездки остаются под правилами сервиса.',
 ];
 
 export const driverSubscriptionEconomics = [
   {
-    label: 'Вариант 1',
-    value: `${driverAccessPlans.monthly.monthlyPrice} ${driverAccessPlans.monthly.currency}/мес`,
-    helper: 'Фиксированный платеж за 30 дней доступа, комиссия с поездок 0%',
+    label: 'Подписка',
+    value: `${monthlySubscriptionPlans.self_employed_driver.amount} ${monthlySubscriptionPlans.self_employed_driver.currency}/мес`,
+    helper: 'Без комиссии с поездок',
   },
   {
-    label: 'Вариант 2',
-    value: `${driverAccessPlans.commission.commissionPercent}%`,
-    helper: 'Без оплаты заранее, сервис удерживает процент с каждой выполненной поездки',
+    label: 'Доля сервиса',
+    value: `${driverCommissionPercent}%`,
+    helper: 'Водитель переводит ее в конце рабочего дня',
   },
   {
     label: 'Главная задача',
     value: 'Трафик',
-    helper: 'Сервис обязан приводить клиентов и держать плотность заказов',
+    helper: 'Сервис должен приводить клиентов и держать плотность заказов.',
   },
 ];

@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Building2, Car, LockKeyhole, LogIn, UserRound } from 'lucide-react-native';
+import {
+  Building2,
+  Car,
+  LockKeyhole,
+  LogIn,
+  MessageSquareText,
+  ShieldCheck,
+  UserRound,
+} from 'lucide-react-native';
 import {
   Pressable,
   SafeAreaView,
@@ -11,15 +19,19 @@ import {
   View,
 } from 'react-native';
 
-import { AccountRole, roleCopy } from '../data/registration';
+import { AccountRole, roleCopy, normalizeAccountRole } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { useAppState } from '../state/AppState';
+import { isDemoModeEnabled } from '../utils/runtimeFlags';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
-const roles: AccountRole[] = ['client', 'driver'];
+const roles: AccountRole[] = ['client', 'self_employed_driver', 'park_admin', 'park_driver'];
 const roleIcons = {
   client: UserRound,
+  self_employed_driver: Car,
+  park_admin: Building2,
+  park_driver: Car,
   driver: Car,
   fleet: Building2,
 };
@@ -33,25 +45,31 @@ const demoAccounts: Array<{
   {
     identifier: 'demo-client@example.test',
     label: 'Клиент',
-    password: 'password123',
+    password: 'Kinetix123',
     role: 'client',
   },
   {
     identifier: 'demo-driver@example.test',
-    label: 'Водитель',
-    password: 'password123',
-    role: 'driver',
+    label: 'Самозанятый водитель',
+    password: 'Kinetix123',
+    role: 'self_employed_driver',
   },
 ];
 
 export function LoginScreen({ navigation }: Props) {
-  const { loginAccount, serverMessage, serverStatus } = useAppState();
+  const { confirmSmsLoginCode, loginAccount, requestSmsLoginCode, serverMessage, serverStatus } = useAppState();
   const [role, setRole] = useState<AccountRole>('client');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [smsCode, setSmsCode] = useState('');
+  const [smsDemoCode, setSmsDemoCode] = useState('');
+  const [notice, setNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
-  const canContinue = identifier.trim().length > 2 && password.length >= 4 && !isSubmitting;
+  const canPasswordContinue = identifier.trim().length > 2 && password.length >= 4 && !isSubmitting;
+  const canRequestSms = identifier.trim().length >= 10 && !isSubmitting;
+  const canConfirmSms = identifier.trim().length >= 10 && smsCode.trim().length >= 4 && !isSubmitting;
+  const showDemoLogin = isDemoModeEnabled();
 
   const submitLogin = async (
     nextIdentifier: string,
@@ -60,7 +78,7 @@ export function LoginScreen({ navigation }: Props) {
   ) => {
     setIsSubmitting(true);
     setErrorText(null);
-    const user = await loginAccount(nextIdentifier, nextPassword, nextRole);
+    const user = await loginAccount(nextIdentifier, nextPassword, normalizeAccountRole(nextRole));
     setIsSubmitting(false);
 
     if (!user) {
@@ -68,14 +86,57 @@ export function LoginScreen({ navigation }: Props) {
       return;
     }
 
-    navigation.replace('Dashboard', {
+    const resolvedRole = normalizeAccountRole(user.role);
+
+    navigation.replace(resolvedRole === 'client' ? 'OrderFlow' : 'Dashboard', {
       firstName: user.firstName || undefined,
-      role: user.role as AccountRole,
+      role: resolvedRole,
     });
   };
 
   const handleLogin = async () => {
     await submitLogin(identifier, password, role);
+  };
+
+  const handleRequestSmsCode = async () => {
+    setIsSubmitting(true);
+    setErrorText(null);
+    setNotice('');
+    setSmsDemoCode('');
+    const result = await requestSmsLoginCode(identifier, normalizeAccountRole(role), 'sms');
+    setIsSubmitting(false);
+
+    if (!result) {
+      setErrorText(serverMessage || 'Не удалось отправить SMS-код.');
+      return;
+    }
+
+    setSmsDemoCode(result.code ?? '');
+    setNotice(
+      result.deliveryMode === 'mvp-returned-code' && result.code
+        ? `MVP-код входа: ${result.code}`
+        : 'Если номер зарегистрирован, SMS-код отправлен.',
+    );
+  };
+
+  const handleSmsLogin = async () => {
+    setIsSubmitting(true);
+    setErrorText(null);
+    setNotice('');
+    const user = await confirmSmsLoginCode(identifier, smsCode, normalizeAccountRole(role));
+    setIsSubmitting(false);
+
+    if (!user) {
+      setErrorText(serverMessage || 'SMS-код не подошел.');
+      return;
+    }
+
+    const nextRole = normalizeAccountRole(user.role);
+
+    navigation.replace(nextRole === 'client' ? 'OrderFlow' : 'Dashboard', {
+      firstName: user.firstName || undefined,
+      role: nextRole,
+    });
   };
 
   const handleDemoLogin = async (account: (typeof demoAccounts)[number]) => {
@@ -117,7 +178,7 @@ export function LoginScreen({ navigation }: Props) {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Icon color={active ? '#FFFFFF' : '#146C5D'} size={18} strokeWidth={2.4} />
+                  <Icon color={active ? '#1E1C1A' : '#D4A853'} size={18} strokeWidth={2.4} />
                   <Text style={[styles.roleButtonText, active && styles.roleButtonTextActive]}>
                     {roleCopy[item].title}
                   </Text>
@@ -126,29 +187,33 @@ export function LoginScreen({ navigation }: Props) {
             })}
           </View>
 
-          <Text style={styles.sectionTitle}>Демо-вход</Text>
-          <View style={styles.demoGrid}>
-            {demoAccounts.map((account) => {
-              const Icon = roleIcons[account.role];
+          {showDemoLogin ? (
+            <>
+              <Text style={styles.sectionTitle}>Демо-вход</Text>
+              <View style={styles.demoGrid}>
+                {demoAccounts.map((account) => {
+                  const Icon = roleIcons[account.role];
 
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={isSubmitting}
-                  key={account.role}
-                  onPress={() => handleDemoLogin(account)}
-                  style={({ pressed }) => [
-                    styles.demoButton,
-                    isSubmitting && styles.demoButtonMuted,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Icon color="#146C5D" size={18} strokeWidth={2.4} />
-                  <Text style={styles.demoButtonText}>{account.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={isSubmitting}
+                      key={account.role}
+                      onPress={() => handleDemoLogin(account)}
+                      style={({ pressed }) => [
+                        styles.demoButton,
+                        isSubmitting && styles.demoButtonMuted,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Icon color="#D4A853" size={18} strokeWidth={2.4} />
+                      <Text style={styles.demoButtonText}>{account.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
 
           <View style={styles.field}>
             <Text style={styles.label}>Почта или телефон</Text>
@@ -157,7 +222,7 @@ export function LoginScreen({ navigation }: Props) {
               autoCorrect={false}
               onChangeText={setIdentifier}
               placeholder="name@example.com или +7 900 000-00-00"
-              placeholderTextColor="#8A8F98"
+              placeholderTextColor="#A89F91"
               style={styles.input}
               value={identifier}
             />
@@ -168,7 +233,7 @@ export function LoginScreen({ navigation }: Props) {
             <TextInput
               onChangeText={setPassword}
               placeholder="Введите пароль"
-              placeholderTextColor="#8A8F98"
+              placeholderTextColor="#A89F91"
               secureTextEntry
               style={styles.input}
               value={password}
@@ -177,17 +242,68 @@ export function LoginScreen({ navigation }: Props) {
 
           <Pressable
             accessibilityRole="button"
-            disabled={!canContinue}
+            disabled={!canPasswordContinue}
             onPress={handleLogin}
             style={({ pressed }) => [
               styles.primaryButton,
-              !canContinue && styles.primaryButtonMuted,
+              !canPasswordContinue && styles.primaryButtonMuted,
               pressed && styles.pressed,
             ]}
           >
-            <LogIn color="#FFFFFF" size={19} strokeWidth={2.4} />
+            <LogIn color="#F5F0E8" size={19} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>{isSubmitting ? 'Проверяем...' : 'Войти'}</Text>
           </Pressable>
+
+          <View style={styles.smsPanel}>
+            <Text style={styles.sectionTitle}>Вход по SMS</Text>
+            <Pressable
+              accessibilityRole="button"
+              disabled={!canRequestSms}
+              onPress={handleRequestSmsCode}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                !canRequestSms && styles.secondaryButtonMuted,
+                pressed && styles.pressed,
+              ]}
+            >
+              <MessageSquareText color="#D4A853" size={18} strokeWidth={2.4} />
+              <Text style={styles.secondaryButtonText}>
+                {isSubmitting ? 'Отправляем...' : 'Получить SMS-код'}
+              </Text>
+            </Pressable>
+
+            {smsDemoCode ? <Text style={styles.demoCode}>MVP-код: {smsDemoCode}</Text> : null}
+            {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+            <View style={styles.field}>
+              <Text style={styles.label}>SMS-код</Text>
+              <TextInput
+                keyboardType="number-pad"
+                maxLength={6}
+                onChangeText={setSmsCode}
+                placeholder="0000"
+                placeholderTextColor="#A89F91"
+                style={styles.input}
+                value={smsCode}
+              />
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={!canConfirmSms}
+              onPress={handleSmsLogin}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                !canConfirmSms && styles.primaryButtonMuted,
+                pressed && styles.pressed,
+              ]}
+            >
+              <ShieldCheck color="#F5F0E8" size={19} strokeWidth={2.4} />
+              <Text style={styles.primaryButtonText}>
+                {isSubmitting ? 'Проверяем...' : 'Войти по SMS'}
+              </Text>
+            </Pressable>
+          </View>
 
           {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
 
@@ -201,10 +317,18 @@ export function LoginScreen({ navigation }: Props) {
 
           <Pressable
             accessibilityRole="button"
+            onPress={() => navigation.navigate('PasswordReset')}
+            style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.linkButtonText}>Восстановить пароль</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
             onPress={() => navigation.navigate('AdminPanel')}
             style={({ pressed }) => [styles.adminButton, pressed && styles.pressed]}
           >
-            <LockKeyhole color="#20242A" size={18} strokeWidth={2.4} />
+            <LockKeyhole color="#F5F0E8" size={18} strokeWidth={2.4} />
             <Text style={styles.adminButtonText}>Админ-панель</Text>
           </Pressable>
         </View>
@@ -216,8 +340,8 @@ export function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   adminButton: {
     alignItems: 'center',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -227,7 +351,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   adminButtonText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -235,15 +359,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   errorText: {
-    color: '#B42318',
+    color: '#C17A70',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   demoButton: {
     alignItems: 'center',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#146C5D',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -258,7 +382,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   demoButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     flexShrink: 1,
     fontSize: 13,
     fontWeight: '900',
@@ -270,33 +394,33 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   form: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 16,
     padding: 16,
   },
   header: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
     padding: 18,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#A89F91',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 16,
-    minHeight: 50,
+    minHeight: 56,
     paddingHorizontal: 14,
   },
   label: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -306,41 +430,78 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   linkButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 56,
     paddingHorizontal: 16,
   },
   primaryButtonMuted: {
-    backgroundColor: '#89958F',
+    backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 15,
     fontWeight: '900',
   },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 50,
+    paddingHorizontal: 16,
+  },
+  secondaryButtonMuted: {
+    opacity: 0.56,
+  },
+  secondaryButtonText: {
+    color: '#D4A853',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  demoCode: {
+    backgroundColor: '#37322E',
+    borderRadius: 8,
+    color: '#D4A853',
+    fontSize: 16,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  notice: {
+    color: '#A89F91',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
   roleButton: {
     alignItems: 'center',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -352,45 +513,52 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   roleButtonActive: {
-    backgroundColor: '#146C5D',
-    borderColor: '#146C5D',
+    backgroundColor: '#D4A853',
+    borderColor: '#D4A853',
   },
   roleButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     flexShrink: 1,
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
   },
   roleButtonTextActive: {
-    color: '#FFFFFF',
+    color: '#F5F0E8',
   },
   roleGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
+  smsPanel: {
+    borderColor: '#3D3D3D',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 12,
+  },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   sectionTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 18,
     fontWeight: '900',
   },
   serverText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 15,
     lineHeight: 22,
   },
   title: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 30,
     fontWeight: '900',
   },

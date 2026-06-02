@@ -1,8 +1,8 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, Clock3, Heart, ReceiptText, Route, Star } from 'lucide-react-native';
+import { ArrowLeft, Clock3, Heart, ReceiptText, Route, Star, Wallet } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { roleCopy } from '../data/registration';
+import { isDriverLikeRole, roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { AppOrder, PaymentStatus, useAppState } from '../state/AppState';
 
@@ -32,16 +32,27 @@ const paymentStatusLabels: Record<PaymentStatus, string> = {
 
 export function OrderHistoryScreen({ navigation, route }: Props) {
   const { firstName, role } = route.params;
-  const { addFavoriteDriver, currentUser, drivers, favoriteDrivers, orders } = useAppState();
+  const {
+    addFavoriteDriver,
+    currentUser,
+    drivers,
+    favoriteDrivers,
+    orders,
+    updateOrderServiceShareStatus,
+  } = useAppState();
+  const isDriverRole = isDriverLikeRole(role);
   const currentDriver =
-    role === 'driver' && currentUser
+    isDriverRole && currentUser
       ? drivers.find((driver) => driver.userId === currentUser.id)
       : undefined;
   const visibleOrders = orders.filter((order) =>
-    role === 'driver'
-      ? order.role === role || order.driver?.id === currentDriver?.id
+    isDriverRole
+      ? isDriverLikeRole(order.role) || order.driver?.id === currentDriver?.id
       : order.role === role,
   );
+  const completedCount = visibleOrders.filter((order) =>
+    ['completed', 'closed'].includes(String(order.status)),
+  ).length;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -53,7 +64,7 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
               onPress={() => navigation.goBack()}
               style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
             >
-              <ArrowLeft color="#146C5D" size={20} strokeWidth={2.4} />
+              <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
               <Text style={styles.backButtonText}>Назад</Text>
             </Pressable>
             <Pressable
@@ -62,16 +73,19 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
               style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
             >
               <Text style={styles.primaryButtonText}>
-                {role === 'driver' ? 'К ленте заказов' : 'Новый заказ'}
+                {isDriverRole ? 'К ленте заказов' : 'Новый заказ'}
               </Text>
             </Pressable>
           </View>
-          <Text style={styles.roleText}>{roleCopy[role].title}</Text>
+          <View style={styles.historyMeta}>
+            <Text style={styles.roleText}>{roleCopy[role].title}</Text>
+            <Text style={styles.completedText}>Завершено: {completedCount}</Text>
+          </View>
         </View>
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <ReceiptText color="#146C5D" size={30} strokeWidth={2.4} />
+            <ReceiptText color="#D4A853" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
             <Text style={styles.title}>История заказов</Text>
@@ -128,6 +142,14 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
                     role,
                   })
                 }
+                onReportServiceShareTransfer={() =>
+                  updateOrderServiceShareStatus(
+                    order.id,
+                    'reported_transferred',
+                    'Driver reported daily service share transfer',
+                  )
+                }
+                isDriverRole={isDriverRole}
                 order={order}
               />
             ))
@@ -147,16 +169,26 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
 
 function OrderCard({
   favorite,
+  isDriverRole,
   onFavorite,
   onPress,
+  onReportServiceShareTransfer,
   order,
 }: {
   favorite: boolean;
+  isDriverRole: boolean;
   onFavorite: () => void;
   onPress: () => void;
+  onReportServiceShareTransfer: () => void;
   order: AppOrder;
 }) {
   const isCompleted = ['closed', 'completed'].includes(order.status);
+  const serviceShareAmount = order.serviceShareAmount ?? order.driverCommission ?? 0;
+  const canReportServiceShareTransfer =
+    isDriverRole &&
+    isCompleted &&
+    serviceShareAmount > 0 &&
+    order.serviceShareStatus === 'pending_transfer';
 
   return (
     <Pressable
@@ -169,7 +201,7 @@ function OrderCard({
         <Text style={styles.status}>{statusLabels[order.status] ?? order.status}</Text>
       </View>
       <View style={styles.routeRow}>
-        <Route color="#146C5D" size={18} strokeWidth={2.4} />
+        <Route color="#D4A853" size={18} strokeWidth={2.4} />
         <View style={styles.routeCopy}>
           <Text style={styles.routeText}>{order.pickup}</Text>
           <Text style={styles.routeText}>{order.destination}</Text>
@@ -177,7 +209,7 @@ function OrderCard({
       </View>
       <View style={styles.orderFooter}>
         <View style={styles.footerItem}>
-          <Clock3 color="#59616C" size={16} strokeWidth={2.4} />
+          <Clock3 color="#A89F91" size={16} strokeWidth={2.4} />
           <Text style={styles.footerText}>{new Date(order.createdAt).toLocaleDateString('ru-RU')}</Text>
         </View>
         <Text style={styles.total}>{order.total} ₽</Text>
@@ -189,7 +221,7 @@ function OrderCard({
       {isCompleted ? (
         <View style={styles.afterTripBox}>
           <View style={styles.afterTripRow}>
-            <ReceiptText color="#146C5D" size={17} strokeWidth={2.4} />
+            <ReceiptText color="#D4A853" size={17} strokeWidth={2.4} />
             <View style={styles.afterTripCopy}>
               <Text style={styles.afterTripTitle}>
                 Чек {order.receipt?.id ?? `RC-${order.id.replace(/\D/g, '')}`}
@@ -202,7 +234,7 @@ function OrderCard({
           </View>
 
           <View style={styles.afterTripRow}>
-            <Star color="#F5A524" fill="#F5A524" size={17} strokeWidth={2.4} />
+            <Star color="#D4A853" fill="#D4A853" size={17} strokeWidth={2.4} />
             <View style={styles.afterTripCopy}>
               <Text style={styles.afterTripTitle}>
                 {order.review ? `${order.review.rating}/5 · ${order.review.mood}` : 'Отзыв ожидает'}
@@ -215,13 +247,38 @@ function OrderCard({
             </View>
           </View>
 
+          {isDriverRole ? (
+            <View style={styles.afterTripRow}>
+              <Wallet color="#D4A853" size={17} strokeWidth={2.4} />
+              <View style={styles.afterTripCopy}>
+                <Text style={styles.afterTripTitle}>Сверка с сервисом</Text>
+                <Text style={styles.afterTripText}>
+                  Собрано водителем {order.driverCollectedAmount ?? order.total} ₽ · к переводу{' '}
+                  {order.serviceShareAmount ?? order.driverCommission ?? 0} ₽ ·{' '}
+                  {formatServiceShareStatus(order.serviceShareStatus)}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {canReportServiceShareTransfer ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onReportServiceShareTransfer}
+              style={({ pressed }) => [styles.favoriteButton, pressed && styles.pressed]}
+            >
+              <Wallet color="#D4A853" size={17} strokeWidth={2.4} />
+              <Text style={styles.favoriteButtonText}>Я перевел долю сервиса</Text>
+            </Pressable>
+          ) : null}
+
           {order.driver ? (
             <Pressable
               accessibilityRole="button"
               onPress={onFavorite}
               style={({ pressed }) => [styles.favoriteButton, pressed && styles.pressed]}
             >
-              <Heart color="#146C5D" size={17} strokeWidth={2.4} />
+              <Heart color="#D4A853" size={17} strokeWidth={2.4} />
               <Text style={styles.favoriteButtonText}>
                 {favorite ? 'Водитель в избранном' : 'Добавить водителя в избранные'}
               </Text>
@@ -242,10 +299,21 @@ function StatCard({ label, value }: { label: string; value: string }) {
   );
 }
 
+function formatServiceShareStatus(status: AppOrder['serviceShareStatus']) {
+  const labels: Record<NonNullable<AppOrder['serviceShareStatus']>, string> = {
+    confirmed: 'перевод подтвержден',
+    not_applicable: 'доля не начислена',
+    pending_transfer: 'ожидает перевод',
+    reported_transferred: 'водитель отметил перевод',
+  };
+
+  return labels[status ?? 'not_applicable'];
+}
+
 const styles = StyleSheet.create({
   afterTripBox: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -262,19 +330,19 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   afterTripText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   afterTripTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '900',
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -283,32 +351,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   empty: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 6,
     padding: 16,
   },
   emptyText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 14,
     lineHeight: 20,
   },
   emptyTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 18,
     fontWeight: '900',
   },
   favoriteButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#146C5D',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -318,7 +386,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   favoriteButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -328,14 +396,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   footerText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -349,7 +417,7 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
@@ -359,13 +427,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   metaLine: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   orderCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -384,39 +452,51 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   orderId: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 16,
     fontWeight: '900',
   },
   paymentLine: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 12,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: 12,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 14,
     fontWeight: '900',
   },
+  completedText: {
+    color: '#A89F91',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  historyMeta: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   roleText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -431,18 +511,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   routeText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   statCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -451,7 +531,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   statLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -461,14 +541,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   statValue: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 22,
     fontWeight: '900',
   },
   status: {
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 6,
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 11,
     fontWeight: '900',
     overflow: 'hidden',
@@ -476,12 +556,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   subtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 15,
     lineHeight: 22,
   },
   title: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 30,
     fontWeight: '900',
     lineHeight: 36,
@@ -500,7 +580,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   total: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 16,
     fontWeight: '900',
   },

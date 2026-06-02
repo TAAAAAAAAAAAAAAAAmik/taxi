@@ -8,6 +8,7 @@ const dbPath = resolve(process.cwd(), '.data/driver-documents-smoke-db.json');
 const storagePath = resolve(process.cwd(), '.data/driver-documents-smoke-files');
 const tinyPngBase64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+const tinyPngBuffer = Buffer.from(tinyPngBase64, 'base64');
 
 let backend;
 
@@ -32,6 +33,7 @@ try {
 
   await waitForBackend();
 
+  const admin = await loginAdmin();
   const stamp = Date.now();
   const registered = await api('/auth/register', {
     body: {
@@ -55,7 +57,7 @@ try {
 
   const uploaded = await api(`/drivers/${encodeURIComponent(driver.id)}/documents`, {
     body: {
-      documents: ['passport', 'driverLicense', 'sts', 'osago'].map((kind) => ({
+      documents: ['passport', 'driverLicense', 'sts', 'osago', 'osgop'].map((kind) => ({
         base64: tinyPngBase64,
         fileName: `${kind}.png`,
         height: 1,
@@ -70,14 +72,105 @@ try {
   });
 
   assert(uploaded.driver.documentsStatus === 'pending', 'Documents should move driver to pending review');
+  assert(uploaded.driver.documentReview?.status === 'pending', 'Document review should be pending');
+  assert(uploaded.driver.documentAudit?.[0]?.action === 'uploaded', 'Upload should be audited');
   assert(uploaded.driver.vehiclePermitStatus === 'pending', 'Vehicle documents should move permit to pending');
 
-  for (const kind of ['passport', 'driverLicense', 'sts', 'osago']) {
+  for (const kind of ['passport', 'driverLicense', 'sts', 'osago', 'osgop']) {
     const upload = uploaded.driver.documentUploads?.[kind];
 
     assert(upload?.status === 'pending', `${kind} upload should be pending`);
-    assert(upload?.storageKey, `${kind} upload should have storage key`);
+    assert(!upload?.storageKey, `${kind} storage key should not be exposed to driver session`);
   }
+
+  const adminDrivers = await api('/drivers', {
+    token: admin.session.token,
+  });
+  const adminDriver = adminDrivers.drivers.find((item) => item.id === driver.id);
+
+  assert(adminDriver?.documentUploads?.passport?.storageKey, 'Admin should see protected storage key');
+
+  const deniedFile = await apiRaw(`/drivers/${encodeURIComponent(driver.id)}/documents/passport/file`, {
+    token: registered.session.token,
+  });
+
+  assert(deniedFile.status === 403, 'Driver session should not read protected document files');
+
+  const protectedFile = await apiRaw(`/drivers/${encodeURIComponent(driver.id)}/documents/passport/file`, {
+    token: admin.session.token,
+  });
+  const protectedFileBuffer = Buffer.from(await protectedFile.arrayBuffer());
+
+  assert(protectedFile.status === 200, 'Admin should read protected document file');
+  assert(
+    protectedFile.headers.get('content-type') === 'image/png',
+    'Protected document response should preserve MIME type',
+  );
+  assert(
+    protectedFileBuffer.equals(tinyPngBuffer),
+    'Protected document response should return stored file bytes',
+  );
+
+  const adminDriversAfterView = await api('/drivers', {
+    token: admin.session.token,
+  });
+  const viewedDriver = adminDriversAfterView.drivers.find((item) => item.id === driver.id);
+
+  assert(viewedDriver?.documentAudit?.[0]?.action === 'viewed', 'Document file access should be audited');
+  assert(viewedDriver?.documentAudit?.[0]?.actor.role === 'admin', 'Document file audit actor should be admin');
+
+  const rejected = await api(`/drivers/${encodeURIComponent(driver.id)}/documents/review`, {
+    body: {
+      reason: 'Фото паспорта не читается',
+      rejectedKinds: ['passport'],
+      status: 'rejected',
+    },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+
+  assert(rejected.driver.documentsStatus === 'rejected', 'Rejected review should reject document package');
+  assert(
+    rejected.driver.documentUploads?.passport?.rejectionReason === 'Фото паспорта не читается',
+    'Rejected document should keep rejection reason',
+  );
+  assert(
+    rejected.driver.documentAudit?.[0]?.action === 'rejected',
+    'Rejected review should be added to audit',
+  );
+
+  const reuploaded = await api(`/drivers/${encodeURIComponent(driver.id)}/documents`, {
+    body: {
+      documents: [
+        {
+          base64: tinyPngBase64,
+          fileName: 'passport-fixed.png',
+          height: 1,
+          kind: 'passport',
+          mimeType: 'image/png',
+          source: 'library',
+          width: 1,
+        },
+      ],
+    },
+    method: 'POST',
+    token: registered.session.token,
+  });
+
+  assert(reuploaded.driver.documentsStatus === 'pending', 'Reupload should return package to pending');
+  assert(reuploaded.driver.documentUploads?.passport?.status === 'pending', 'Reuploaded document should be pending');
+
+  const approved = await api(`/drivers/${encodeURIComponent(driver.id)}/documents/review`, {
+    body: {
+      note: 'Пакет документов читается',
+      status: 'approved',
+    },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+
+  assert(approved.driver.documentsStatus === 'approved', 'Approved review should approve documents');
+  assert(approved.driver.vehiclePermitStatus === 'approved', 'Approved vehicle files should approve permit status');
 
   console.log('Driver documents smoke test passed');
 } finally {
@@ -104,6 +197,15 @@ async function waitForBackend() {
   throw new Error('Backend did not start in time');
 }
 
+async function loginAdmin() {
+  return api('/auth/admin-login', {
+    body: {
+      password: 'smoke-admin',
+    },
+    method: 'POST',
+  });
+}
+
 async function api(path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: options.method || 'GET',
@@ -121,6 +223,18 @@ async function api(path, options = {}) {
   }
 
   return payload;
+}
+
+async function apiRaw(path, options = {}) {
+  return fetch(`${baseUrl}${path}`, {
+    method: options.method || 'GET',
+    headers: {
+      ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+      accept: options.accept || '*/*',
+      ...(options.body ? { 'content-type': 'application/json' } : {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
 }
 
 function assert(condition, message) {

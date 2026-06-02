@@ -1,6 +1,6 @@
 import { ReactNode, createContext, useContext, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { AccountRole } from '../data/registration';
+import { AccountRole, isDriverLikeRole, isParkDriverRole } from '../data/registration';
 import {
   DriverBillingMode,
   DriverSubscriptionPayment,
@@ -8,37 +8,61 @@ import {
 } from '../data/subscription';
 import { OrderStatusSummary } from '../navigation/types';
 import {
+  AccountDeletionResult,
   AdminReferralDashboard,
+  AuthDeliveryChannel,
   AuthUser,
   assignOrderWithStatus as assignOrderApi,
+  confirmSmsLoginCode as confirmSmsLoginCodeApi,
+  confirmPasswordReset as confirmPasswordResetApi,
   createOrder as createOrderApi,
+  deleteAccount as deleteAccountApi,
   DriverCompliancePatch,
+  DriverDocumentReviewPayload,
   fetchAdminReferralDashboard,
   fetchApiHealth,
   fetchDriverBilling,
   fetchDrivers,
   fetchOrders,
   fetchReferralDashboard,
+  fetchServiceShareSummary,
+  fetchSupportThreads,
   loginAccount as loginAccountApi,
   loginAdmin as loginAdminApi,
+  logoutAccount as logoutAccountApi,
+  PasswordResetCodeResult,
   ReferralDashboard,
+  RealtimeConnectionMode,
+  RealtimeNotification,
+  RealtimeSnapshot,
   payDriverSubscription as payDriverSubscriptionApi,
+  requestSmsLoginCode as requestSmsLoginCodeApi,
+  requestPasswordResetCode as requestPasswordResetCodeApi,
   registerAccount as registerAccountApi,
   RegisterAccountPayload,
   refundDriverSubscriptionPayment as refundDriverSubscriptionPaymentApi,
   requestVerificationCode as requestVerificationCodeApi,
+  reviewDriverDocuments as reviewDriverDocumentsApi,
   setApiAuthToken,
+  SmsLoginCodeResult,
+  sendSupportMessageToServer,
+  subscribeRealtime,
   submitDriverDocuments as submitDriverDocumentsApi,
+  syncDriverSubscriptionPayment as syncDriverSubscriptionPaymentApi,
   updateDriverAccess as updateDriverAccessApi,
   updateDriverAvailability as updateDriverAvailabilityApi,
   updateDriverCompliance as updateDriverComplianceApi,
   updateDriverStatus as updateDriverStatusApi,
   updateOrderPaymentStatus as updateOrderPaymentStatusApi,
+  updateOrderServiceShareStatus as updateOrderServiceShareStatusApi,
   updateOrderStatus as updateOrderStatusApi,
   VerificationChannel,
   VerificationCodeResult,
   verifyContactCode as verifyContactCodeApi,
 } from '../services/apiClient';
+import type { DriverServiceShareSummary } from '../services/apiClient';
+import { configurePushNotifications } from '../services/pushNotifications';
+import { isDemoModeEnabled } from '../utils/runtimeFlags';
 
 export type SavedPlace = {
   id: 'home';
@@ -56,18 +80,61 @@ export type DriverSubscription = {
   monthlyPrice: number;
   ordersCommission: number;
   expiresAt?: string;
+  commissionFreeUntil?: string;
 };
 
 export type ApiConnectionState = 'checking' | 'connected' | 'offline';
+export type RealtimeConnectionState = 'connecting' | 'live' | 'offline' | 'polling';
 export type PaymentStatus = 'authorized' | 'failed' | 'paid' | 'pending' | 'refunded';
-export type DriverDocumentKind = 'driverLicense' | 'osago' | 'passport' | 'sts';
+export type DriverServiceShareStatus =
+  | 'confirmed'
+  | 'not_applicable'
+  | 'pending_transfer'
+  | 'reported_transferred';
+export type DriverDocumentKind = 'driverLicense' | 'osago' | 'osgop' | 'passport' | 'sts';
+
+export type DriverDocumentActor = {
+  id: string;
+  name?: string;
+  role: string;
+};
+
+export type DriverDocumentAuditEntry = {
+  action: 'uploaded' | 'approved' | 'rejected' | 'reset' | 'viewed';
+  actor: DriverDocumentActor;
+  createdAt: string;
+  driverId: string;
+  driverName?: string;
+  id: string;
+  kinds: DriverDocumentKind[];
+  note?: string;
+  reason?: string;
+  status: 'missing' | 'pending' | 'approved' | 'rejected';
+  userId?: string;
+};
+
+export type DriverDocumentReview = {
+  note?: string;
+  reason?: string;
+  rejectedKinds: DriverDocumentKind[];
+  reviewedAt?: string;
+  reviewedBy?: DriverDocumentActor;
+  status: 'missing' | 'pending' | 'approved' | 'rejected';
+  submittedAt?: string;
+  submittedBy?: DriverDocumentActor;
+};
 
 export type DriverDocumentUpload = {
+  checksum?: string;
+  expiresAt?: string;
   fileName: string;
   fileSize?: number;
   height?: number;
   kind: DriverDocumentKind;
   mimeType: string;
+  rejectionReason?: string;
+  reviewedAt?: string;
+  reviewedBy?: DriverDocumentActor;
   source: 'camera' | 'library';
   status: 'missing' | 'pending' | 'approved' | 'rejected';
   storageKey?: string;
@@ -89,6 +156,7 @@ export type DriverDocumentUploadInput = {
 export type OrderParticipant = {
   id: string;
   name: string;
+  billingMode?: DriverBillingMode;
   phone?: string;
   vehicle?: string;
   rating?: number;
@@ -99,6 +167,8 @@ export type DriverProfile = OrderParticipant & {
   billingMode: DriverBillingMode;
   canReceiveOrders?: boolean;
   contractStatus: 'missing' | 'pending' | 'signed' | 'rejected';
+  documentAudit?: DriverDocumentAuditEntry[];
+  documentReview?: DriverDocumentReview;
   documentUploads?: Partial<Record<DriverDocumentKind, DriverDocumentUpload>>;
   documentsStatus: 'missing' | 'pending' | 'approved' | 'rejected';
   isOnline?: boolean;
@@ -109,6 +179,8 @@ export type DriverProfile = OrderParticipant & {
   vehiclePermitStatus: 'missing' | 'pending' | 'approved' | 'rejected';
   accessBlockers?: string[];
   accessExpiresAt?: string;
+  commissionTrialEndsAt?: string;
+  createdAt?: string;
   userId?: string;
   updatedAt?: string;
 };
@@ -164,6 +236,29 @@ export type AppOrder = OrderStatusSummary & {
   }>;
   paymentStatus?: PaymentStatus;
   paidAt?: string;
+  driverBillingMode?: DriverBillingMode;
+  driverCollectedAmount?: number;
+  driverCommission?: number;
+  driverCommissionRate?: number;
+  driverNetAmount?: number;
+  driverPayout?: number;
+  serviceShareAmount?: number;
+  serviceShareBatchDate?: string;
+  serviceShareConfirmedAt?: string;
+  serviceShareEvents?: Array<{
+    actor: string;
+    at: string;
+    note?: string;
+    status: DriverServiceShareStatus;
+  }>;
+  serviceShareRate?: number;
+  serviceShareReportedAt?: string;
+  serviceShareStatus?: DriverServiceShareStatus;
+  safetyPinRequired?: boolean;
+  safetyPinVerifiedAt?: string;
+  tripPin?: string;
+  fulfilledByRole?: 'self_employed' | 'park_driver';
+  parkId?: string;
   statusHistory?: Array<{
     actor: string;
     at: string;
@@ -202,6 +297,7 @@ type AppStateValue = {
   currentUser?: AuthUser;
   referralDashboard?: ReferralDashboard;
   adminReferralDashboard?: AdminReferralDashboard;
+  serviceShareSummary?: DriverServiceShareSummary;
   driverSubscription: DriverSubscription;
   driverPayments: DriverSubscriptionPayment[];
   favoriteDrivers: FavoriteDriver[];
@@ -209,22 +305,50 @@ type AppStateValue = {
   supportThreads: SupportThread[];
   serverStatus: ApiConnectionState;
   serverMessage: string;
+  notifications: RealtimeNotification[];
+  realtimeMessage: string;
+  realtimeStatus: RealtimeConnectionState;
+  realtimeUpdatedAt?: string;
+  simpleMode: boolean;
   addOrder: (order: OrderStatusSummary, role: AccountRole, clientName?: string) => Promise<AppOrder>;
   assignOrderToDriver: (orderId: string, driverId: string, status?: string) => Promise<AppOrder | null>;
   loginAccount: (identifier: string, password: string, role: AccountRole) => Promise<AuthUser | null>;
+  requestSmsLoginCode: (
+    phone: string,
+    role: AccountRole,
+    deliveryChannel?: Extract<AuthDeliveryChannel, 'max' | 'sms' | 'telegram'>,
+  ) => Promise<SmsLoginCodeResult | null>;
+  confirmSmsLoginCode: (
+    phone: string,
+    code: string,
+    role: AccountRole,
+  ) => Promise<AuthUser | null>;
   loginAdmin: (password: string) => Promise<boolean>;
   registerAccount: (payload: RegisterAccountPayload) => Promise<AuthUser | null>;
   requestVerificationCode: (
     channel: VerificationChannel,
     target?: string,
+    deliveryChannel?: AuthDeliveryChannel,
   ) => Promise<VerificationCodeResult | null>;
   verifyContactCode: (
     channel: VerificationChannel,
     code: string,
     target?: string,
   ) => Promise<AuthUser | null>;
+  requestPasswordResetCode: (
+    identifier: string,
+    deliveryChannel?: AuthDeliveryChannel,
+  ) => Promise<PasswordResetCodeResult | null>;
+  confirmPasswordReset: (
+    identifier: string,
+    code: string,
+    password: string,
+  ) => Promise<AuthUser | null>;
+  deleteAccount: (reason?: string) => Promise<AccountDeletionResult | null>;
+  logoutAccount: () => Promise<void>;
   refreshServerData: () => Promise<void>;
   refreshAdminReferralDashboard: () => Promise<void>;
+  refreshServiceShareSummary: (date?: string) => Promise<void>;
   refreshReferralDashboard: (userId?: string) => Promise<void>;
   addFavoriteDriver: (driver: FavoriteDriver) => void;
   addOrderReview: (orderId: string, review: Omit<TripReview, 'createdAt' | 'routeSignature'>) => void;
@@ -235,15 +359,28 @@ type AppStateValue = {
     text: string;
     title?: string;
   }) => void;
+  setSimpleMode: (enabled: boolean) => void;
   updateDriverComplianceStatus: (driverId: string, payload: DriverCompliancePatch) => Promise<void>;
+  updateDriverAccess: (
+    driverId: string,
+    billingMode: DriverBillingMode,
+    subscriptionStatus?: DriverProfile['subscriptionStatus'],
+  ) => Promise<void>;
+  reviewDriverDocuments: (driverId: string, payload: DriverDocumentReviewPayload) => Promise<void>;
   submitDriverDocuments: (driverId: string, documents: DriverDocumentUploadInput[]) => Promise<void>;
   updateDriverAvailability: (driverId: string, isOnline: boolean) => Promise<void>;
   updateDriverReviewStatus: (driverId: string, status: DriverProfile['status']) => Promise<void>;
   updateOrderPaymentStatus: (orderId: string, status: PaymentStatus, note?: string) => Promise<void>;
-  updateOrderStatus: (orderId: string, status: string) => Promise<void>;
+  updateOrderServiceShareStatus: (
+    orderId: string,
+    status: DriverServiceShareStatus,
+    note?: string,
+  ) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: string, pinCode?: string) => Promise<void>;
   activateDriverSubscription: (billingMode?: DriverBillingMode) => void;
   payDriverSubscription: (billingMode?: DriverBillingMode) => Promise<void>;
   refundDriverSubscriptionPayment: (paymentId: string, reason?: string) => Promise<void>;
+  syncDriverSubscriptionPayment: (paymentId: string) => Promise<void>;
 };
 
 const AppStateContext = createContext<AppStateValue | undefined>(undefined);
@@ -276,6 +413,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [referralDashboard, setReferralDashboard] = useState<ReferralDashboard | undefined>();
   const [adminReferralDashboard, setAdminReferralDashboard] =
     useState<AdminReferralDashboard | undefined>();
+  const [serviceShareSummary, setServiceShareSummary] =
+    useState<DriverServiceShareSummary | undefined>();
   const [favoriteDrivers, setFavoriteDrivers] = useState<FavoriteDriver[]>([]);
   const [savedHomeAddress, setSavedHomeAddress] = useState<SavedPlace | undefined>();
   const [supportThreads, setSupportThreads] = useState<SupportThread[]>([]);
@@ -284,17 +423,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [driverPayments, setDriverPayments] = useState<DriverSubscriptionPayment[]>([]);
   const [serverStatus, setServerStatus] = useState<ApiConnectionState>('checking');
   const [serverMessage, setServerMessage] = useState('Проверяем MVP backend...');
+  const [notifications, setNotifications] = useState<RealtimeNotification[]>([]);
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeConnectionState>('connecting');
+  const [realtimeMessage, setRealtimeMessage] = useState('Подключаем серверный поток заказов...');
+  const [realtimeUpdatedAt, setRealtimeUpdatedAt] = useState<string | undefined>();
+  const [simpleMode, setSimpleMode] = useState(false);
 
   const refreshServerData = useCallback(async () => {
     try {
-      const [health, serverOrders, serverDrivers] = await Promise.all([
+      const [health, serverOrders, serverDrivers, serverSupportThreads] = await Promise.all([
         fetchApiHealth(),
         fetchOrders(),
         fetchDrivers(),
+        fetchSupportThreads(),
       ]);
 
       setOrders(serverOrders);
       setDrivers(serverDrivers);
+      setSupportThreads(serverSupportThreads);
       setServerStatus('connected');
       setServerMessage(`Backend подключен: ${health.service}`);
     } catch {
@@ -303,9 +449,66 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const applyRealtimeSnapshot = useCallback((snapshot: RealtimeSnapshot) => {
+    setOrders(snapshot.orders);
+    setDrivers(snapshot.drivers);
+    setNotifications(snapshot.notifications);
+    if (snapshot.supportThreads) {
+      setSupportThreads(snapshot.supportThreads);
+    }
+    setRealtimeUpdatedAt(snapshot.generatedAt);
+    setServerStatus('connected');
+  }, []);
+
   useEffect(() => {
     refreshServerData();
   }, [refreshServerData]);
+
+  useEffect(() => {
+    configurePushNotifications(currentUser).catch((error) => {
+      console.info(
+        '[push] registration skipped',
+        error instanceof Error ? error.message : 'unknown push registration error',
+      );
+    });
+  }, [currentUser]);
+
+  useEffect(() => {
+    setRealtimeStatus('connecting');
+    const unsubscribe = subscribeRealtime({
+      onError: (error) => {
+        setRealtimeStatus((current) => (current === 'live' ? 'polling' : current));
+        setRealtimeMessage(error.message);
+      },
+      onMessage: (payload) => {
+        applyRealtimeSnapshot(payload.snapshot);
+        setRealtimeStatus((current) => (current === 'connecting' ? 'live' : current));
+        if (payload.notification) {
+          setRealtimeMessage(payload.notification.title);
+        } else if (payload.type === 'snapshot') {
+          setRealtimeMessage('Серверный поток заказов подключен.');
+        }
+      },
+      onModeChange: (mode: RealtimeConnectionMode) => {
+        if (mode === 'websocket') {
+          setRealtimeStatus('live');
+          setRealtimeMessage('WebSocket заказов подключен.');
+          return;
+        }
+
+        if (mode === 'event-stream') {
+          setRealtimeStatus('live');
+          setRealtimeMessage('Серверный поток заказов подключен.');
+          return;
+        }
+
+        setRealtimeStatus('polling');
+        setRealtimeMessage('Поток событий недоступен, включено обновление каждые 5 секунд.');
+      },
+    });
+
+    return unsubscribe;
+  }, [applyRealtimeSnapshot]);
 
   const refreshReferralDashboard = useCallback(
     async (userId = currentUser?.id) => {
@@ -329,6 +532,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setAdminReferralDashboard(dashboard);
     } catch {
       setAdminReferralDashboard(undefined);
+    }
+  }, []);
+
+  const refreshServiceShareSummary = useCallback(async (date?: string) => {
+    try {
+      const summary = await fetchServiceShareSummary(date);
+      setServiceShareSummary(summary);
+      setServerStatus('connected');
+    } catch {
+      setServiceShareSummary(undefined);
     }
   }, []);
 
@@ -377,9 +590,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setDriverSubscription(nextSubscription);
-
       if (!currentDriver) {
+        setDriverSubscription(nextSubscription);
         setDriverPayments((current) => [
           createLocalDriverPayment(undefined, billingMode, nextSubscription),
           ...current,
@@ -390,14 +602,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       try {
         const dashboard = await payDriverSubscriptionApi(currentDriver.id, billingMode);
+        const pendingPayment = dashboard.payments.find(
+          (payment) => payment.status === 'pending' && payment.confirmationUrl,
+        );
+
         applyBillingDashboard(dashboard);
         setServerStatus('connected');
         setServerMessage(
-          billingMode === 'monthly'
-            ? 'Оплата подписки проведена, чек сохранен на backend.'
-            : 'Модель комиссии подключена, запись сохранена на backend.',
+          pendingPayment
+            ? 'Платеж создан у провайдера. Завершите оплату и проверьте статус.'
+            : 'Оплата подписки проведена, чек сохранен на backend.',
         );
       } catch (error) {
+        setDriverSubscription(nextSubscription);
         setDriverPayments((current) => [
           createLocalDriverPayment(currentDriver, billingMode, nextSubscription),
           ...current,
@@ -406,11 +623,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setServerMessage(
           error instanceof Error
             ? error.message
-            : 'Backend не отвечает. Подписка отмечена только локально.',
+        : 'Backend не отвечает. Модель оплаты отмечена только локально.',
         );
       }
     },
     [applyBillingDashboard, currentDriver],
+  );
+
+  const syncDriverSubscriptionPayment = useCallback(
+    async (paymentId: string) => {
+      try {
+        const dashboard = await syncDriverSubscriptionPaymentApi(paymentId);
+
+        applyBillingDashboard(dashboard);
+        setServerStatus('connected');
+        setServerMessage('Статус платежа обновлен с провайдера.');
+      } catch (error) {
+        setServerStatus('offline');
+        setServerMessage(error instanceof Error ? error.message : 'Не удалось проверить платеж.');
+      }
+    },
+    [applyBillingDashboard],
   );
 
   const refundDriverSubscriptionPayment = useCallback(
@@ -535,8 +768,46 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           await refreshReferralDashboard(result.user.id);
           return result.user;
         } catch (error) {
+          const demoUser = createDemoAuthUser(identifier, password, role);
+
+          if (demoUser) {
+            setApiAuthToken(undefined);
+            setCurrentUser(demoUser);
+            setServerStatus('offline');
+            setServerMessage('Открыт демо-вход без backend. Данные сохраняются только в браузере.');
+            return demoUser;
+          }
+
           setServerStatus('offline');
           setServerMessage(error instanceof Error ? error.message : 'Не удалось войти.');
+          return null;
+        }
+      },
+      requestSmsLoginCode: async (phone, role, deliveryChannel = 'sms') => {
+        try {
+          const result = await requestSmsLoginCodeApi(phone, role, deliveryChannel);
+          setServerStatus('connected');
+          setServerMessage('SMS-код входа отправлен.');
+          return result;
+        } catch (error) {
+          setServerStatus('offline');
+          setServerMessage(error instanceof Error ? error.message : 'Не удалось отправить SMS-код входа.');
+          return null;
+        }
+      },
+      confirmSmsLoginCode: async (phone, code, role) => {
+        try {
+          const result = await confirmSmsLoginCodeApi(phone, code, role);
+          setApiAuthToken(result.session.token);
+          setCurrentUser(result.user);
+          setServerStatus('connected');
+          setServerMessage('Вход по SMS выполнен.');
+          await refreshServerData();
+          await refreshReferralDashboard(result.user.id);
+          return result.user;
+        } catch (error) {
+          setServerStatus('offline');
+          setServerMessage(error instanceof Error ? error.message : 'SMS-код входа не подошел.');
           return null;
         }
       },
@@ -549,6 +820,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           setServerMessage('Админ подтвержден на backend.');
           await refreshServerData();
           await refreshAdminReferralDashboard();
+          await refreshServiceShareSummary();
           return true;
         } catch (error) {
           setServerStatus('offline');
@@ -556,8 +828,51 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           return false;
         }
       },
+      logoutAccount: async () => {
+        try {
+          await logoutAccountApi();
+        } catch {
+          // Local session state is cleared even when the backend is unreachable.
+        }
+
+        setApiAuthToken(undefined);
+        setCurrentUser(undefined);
+        setReferralDashboard(undefined);
+        setAdminReferralDashboard(undefined);
+        setServiceShareSummary(undefined);
+        setDriverPayments([]);
+        setDriverSubscription(initialDriverSubscription);
+        setServerMessage('Вы вышли из аккаунта.');
+      },
+      deleteAccount: async (reason) => {
+        try {
+          const result = await deleteAccountApi(reason);
+          setApiAuthToken(undefined);
+          setCurrentUser(undefined);
+          setReferralDashboard(undefined);
+          setAdminReferralDashboard(undefined);
+          setServiceShareSummary(undefined);
+          setDriverPayments([]);
+          setFavoriteDrivers([]);
+          setSavedHomeAddress(undefined);
+          setSupportThreads([]);
+          setDriverSubscription(initialDriverSubscription);
+          setServerStatus('connected');
+          setServerMessage('Аккаунт и связанные персональные данные удалены.');
+          await refreshServerData();
+          return result;
+        } catch (error) {
+          setServerStatus('offline');
+          setServerMessage(error instanceof Error ? error.message : 'Не удалось удалить аккаунт.');
+          return null;
+        }
+      },
       orders,
+      notifications,
       payDriverSubscription,
+      realtimeMessage,
+      realtimeStatus,
+      realtimeUpdatedAt,
       referralDashboard,
       registerAccount: async (payload) => {
         try {
@@ -576,9 +891,38 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }
       },
       refundDriverSubscriptionPayment,
-      requestVerificationCode: async (channel, target) => {
+      syncDriverSubscriptionPayment,
+      requestPasswordResetCode: async (identifier, deliveryChannel) => {
         try {
-          const result = await requestVerificationCodeApi(channel, target);
+          const result = await requestPasswordResetCodeApi(identifier, deliveryChannel);
+          setServerStatus('connected');
+          setServerMessage('Код восстановления пароля отправлен.');
+          return result;
+        } catch (error) {
+          setServerStatus('offline');
+          setServerMessage(error instanceof Error ? error.message : 'Не удалось отправить код.');
+          return null;
+        }
+      },
+      confirmPasswordReset: async (identifier, code, password) => {
+        try {
+          const result = await confirmPasswordResetApi(identifier, code, password);
+          setApiAuthToken(result.session.token);
+          setCurrentUser(result.user);
+          setServerStatus('connected');
+          setServerMessage('Пароль обновлен, вход выполнен.');
+          await refreshServerData();
+          await refreshReferralDashboard(result.user.id);
+          return result.user;
+        } catch (error) {
+          setServerStatus('offline');
+          setServerMessage(error instanceof Error ? error.message : 'Код восстановления не подошел.');
+          return null;
+        }
+      },
+      requestVerificationCode: async (channel, target, deliveryChannel) => {
+        try {
+          const result = await requestVerificationCodeApi(channel, target, deliveryChannel);
           setServerStatus('connected');
           setServerMessage(
             channel === 'email'
@@ -607,6 +951,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
       refreshAdminReferralDashboard,
       refreshServerData,
+      refreshServiceShareSummary,
       refreshReferralDashboard,
       saveHomeAddress: (place) => {
         setSavedHomeAddress({
@@ -617,17 +962,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
       },
       savedHomeAddress,
+      serviceShareSummary,
       serverMessage,
       serverStatus,
       sendSupportMessage: ({ category, role, text, title }) => {
         const now = new Date().toISOString();
         const normalizedCategory = category.trim() || 'Общий вопрос';
         const threadId = `${role}-${normalizeThreadKey(normalizedCategory)}`;
+        const trimmedText = text.trim();
         const userMessage: SupportMessage = {
           author: 'user',
           createdAt: now,
           id: `MSG-${Date.now()}`,
-          text: text.trim(),
+          text: trimmedText,
         };
         const supportMessage: SupportMessage = {
           author: 'support',
@@ -672,8 +1019,84 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             ...current,
           ];
         });
+
+        void sendSupportMessageToServer({
+          category: normalizedCategory,
+          role,
+          text: trimmedText,
+          threadId,
+          title: title?.trim() || normalizedCategory,
+          userId: currentUser?.id,
+        })
+          .then((serverThread) => {
+            setSupportThreads((current) => [
+              serverThread,
+              ...current.filter((thread) => thread.id !== serverThread.id),
+            ]);
+            setServerStatus('connected');
+            setServerMessage('Сообщение отправлено на сервер сообщений.');
+          })
+          .catch((error) => {
+            setServerStatus('offline');
+            setServerMessage(
+              error instanceof Error
+                ? error.message
+                : 'Сервер сообщений не отвечает. Сообщение сохранено локально.',
+            );
+          });
       },
+      setSimpleMode,
+      simpleMode,
       supportThreads,
+      updateDriverAccess: async (driverId, billingMode, subscriptionStatus = 'active') => {
+        try {
+          const serverDriver = await updateDriverAccessApi(
+            driverId,
+            billingMode,
+            subscriptionStatus,
+            subscriptionStatus === 'active'
+              ? 'Пилотная ручная активация'
+              : 'Пилотное отключение доступа',
+          );
+          setDrivers((current) =>
+            current.map((driver) => (driver.id === serverDriver.id ? serverDriver : driver)),
+          );
+          setServerStatus('connected');
+          setServerMessage(
+            subscriptionStatus === 'active'
+              ? 'Пилотный доступ водителя активирован вручную.'
+              : 'Пилотный доступ водителя отключен.',
+          );
+        } catch {
+          setServerStatus('offline');
+          setServerMessage('Backend не отвечает. Доступ водителя сохранен только локально.');
+          setDrivers((current) =>
+            current.map((driver) => {
+              if (driver.id !== driverId) {
+                return driver;
+              }
+
+              const expiresAt = new Date();
+              expiresAt.setDate(expiresAt.getDate() + 30);
+              const nextDriver = {
+                ...driver,
+                accessExpiresAt:
+                  subscriptionStatus === 'active' && billingMode === 'monthly'
+                    ? expiresAt.toISOString()
+                    : undefined,
+                billingMode,
+                isOnline: subscriptionStatus === 'active' ? driver.isOnline : false,
+                subscriptionStatus,
+              };
+
+              return {
+                ...nextDriver,
+                canReceiveOrders: hasCompletedDriverCompliance(nextDriver),
+              };
+            }),
+          );
+        }
+      },
       updateDriverComplianceStatus: async (driverId, payload) => {
         try {
           const serverDriver = await updateDriverComplianceApi(driverId, payload);
@@ -698,6 +1121,83 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           );
         }
       },
+      reviewDriverDocuments: async (driverId, payload) => {
+        try {
+          const serverDriver = await reviewDriverDocumentsApi(driverId, payload);
+          setDrivers((current) =>
+            current.map((driver) => (driver.id === serverDriver.id ? serverDriver : driver)),
+          );
+          setServerStatus('connected');
+          setServerMessage(
+            payload.status === 'approved'
+              ? 'Документы водителя одобрены на backend.'
+              : payload.status === 'rejected'
+                ? 'Отказ по документам сохранен на backend.'
+                : 'Проверка документов возвращена в работу.',
+          );
+        } catch {
+          setServerStatus('offline');
+          setServerMessage('Backend не отвечает. Решение по документам сохранено только локально.');
+          setDrivers((current) =>
+            current.map((driver) => {
+              if (driver.id !== driverId) {
+                return driver;
+              }
+
+              const now = new Date().toISOString();
+              const rejectedKinds =
+                payload.status === 'rejected'
+                  ? payload.rejectedKinds?.length
+                    ? payload.rejectedKinds
+                    : (Object.keys(driver.documentUploads ?? {}) as DriverDocumentKind[])
+                  : [];
+              const nextUploads = Object.fromEntries(
+                Object.entries(driver.documentUploads ?? {}).map(([kind, upload]) => [
+                  kind,
+                  {
+                    ...upload,
+                    rejectionReason:
+                      payload.status === 'rejected' && rejectedKinds.includes(kind as DriverDocumentKind)
+                        ? payload.reason
+                        : undefined,
+                    reviewedAt: payload.status === 'pending' ? undefined : now,
+                    status:
+                      payload.status === 'rejected' && rejectedKinds.includes(kind as DriverDocumentKind)
+                        ? 'rejected'
+                        : payload.status,
+                  },
+                ]),
+              ) as Partial<Record<DriverDocumentKind, DriverDocumentUpload>>;
+              const nextDriver = {
+                ...driver,
+                documentReview: {
+                  note: payload.note,
+                  reason: payload.reason,
+                  rejectedKinds,
+                  reviewedAt: payload.status === 'pending' ? undefined : now,
+                  status: payload.status,
+                  submittedAt: driver.documentReview?.submittedAt,
+                  submittedBy: driver.documentReview?.submittedBy,
+                },
+                documentUploads: nextUploads,
+                documentsStatus: payload.status,
+                vehiclePermitStatus:
+                  payload.status === 'approved'
+                    ? ('approved' as const)
+                    : payload.status === 'rejected' &&
+                        rejectedKinds.some((kind) => ['osago', 'osgop', 'sts'].includes(kind))
+                      ? ('rejected' as const)
+                      : driver.vehiclePermitStatus,
+              };
+
+              return {
+                ...nextDriver,
+                canReceiveOrders: hasCompletedDriverCompliance(nextDriver),
+              };
+            }),
+          );
+        }
+      },
       submitDriverDocuments: async (driverId, documents) => {
         try {
           const serverDriver = await submitDriverDocumentsApi(driverId, documents);
@@ -717,13 +1217,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
               const nextDriver = {
                 ...driver,
+                documentReview: {
+                  rejectedKinds: [],
+                  status: 'pending' as const,
+                  submittedAt: new Date().toISOString(),
+                },
                 documentUploads: {
                   ...(driver.documentUploads ?? {}),
                   ...createLocalDocumentUploads(documents),
                 },
                 documentsStatus: 'pending' as const,
                 vehiclePermitStatus:
-                  documents.some((document) => ['osago', 'sts'].includes(document.kind))
+                  documents.some((document) => ['osago', 'osgop', 'sts'].includes(document.kind))
                     ? ('pending' as const)
                     : driver.vehiclePermitStatus,
               };
@@ -786,29 +1291,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           );
         }
       },
-      updateOrderStatus: async (orderId, status) => {
+      updateOrderStatus: async (orderId, status, pinCode) => {
         setOrders((current) =>
           current.map((order) =>
-            order.id === orderId
-              ? {
-                  ...order,
-                  receipt:
-                    ['closed', 'completed'].includes(status) && !order.receipt
-                      ? createReceipt(order)
-                      : order.receipt,
-                  paidAt:
-                    ['closed', 'completed'].includes(status) && order.paymentStatus !== 'paid'
-                      ? new Date().toISOString()
-                      : order.paidAt,
-                  paymentStatus: ['closed', 'completed'].includes(status) ? 'paid' : order.paymentStatus,
-                  status,
-                }
-              : order,
+            order.id === orderId ? updateLocalOrderStatus(order, status) : order,
           ),
         );
 
         try {
-          const serverOrder = await updateOrderStatusApi(orderId, status);
+          const serverOrder = await updateOrderStatusApi(orderId, status, pinCode);
           setOrders((current) =>
             current.map((order) => (order.id === serverOrder.id ? serverOrder : order)),
           );
@@ -857,6 +1348,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           setServerMessage('Backend не отвечает. Оплата отмечена только локально.');
         }
       },
+      updateOrderServiceShareStatus: async (orderId, status, note) => {
+        setOrders((current) =>
+          current.map((order) =>
+            order.id === orderId ? updateLocalServiceShareStatus(order, status, note) : order,
+          ),
+        );
+
+        try {
+          const result = await updateOrderServiceShareStatusApi(orderId, status, note);
+          setOrders((current) =>
+            current.map((order) => (order.id === result.order.id ? result.order : order)),
+          );
+          if (result.summary) {
+            setServiceShareSummary(result.summary);
+          }
+          setServerStatus('connected');
+          setServerMessage('РЎРІРµСЂРєР° РґРѕР»Рё СЃРµСЂРІРёСЃР° СЃРѕС…СЂР°РЅРµРЅР° РЅР° backend.');
+        } catch (error) {
+          setServerStatus('offline');
+          setServerMessage(error instanceof Error ? error.message : 'РЎРІРµСЂРєР° РѕС‚РјРµС‡РµРЅР° С‚РѕР»СЊРєРѕ Р»РѕРєР°Р»СЊРЅРѕ.');
+        }
+      },
     }),
     [
       driverSubscription,
@@ -865,18 +1378,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       currentUser,
       currentDriver?.id,
       favoriteDrivers,
+      notifications,
       orders,
+      realtimeMessage,
+      realtimeStatus,
+      realtimeUpdatedAt,
       referralDashboard,
       adminReferralDashboard,
       refreshAdminReferralDashboard,
       refreshReferralDashboard,
       refreshServerData,
+      refreshServiceShareSummary,
       savedHomeAddress,
+      serviceShareSummary,
       serverMessage,
       serverStatus,
+      simpleMode,
       supportThreads,
       payDriverSubscription,
       refundDriverSubscriptionPayment,
+      syncDriverSubscriptionPayment,
       visibleDriverSubscription,
     ],
   );
@@ -894,6 +1415,39 @@ export function useAppState() {
   return value;
 }
 
+function createDemoAuthUser(identifier: string, password: string, role: AccountRole): AuthUser | null {
+  if (!isDemoModeEnabled() || password !== 'Kinetix123') {
+    return null;
+  }
+
+  const normalizedIdentifier = identifier.trim().toLowerCase();
+
+  if (role === 'client' && normalizedIdentifier === 'demo-client@example.test') {
+    return {
+      id: 'demo-client-local',
+      role: 'client',
+      firstName: 'Демо',
+      email: 'demo-client@example.test',
+      emailVerifiedAt: new Date().toISOString(),
+    };
+  }
+
+  if (
+    role === 'self_employed_driver' &&
+    normalizedIdentifier === 'demo-driver@example.test'
+  ) {
+    return {
+      id: 'demo-driver-local',
+      role: 'self_employed_driver',
+      firstName: 'Демо-водитель',
+      email: 'demo-driver@example.test',
+      emailVerifiedAt: new Date().toISOString(),
+    };
+  }
+
+  return null;
+}
+
 const defaultDriver: OrderParticipant = {
   id: 'driver-alexey-solaris',
   name: 'Алексей',
@@ -906,7 +1460,7 @@ const defaultDriver: OrderParticipant = {
 const initialDrivers: DriverProfile[] = [
   {
     ...defaultDriver,
-    billingMode: 'commission',
+    billingMode: 'monthly',
     canReceiveOrders: true,
     contractStatus: 'signed',
     documentsStatus: 'approved',
@@ -928,6 +1482,7 @@ function createDriverSubscriptionFromProfile(driver: DriverProfile): DriverSubsc
 
   return {
     billingMode: driver.billingMode,
+    commissionFreeUntil: driver.commissionTrialEndsAt,
     expiresAt,
     monthlyPrice: plan.monthlyPrice,
     ordersCommission: plan.commissionPercent,
@@ -957,7 +1512,7 @@ function createLocalDriverPayment(
     driverName: driver?.name,
     id,
     paidAt: now,
-    paymentMethod: amount > 0 ? 'Локальная демо-карта' : 'Комиссия с поездок',
+    paymentMethod: 'Локальная демо-карта',
     planName: plan.name,
     provider: {
       mode: 'demo',
@@ -1017,15 +1572,20 @@ function createLocalOrder(
   user?: AuthUser,
 ): AppOrder {
   const createdAt = new Date().toISOString();
-  const status = role === 'client' ? 'searching' : role === 'driver' ? 'accepted' : 'created';
+  const status = role === 'client' ? 'searching' : isDriverLikeRole(role) ? 'accepted' : 'created';
   const paymentStatus = getInitialPaymentStatus(order.paymentMethod, order.total);
+  const fulfilledByRole = isDriverLikeRole(role)
+    ? isParkDriverRole(role)
+      ? 'park_driver'
+      : 'self_employed'
+    : undefined;
 
   return {
     ...order,
     clientName,
     clientPhone: user?.phone,
     createdAt,
-    driver: role === 'client' ? undefined : defaultDriver,
+    driver: isDriverLikeRole(role) ? defaultDriver : undefined,
     paidAt: paymentStatus === 'paid' ? createdAt : undefined,
     paymentAuthorizedAt: paymentStatus === 'authorized' ? createdAt : undefined,
     paymentEvents: [
@@ -1037,6 +1597,8 @@ function createLocalOrder(
       },
     ],
     paymentStatus,
+    fulfilledByRole,
+    parkId: user?.parkId,
     role,
     status,
     statusHistory: [
@@ -1063,6 +1625,95 @@ function createReceipt(order: OrderStatusSummary): TripReceipt {
     subtotal: order.total,
     total: order.total,
   };
+}
+
+function updateLocalOrderStatus(order: AppOrder, status: string): AppOrder {
+  const isFinal = ['closed', 'completed'].includes(status);
+  const now = new Date().toISOString();
+  const nextOrder: AppOrder = {
+    ...order,
+    arrivedAt: status === 'arrived' ? order.arrivedAt || now : order.arrivedAt,
+    completedAt: isFinal ? order.completedAt || now : order.completedAt,
+    paidAt: isFinal && order.paymentStatus !== 'paid' ? order.paidAt || now : order.paidAt,
+    paymentStatus: isFinal ? 'paid' : order.paymentStatus,
+    receipt: isFinal && !order.receipt ? createReceipt(order) : order.receipt,
+    startedAt: status === 'started' ? order.startedAt || now : order.startedAt,
+    status,
+    statusHistory: [
+      {
+        actor: 'local',
+        at: now,
+        status,
+      },
+      ...(order.statusHistory ?? []),
+    ],
+    updatedAt: now,
+  };
+
+  return isFinal ? applyDriverCollectedSettlement(nextOrder) : nextOrder;
+}
+
+function applyDriverCollectedSettlement(order: AppOrder): AppOrder {
+  const billingMode = normalizeBillingMode(order.driver?.billingMode || order.driverBillingMode);
+  const isParkOrder = order.fulfilledByRole === 'park_driver' || isParkDriverRole(order.role);
+  const driverCollectedAmount = Number(order.total || 0);
+  const serviceShareRate = isParkOrder ? 0 : driverAccessPlans[billingMode].commissionPercent;
+  const serviceShareAmount = Math.round((driverCollectedAmount * serviceShareRate) / 100);
+  const driverNetAmount = Math.max(0, driverCollectedAmount - serviceShareAmount);
+  const existingStatus = order.serviceShareStatus;
+  const serviceShareStatus: DriverServiceShareStatus =
+    serviceShareAmount > 0
+      ? existingStatus === 'confirmed' || existingStatus === 'reported_transferred'
+        ? existingStatus
+        : 'pending_transfer'
+      : 'not_applicable';
+
+  return {
+    ...order,
+    driverBillingMode: billingMode,
+    driverCollectedAmount,
+    driverCommission: serviceShareAmount,
+    driverCommissionRate: serviceShareRate,
+    driverNetAmount,
+    driverPayout: driverNetAmount,
+    serviceShareAmount,
+    serviceShareBatchDate: (order.completedAt || order.updatedAt || new Date().toISOString()).slice(0, 10),
+    serviceShareRate,
+    serviceShareStatus,
+  };
+}
+
+function updateLocalServiceShareStatus(
+  order: AppOrder,
+  status: DriverServiceShareStatus,
+  note?: string,
+): AppOrder {
+  const now = new Date().toISOString();
+
+  return {
+    ...order,
+    serviceShareConfirmedAt:
+      status === 'confirmed' ? now : order.serviceShareConfirmedAt,
+    serviceShareEvents: [
+      {
+        actor: 'local',
+        at: now,
+        note,
+        status,
+      },
+      ...(order.serviceShareEvents ?? []),
+    ],
+    serviceShareReportedAt:
+      status === 'reported_transferred' || status === 'confirmed'
+        ? order.serviceShareReportedAt || now
+        : order.serviceShareReportedAt,
+    serviceShareStatus: status,
+    updatedAt: now,
+  };
+}
+
+function normalizeBillingMode(value?: DriverBillingMode): DriverBillingMode {
+  return value === 'commission' ? 'commission' : 'monthly';
 }
 
 function getInitialPaymentStatus(paymentMethod: string, total: number): PaymentStatus {

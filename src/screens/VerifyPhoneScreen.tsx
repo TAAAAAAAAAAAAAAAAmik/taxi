@@ -12,14 +12,26 @@ import {
 } from 'react-native';
 
 import { RootStackParamList } from '../navigation/types';
+import { AuthDeliveryChannel } from '../services/apiClient';
 import { useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VerifyPhone'>;
+
+const deliveryOptions: Array<{
+  channel: Extract<AuthDeliveryChannel, 'max' | 'sms' | 'telegram'>;
+  label: string;
+}> = [
+  { channel: 'sms', label: 'SMS' },
+  { channel: 'telegram', label: 'Telegram' },
+  { channel: 'max', label: 'MAX' },
+];
 
 export function VerifyPhoneScreen({ navigation, route }: Props) {
   const { email, firstName, phone, role } = route.params;
   const { requestVerificationCode, serverMessage, verifyContactCode } = useAppState();
   const [code, setCode] = useState('');
+  const [deliveryChannel, setDeliveryChannel] =
+    useState<Extract<AuthDeliveryChannel, 'max' | 'sms' | 'telegram'>>('sms');
   const [demoCode, setDemoCode] = useState('');
   const [notice, setNotice] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -34,7 +46,8 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
 
     setIsSending(true);
     setNotice('');
-    const result = await requestVerificationCode('phone', phone);
+    setDemoCode('');
+    const result = await requestVerificationCode('phone', phone, deliveryChannel);
     setIsSending(false);
 
     if (!result) {
@@ -42,8 +55,12 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
       return;
     }
 
-    setDemoCode(result.code);
-    setNotice(`MVP-код создан и действует до ${formatTime(result.expiresAt)}.`);
+    setDemoCode(result.code ?? '');
+    setNotice(
+      result.deliveryMode === 'mvp-returned-code' && result.code
+        ? `MVP-код создан и действует до ${formatTime(result.expiresAt)}.`
+        : 'Код подтверждения отправлен по выбранному каналу.',
+    );
   };
 
   useEffect(() => {
@@ -73,13 +90,38 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <View style={styles.iconWrap}>
-            <Phone color="#146C5D" size={30} strokeWidth={2.4} />
+            <Phone color="#D4A853" size={30} strokeWidth={2.4} />
           </View>
           <Text style={styles.title}>Подтверждение телефона</Text>
           <Text style={styles.subtitle}>
             Введите код из SMS или мессенджера. В MVP backend создает код и показывает его здесь
             для ручной проверки пилотного сценария.
           </Text>
+          <View style={styles.deliveryGrid}>
+            {deliveryOptions.map((option) => {
+              const active = option.channel === deliveryChannel;
+
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  disabled={isSending}
+                  key={option.channel}
+                  onPress={() => setDeliveryChannel(option.channel)}
+                  style={({ pressed }) => [
+                    styles.deliveryButton,
+                    active && styles.deliveryButtonActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <MessageSquareText color={active ? '#1E1C1A' : '#D4A853'} size={17} strokeWidth={2.4} />
+                  <Text style={[styles.deliveryButtonText, active && styles.deliveryButtonTextActive]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <Text style={styles.target}>{phone || 'Телефон из анкеты'}</Text>
           {demoCode ? <Text style={styles.demoCode}>MVP-код: {demoCode}</Text> : null}
           {notice ? <Text style={styles.notice}>{notice}</Text> : null}
@@ -91,7 +133,7 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
               maxLength={6}
               onChangeText={setCode}
               placeholder="0000"
-              placeholderTextColor="#8A8F98"
+              placeholderTextColor="#A89F91"
               style={styles.input}
               value={code}
             />
@@ -107,7 +149,7 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <ShieldCheck color="#FFFFFF" size={19} strokeWidth={2.4} />
+            <ShieldCheck color="#F5F0E8" size={19} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>
               {isVerifying ? 'Проверяем...' : 'Подтвердить телефон'}
             </Text>
@@ -119,7 +161,7 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
             onPress={sendCode}
             style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
           >
-            <MessageSquareText color="#146C5D" size={18} strokeWidth={2.4} />
+            <MessageSquareText color="#D4A853" size={18} strokeWidth={2.4} />
             <Text style={styles.secondaryButtonText}>
               {isSending ? 'Отправляем...' : 'Отправить код повторно'}
             </Text>
@@ -132,40 +174,71 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 16,
     padding: 18,
   },
   demoCode: {
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 18,
     fontWeight: '900',
     overflow: 'hidden',
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  deliveryButton: {
+    alignItems: 'center',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 118,
+    paddingHorizontal: 12,
+  },
+  deliveryButtonActive: {
+    backgroundColor: '#D4A853',
+    borderColor: '#D4A853',
+  },
+  deliveryButtonText: {
+    color: '#D4A853',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  deliveryButtonTextActive: {
+    color: '#F5F0E8',
+  },
+  deliveryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   field: {
     gap: 8,
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#A89F91',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0,
@@ -173,76 +246,77 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   label: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   notice: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   page: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     justifyContent: 'center',
     minHeight: '100%',
     padding: 16,
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 56,
     paddingHorizontal: 16,
   },
   primaryButtonMuted: {
-    backgroundColor: '#89958F',
+    backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 15,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#146C5D',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 50,
+    minHeight: 56,
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 15,
     lineHeight: 22,
   },
   target: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 16,
     fontWeight: '900',
   },
   title: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 28,
     fontWeight: '900',
     lineHeight: 34,

@@ -15,6 +15,7 @@ import {
   FileText,
   Headphones,
   Home,
+  LogOut,
   LucideProps,
   MapPinned,
   ReceiptText,
@@ -25,7 +26,12 @@ import {
   Wallet,
 } from 'lucide-react-native';
 
-import { AccountRole, roleCopy } from '../data/registration';
+import {
+  AccountRole,
+  isDriverLikeRole,
+  isSelfEmployedDriverRole,
+  roleCopy,
+} from '../data/registration';
 import {
   MenuActionTarget,
   MenuIconName,
@@ -40,6 +46,10 @@ type PostRegistrationMenuProps = {
   firstName?: string;
   availableCarsCount?: number;
   driverStats?: DriverStatsSummary;
+  realtimeMessage?: string;
+  realtimeStatus?: 'connecting' | 'live' | 'offline' | 'polling';
+  realtimeUpdatedAt?: string;
+  simpleMode?: boolean;
   driverLine?: {
     accessBlockers?: string[];
     canToggle: boolean;
@@ -47,7 +57,10 @@ type PostRegistrationMenuProps = {
     status: string;
   };
   onBackToRegistration: () => void;
+  onDeleteAccount: () => void;
+  onLogout: () => void;
   onToggleDriverLine?: () => void;
+  onToggleSimpleMode?: () => void;
   onOpenOrderFlow: () => void;
   onOpenDriverDocuments: () => void;
   onOpenOrderHistory: () => void;
@@ -62,9 +75,12 @@ export type DriverStatsSummary = {
   weekOrders: number;
   monthOrders: number;
   gross: number;
-  commission: number;
+  commissionFreeUntil?: string;
+  driverNet: number;
+  serviceShare: number;
+  serviceShareRate: number;
+  serviceShareToday: number;
   subscriptionCost: number;
-  payout: number;
   billingMode: 'monthly' | 'commission';
 };
 
@@ -89,8 +105,15 @@ export function PostRegistrationMenu({
   driverStats,
   driverLine,
   firstName,
+  realtimeMessage,
+  realtimeStatus = 'connecting',
+  realtimeUpdatedAt,
+  simpleMode = false,
   onBackToRegistration,
+  onDeleteAccount,
+  onLogout,
   onToggleDriverLine,
+  onToggleSimpleMode,
   onOpenOrderHistory,
   onOpenDriverDocuments,
   onOpenOrderFlow,
@@ -101,8 +124,11 @@ export function PostRegistrationMenu({
   role,
 }: PostRegistrationMenuProps) {
   const { width } = useWindowDimensions();
-  const config = roleMenuConfig[role];
+  const config = roleMenuConfig[role] ?? roleMenuConfig.client;
+  const pages = sectionPages[role] ?? sectionPages.client;
   const isWide = width >= 820;
+  const isDriverRole = isDriverLikeRole(role);
+  const isSelfEmployedDriver = isSelfEmployedDriverRole(role);
   const [activeItemId, setActiveItemId] = useState(config.menuItems[0].id);
 
   const activeItem = useMemo(
@@ -110,11 +136,10 @@ export function PostRegistrationMenu({
     [activeItemId, config.menuItems],
   );
   const activePage = useMemo(
-    () => sectionPages[role][activeItem.id] ?? sectionPages[role][config.menuItems[0].id],
-    [activeItem.id, config.menuItems, role],
+    () => pages[activeItem.id] ?? pages[config.menuItems[0].id],
+    [activeItem.id, config.menuItems, pages],
   );
   const displayName = firstName?.trim() || 'Пользователь';
-
   const handleActionTarget = (target?: MenuActionTarget) => {
     if (target === 'order') {
       onOpenOrderFlow();
@@ -151,6 +176,11 @@ export function PostRegistrationMenu({
       return;
     }
 
+    if (target === 'deleteAccount') {
+      onDeleteAccount();
+      return;
+    }
+
     if (target === 'registration') {
       onBackToRegistration();
     }
@@ -161,13 +191,17 @@ export function PostRegistrationMenu({
       <View style={styles.topBar}>
         <View style={styles.brandRow}>
           <View style={styles.brandMark}>
-            <Car color="#FFFFFF" size={24} strokeWidth={2.4} />
+            <Car color="#F5F0E8" size={24} strokeWidth={2.4} />
           </View>
-          <View style={styles.brandCopy}>
-            <Text style={styles.appName}>Такси Партнер</Text>
-            <Text style={styles.appMeta}>{roleCopy[role].title}</Text>
-          </View>
+        <View style={styles.brandCopy}>
+          <Text style={styles.appName}>Такси Салават</Text>
+          <Text style={styles.appMeta}>{roleCopy[role]?.title ?? roleCopy.client.title}</Text>
+          <Text style={styles.liveText}>
+            {formatRealtimeStatus(realtimeStatus)}
+            {realtimeUpdatedAt ? ` · ${new Date(realtimeUpdatedAt).toLocaleTimeString('ru-RU')}` : ''}
+          </Text>
         </View>
+      </View>
 
         <View style={styles.topActions}>
           <Pressable
@@ -175,25 +209,25 @@ export function PostRegistrationMenu({
             onPress={onOpenOrderFlow}
             style={({ pressed }) => [styles.orderButton, pressed && styles.pressed]}
           >
-            <Route color="#FFFFFF" size={18} strokeWidth={2.4} />
-            <Text style={styles.orderButtonText}>{role === 'driver' ? 'Заказы' : 'Оформить заказ'}</Text>
+            <Route color="#1E1C1A" size={18} strokeWidth={2.4} />
+            <Text style={styles.orderButtonText}>{isDriverRole ? 'Заказы' : 'Вызвать'}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             onPress={onOpenOrderHistory}
             style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
           >
-            <ReceiptText color="#146C5D" size={17} strokeWidth={2.4} />
+            <ReceiptText color="#D4A853" size={17} strokeWidth={2.4} />
             <Text style={styles.outlineButtonText}>История</Text>
           </Pressable>
-          {role === 'driver' ? (
+          {isSelfEmployedDriver ? (
             <Pressable
               accessibilityRole="button"
               onPress={onOpenSubscription}
               style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
             >
-              <Wallet color="#146C5D" size={17} strokeWidth={2.4} />
-              <Text style={styles.outlineButtonText}>Подписка</Text>
+              <Wallet color="#D4A853" size={17} strokeWidth={2.4} />
+              <Text style={styles.outlineButtonText}>Расчеты</Text>
             </Pressable>
           ) : null}
           <Pressable
@@ -203,8 +237,23 @@ export function PostRegistrationMenu({
           >
             <Text style={styles.outlineButtonText}>К анкете</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onLogout}
+            style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
+          >
+            <LogOut color="#D4A853" size={17} strokeWidth={2.4} />
+            <Text style={styles.outlineButtonText}>Выйти</Text>
+          </Pressable>
         </View>
       </View>
+
+      {realtimeMessage ? (
+        <View style={styles.livePanel}>
+          <View style={[styles.liveDot, realtimeStatus === 'live' && styles.liveDotActive]} />
+          <Text style={styles.livePanelText}>{realtimeMessage}</Text>
+        </View>
+      ) : null}
 
       <View style={[styles.layout, isWide && styles.layoutWide]}>
         <View style={[styles.sidebar, isWide && styles.sidebarWide]}>
@@ -219,26 +268,41 @@ export function PostRegistrationMenu({
           </View>
 
           {role === 'client' ? (
-            <Pressable
-              accessibilityLabel={`Доступно машин: ${availableCarsCount}`}
-              accessibilityRole="button"
-              onPress={onOpenOrderFlow}
-              style={({ pressed }) => [styles.availableCarsButton, pressed && styles.pressed]}
-            >
-              <View style={styles.availableCarsIcon}>
-                <Car color="#FFFFFF" size={28} strokeWidth={2.5} />
-              </View>
-              <View style={styles.availableCarsCopy}>
-                <Text style={styles.availableCarsLabel}>Машин доступно сейчас</Text>
-                <Text style={styles.availableCarsValue}>{availableCarsCount}</Text>
-                <Text style={styles.availableCarsHint}>
-                  Сейчас в зоне Салаватского района
-                </Text>
-              </View>
-            </Pressable>
+            <>
+              <Pressable
+                accessibilityLabel={`Доступно машин: ${availableCarsCount}`}
+                accessibilityRole="button"
+                onPress={onOpenOrderFlow}
+                style={({ pressed }) => [styles.availableCarsButton, pressed && styles.pressed]}
+              >
+                <View style={styles.availableCarsIcon}>
+                  <Car color="#F5F0E8" size={28} strokeWidth={2.5} />
+                </View>
+                <View style={styles.availableCarsCopy}>
+                  <Text style={styles.availableCarsLabel}>Машин доступно сейчас</Text>
+                  <Text style={styles.availableCarsValue}>{availableCarsCount}</Text>
+                  <Text style={styles.availableCarsHint}>Малояз, Эконом 120 ₽</Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="switch"
+                accessibilityState={{ checked: simpleMode }}
+                onPress={onToggleSimpleMode}
+                style={({ pressed }) => [styles.simpleModeButton, pressed && styles.pressed]}
+              >
+                <View style={[styles.simpleModeSwitch, simpleMode && styles.simpleModeSwitchActive]}>
+                  <View style={[styles.simpleModeKnob, simpleMode && styles.simpleModeKnobActive]} />
+                </View>
+                <View style={styles.simpleModeCopy}>
+                  <Text style={styles.simpleModeTitle}>Простой режим</Text>
+                  <Text style={styles.simpleModeText}>Крупнее шрифты, больше кнопки, только заказ.</Text>
+                </View>
+              </Pressable>
+            </>
           ) : null}
 
-          {role === 'driver' ? (
+          {isSelfEmployedDriver ? (
             <Pressable
               accessibilityRole="button"
               disabled={!driverLine?.canToggle}
@@ -257,7 +321,7 @@ export function PostRegistrationMenu({
                 ]}
               >
                 <Car
-                  color={driverLine?.isOnline ? '#146C5D' : '#FFFFFF'}
+                  color={driverLine?.isOnline ? '#D4A853' : '#F5F0E8'}
                   size={26}
                   strokeWidth={2.5}
                 />
@@ -295,7 +359,7 @@ export function PostRegistrationMenu({
             </Pressable>
           ) : null}
 
-          {role === 'driver' && driverLine ? (
+          {isDriverRole && driverLine ? (
             <View style={styles.accessPanel}>
               <Text style={styles.accessTitle}>Документы и допуск</Text>
               <Text style={styles.accessText}>
@@ -306,18 +370,36 @@ export function PostRegistrationMenu({
             </View>
           ) : null}
 
-          {role === 'driver' && driverStats ? <DriverStatsCard stats={driverStats} /> : null}
+          {isDriverRole && driverStats ? <DriverStatsCard stats={driverStats} /> : null}
 
-          <View style={styles.menuList}>
-            {config.menuItems.map((item) => (
-              <MenuButton
-                active={item.id === activeItem.id}
-                item={item}
-                key={item.id}
-                onPress={() => setActiveItemId(item.id)}
-              />
-            ))}
-          </View>
+          {isWide ? (
+            <View style={styles.menuList}>
+              {config.menuItems.map((item) => (
+                <MenuButton
+                  active={item.id === activeItem.id}
+                  item={item}
+                  key={item.id}
+                  onPress={() => setActiveItemId(item.id)}
+                />
+              ))}
+            </View>
+          ) : (
+            <ScrollView
+              contentContainerStyle={styles.menuRail}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+            >
+              {config.menuItems.map((item) => (
+                <MenuButton
+                  active={item.id === activeItem.id}
+                  compact
+                  item={item}
+                  key={item.id}
+                  onPress={() => setActiveItemId(item.id)}
+                />
+              ))}
+            </ScrollView>
+          )}
         </View>
 
         <View style={styles.main}>
@@ -336,10 +418,11 @@ export function PostRegistrationMenu({
 type MenuButtonProps = {
   item: MenuItem;
   active: boolean;
+  compact?: boolean;
   onPress: () => void;
 };
 
-function MenuButton({ active, item, onPress }: MenuButtonProps) {
+function MenuButton({ active, compact = false, item, onPress }: MenuButtonProps) {
   const Icon = iconMap[item.icon];
 
   return (
@@ -349,19 +432,22 @@ function MenuButton({ active, item, onPress }: MenuButtonProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.menuButton,
+        compact && styles.menuButtonCompact,
         active && styles.menuButtonActive,
         pressed && styles.pressed,
       ]}
     >
-      <View style={[styles.menuIconWrap, active && styles.menuIconWrapActive]}>
-        <Icon color={active ? '#FFFFFF' : '#146C5D'} size={19} strokeWidth={2.3} />
+      <View style={[styles.menuIconWrap, compact && styles.menuIconWrapCompact, active && styles.menuIconWrapActive]}>
+        <Icon color={active ? '#1E1C1A' : '#D4A853'} size={19} strokeWidth={2.3} />
       </View>
       <View style={styles.menuCopy}>
         <View style={styles.menuTitleRow}>
-          <Text style={[styles.menuTitle, active && styles.menuTitleActive]}>{item.title}</Text>
+          <Text numberOfLines={compact ? 2 : 1} style={[styles.menuTitle, active && styles.menuTitleActive]}>
+            {item.title}
+          </Text>
           {item.badge ? <Text style={styles.badge}>{item.badge}</Text> : null}
         </View>
-        <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+        {compact ? null : <Text numberOfLines={1} style={styles.menuSubtitle}>{item.subtitle}</Text>}
       </View>
     </Pressable>
   );
@@ -382,10 +468,10 @@ function QuickActionCard({ action, onActionTarget }: QuickActionCardProps) {
       style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}
     >
       <View style={styles.quickIconWrap}>
-        <Icon color="#146C5D" size={21} strokeWidth={2.3} />
+        <Icon color="#D4A853" size={21} strokeWidth={2.3} />
       </View>
-      <Text style={styles.quickTitle}>{action.title}</Text>
-      <Text style={styles.quickSubtitle}>{action.subtitle}</Text>
+      <Text numberOfLines={2} style={styles.quickTitle}>{action.title}</Text>
+      <Text numberOfLines={2} style={styles.quickSubtitle}>{action.subtitle}</Text>
     </Pressable>
   );
 }
@@ -410,11 +496,11 @@ function SectionPageView({ appTitle, driverStats, onActionTarget, page }: Sectio
 
       <View style={styles.heroPanel}>
         <View style={styles.heroIcon}>
-          <Icon color="#146C5D" size={28} strokeWidth={2.4} />
+          <Icon color="#D4A853" size={28} strokeWidth={2.4} />
         </View>
         <View style={styles.heroCopy}>
-          <Text style={styles.heroTitle}>{page.title}</Text>
-          <Text style={styles.heroText}>{page.subtitle}</Text>
+          <Text numberOfLines={2} style={styles.heroTitle}>{page.title}</Text>
+          <Text numberOfLines={3} style={styles.heroText}>{page.subtitle}</Text>
         </View>
       </View>
 
@@ -432,7 +518,7 @@ function SectionPageView({ appTitle, driverStats, onActionTarget, page }: Sectio
 
       <View style={styles.statusPanel}>
         <Text style={styles.statusTitle}>{page.statusTitle}</Text>
-        <Text style={styles.statusText}>{page.statusText}</Text>
+        <Text numberOfLines={3} style={styles.statusText}>{page.statusText}</Text>
         <View style={styles.actionRow}>
           <Pressable
             accessibilityRole="button"
@@ -453,7 +539,7 @@ function SectionPageView({ appTitle, driverStats, onActionTarget, page }: Sectio
 
       <View style={styles.contentPanel}>
         <Text style={styles.panelTitle}>Быстрые действия</Text>
-        <Text style={styles.panelSubtitle}>Основные операции этого раздела.</Text>
+        <Text numberOfLines={1} style={styles.panelSubtitle}>Основные операции этого раздела.</Text>
         <View style={styles.quickGrid}>
           {page.quickActions.map((action) => (
             <QuickActionCard action={action} key={action.id} onActionTarget={onActionTarget} />
@@ -471,7 +557,7 @@ function SectionPageView({ appTitle, driverStats, onActionTarget, page }: Sectio
       </View>
 
       <View style={styles.notePanel}>
-        <ShieldCheck color="#146C5D" size={18} strokeWidth={2.4} />
+        <ShieldCheck color="#D4A853" size={18} strokeWidth={2.4} />
         <Text style={styles.noteText}>{page.note}</Text>
       </View>
     </>
@@ -484,13 +570,10 @@ function DriverStatsCard({ stats }: { stats: DriverStatsSummary }) {
       <Text style={styles.driverStatsTitle}>Статистика месяца</Text>
       <View style={styles.driverStatsRows}>
         <MiniStat label="Заказы" value={String(stats.monthOrders)} />
-        <MiniStat label="Заработано" value={`${stats.gross} ₽`} />
-        <MiniStat
-          label={stats.billingMode === 'commission' ? 'К удержанию' : 'Подписка'}
-          value={`${stats.billingMode === 'commission' ? stats.commission : stats.subscriptionCost} ₽`}
-        />
+        <MiniStat label="Собрано" value={`${stats.gross} ₽`} />
+        <MiniStat label="Доля сервиса" value={`${stats.serviceShare} ₽`} />
       </View>
-      <Text style={styles.driverStatsHint}>К выплате: {stats.payout} ₽</Text>
+      <Text style={styles.driverStatsHint}>Сегодня к переводу: {stats.serviceShareToday} ₽</Text>
     </View>
   );
 }
@@ -498,18 +581,18 @@ function DriverStatsCard({ stats }: { stats: DriverStatsSummary }) {
 function DriverStatsPanel({ stats }: { stats: DriverStatsSummary }) {
   return (
     <View style={styles.financePanel}>
-      <Text style={styles.panelTitle}>Доход и удержания</Text>
+      <Text style={styles.panelTitle}>Выручка и доля сервиса</Text>
       <Text style={styles.panelSubtitle}>
-        Считаем завершенные заказы текущего водителя. При модели 12% удержание считается с
-        поездок, при месячном доступе комиссия с заказов равна нулю.
+        Клиент платит водителю напрямую. Приложение считает долю сервиса, которую водитель переводит в конце рабочего дня.
       </Text>
       <View style={styles.metricsGrid}>
         <MiniMetric label="Сегодня" value={`${stats.todayOrders} заказов`} />
         <MiniMetric label="Неделя" value={`${stats.weekOrders} заказов`} />
         <MiniMetric label="Месяц" value={`${stats.monthOrders} заказов`} />
-        <MiniMetric label="Заработано" value={`${stats.gross} ₽`} />
-        <MiniMetric label="Комиссия" value={`${stats.commission} ₽`} />
-        <MiniMetric label="К выплате" value={`${stats.payout} ₽`} />
+        <MiniMetric label="Собрано водителем" value={`${stats.gross} ₽`} />
+        <MiniMetric label="К переводу сегодня" value={`${stats.serviceShareToday} ₽`} />
+        <MiniMetric label={`Доля сервиса ${stats.serviceShareRate}%`} value={`${stats.serviceShare} ₽`} />
+        <MiniMetric label="Остается водителю" value={`${stats.driverNet} ₽`} />
       </View>
     </View>
   );
@@ -541,12 +624,12 @@ function SectionDataRow({ row }: SectionDataRowProps) {
   return (
     <View style={styles.sectionRow}>
       <View style={styles.sectionRowCopy}>
-        <Text style={styles.sectionRowTitle}>{row.title}</Text>
-        <Text style={styles.sectionRowSubtitle}>{row.subtitle}</Text>
+        <Text numberOfLines={1} style={styles.sectionRowTitle}>{row.title}</Text>
+        <Text numberOfLines={2} style={styles.sectionRowSubtitle}>{row.subtitle}</Text>
       </View>
       <View style={styles.sectionRowMeta}>
-        <Text style={styles.sectionRowValue}>{row.value}</Text>
-        <Text style={styles.sectionRowStatus}>{row.status}</Text>
+        <Text numberOfLines={1} style={styles.sectionRowValue}>{row.value}</Text>
+        <Text numberOfLines={1} style={styles.sectionRowStatus}>{row.status}</Text>
       </View>
     </View>
   );
@@ -570,6 +653,36 @@ function formatDriverBlockers(blockers: string[]) {
   return blockers.map((blocker) => labels[blocker] ?? blocker).join(', ');
 }
 
+function formatRealtimeStatus(status: 'connecting' | 'live' | 'offline' | 'polling') {
+  if (status === 'live') {
+    return 'Заказы online';
+  }
+
+  if (status === 'polling') {
+    return 'Обновление каждые 5 сек';
+  }
+
+  if (status === 'offline') {
+    return 'Поток недоступен';
+  }
+
+  return 'Подключаем заказы';
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  });
+}
+
 const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
@@ -577,56 +690,62 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   accessPanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 12,
   },
   accessText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   accessTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '900',
   },
   appMeta: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     marginTop: 2,
   },
+  liveText: {
+    color: '#D4A853',
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 2,
+  },
   appName: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 18,
     fontWeight: '900',
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     height: 42,
     justifyContent: 'center',
     width: 42,
   },
   avatarText: {
-    color: '#FFFFFF',
+    color: '#F5F0E8',
     fontSize: 18,
     fontWeight: '900',
   },
   availableCarsButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
-    borderColor: '#0B4C42',
+    backgroundColor: '#D4A853',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 14,
-    minHeight: 112,
-    padding: 16,
+    minHeight: 88,
+    padding: 12,
   },
   availableCarsCopy: {
     flex: 1,
@@ -634,35 +753,35 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   availableCarsHint: {
-    color: '#DCEFEB',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   availableCarsIcon: {
     alignItems: 'center',
-    backgroundColor: '#0B4C42',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
-    height: 58,
+    height: 46,
     justifyContent: 'center',
-    width: 58,
+    width: 46,
   },
   availableCarsLabel: {
-    color: '#DCEFEB',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   availableCarsValue: {
-    color: '#FFFFFF',
-    fontSize: 42,
+    color: '#F5F0E8',
+    fontSize: 34,
     fontWeight: '900',
-    lineHeight: 46,
+    lineHeight: 38,
   },
   badge: {
-    backgroundColor: '#FFF3E5',
+    backgroundColor: '#37322E',
     borderRadius: 6,
-    color: '#C75319',
+    color: '#C17A70',
     fontSize: 10,
     fontWeight: '900',
     overflow: 'hidden',
@@ -674,7 +793,7 @@ const styles = StyleSheet.create({
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
@@ -688,31 +807,31 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   contentPanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 14,
-    padding: 16,
+    gap: 10,
+    padding: 12,
   },
   driverLineButton: {
     alignItems: 'center',
-    backgroundColor: '#20242A',
-    borderColor: '#20242A',
+    backgroundColor: '#D4A853',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 14,
-    minHeight: 104,
-    padding: 16,
+    minHeight: 88,
+    padding: 12,
   },
   driverLineButtonDisabled: {
-    backgroundColor: '#7A828C',
-    borderColor: '#7A828C',
+    backgroundColor: '#5A544E',
+    borderColor: '#5A544E',
   },
   driverLineButtonOnline: {
-    backgroundColor: '#E9F4F1',
-    borderColor: '#146C5D',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
   },
   driverLineCopy: {
     flex: 1,
@@ -720,47 +839,47 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   driverLineHint: {
-    color: '#DDE5E2',
+    color: '#37322E',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   driverLineIcon: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
-    height: 54,
+    height: 46,
     justifyContent: 'center',
-    width: 54,
+    width: 46,
   },
   driverLineIconOnline: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#2C2926',
   },
   driverLineLabel: {
-    color: '#DDE5E2',
+    color: '#37322E',
     fontSize: 13,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   driverLineTextOnline: {
-    color: '#0B4C42',
+    color: '#D4A853',
   },
   driverLineValue: {
-    color: '#FFFFFF',
-    fontSize: 28,
+    color: '#1E1C1A',
+    fontSize: 24,
     fontWeight: '900',
-    lineHeight: 34,
+    lineHeight: 28,
   },
   driverStatsCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
     padding: 14,
   },
   driverStatsHint: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -768,17 +887,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   driverStatsTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 16,
     fontWeight: '900',
   },
   financePanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
-    padding: 16,
+    padding: 12,
   },
   heroCopy: {
     flex: 1,
@@ -787,40 +906,67 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
-    height: 52,
+    height: 44,
     justifyContent: 'center',
-    width: 52,
+    width: 44,
   },
   heroPanel: {
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 14,
-    padding: 16,
+    gap: 12,
+    padding: 12,
   },
   heroText: {
-    color: '#59616C',
-    fontSize: 14,
-    lineHeight: 20,
+    color: '#A89F91',
+    fontSize: 13,
+    lineHeight: 18,
   },
   heroTitle: {
-    color: '#20242A',
-    fontSize: 24,
+    color: '#F5F0E8',
+    fontSize: 20,
     fontWeight: '900',
-    lineHeight: 30,
+    lineHeight: 24,
   },
   hello: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 16,
     fontWeight: '900',
   },
   layout: {
-    gap: 18,
+    gap: 12,
+  },
+  liveDot: {
+    backgroundColor: '#5C8D89',
+    borderRadius: 5,
+    height: 10,
+    marginTop: 4,
+    width: 10,
+  },
+  liveDotActive: {
+    backgroundColor: '#7A9A7E',
+  },
+  livePanel: {
+    alignItems: 'flex-start',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 9,
+    padding: 12,
+  },
+  livePanelText: {
+    color: '#F5F0E8',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   layoutWide: {
     alignItems: 'flex-start',
@@ -828,22 +974,27 @@ const styles = StyleSheet.create({
   },
   main: {
     flex: 1,
-    gap: 14,
+    gap: 10,
     minWidth: 0,
   },
   menuButton: {
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 11,
-    padding: 12,
+    gap: 9,
+    padding: 10,
+  },
+  menuButtonCompact: {
+    alignItems: 'center',
+    minHeight: 76,
+    width: 152,
   },
   menuButtonActive: {
-    backgroundColor: '#E9F4F1',
-    borderColor: '#146C5D',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
   },
   menuCopy: {
     flex: 1,
@@ -852,31 +1003,39 @@ const styles = StyleSheet.create({
   },
   menuIconWrap: {
     alignItems: 'center',
-    backgroundColor: '#EAF1EF',
+    backgroundColor: '#37322E',
     borderRadius: 8,
-    height: 36,
+    height: 32,
     justifyContent: 'center',
-    width: 36,
+    width: 32,
+  },
+  menuIconWrapCompact: {
+    height: 34,
+    width: 34,
   },
   menuIconWrapActive: {
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
   },
   menuList: {
-    gap: 9,
+    gap: 8,
+  },
+  menuRail: {
+    gap: 8,
+    paddingRight: 4,
   },
   menuSubtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   menuTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flexShrink: 1,
     fontSize: 14,
     fontWeight: '900',
   },
   menuTitleActive: {
-    color: '#0B4C42',
+    color: '#D4A853',
   },
   menuTitleRow: {
     alignItems: 'center',
@@ -885,22 +1044,22 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metricCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     gap: 5,
-    minWidth: 150,
-    padding: 14,
+    minWidth: 132,
+    padding: 12,
   },
   metricHelper: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 16,
   },
   metricLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -911,14 +1070,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   metricValue: {
-    color: '#20242A',
-    fontSize: 22,
+    color: '#F5F0E8',
+    fontSize: 20,
     fontWeight: '900',
   },
   miniStat: {
     alignItems: 'center',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -927,20 +1086,20 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   miniStatLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
   },
   miniStatValue: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
     textAlign: 'right',
   },
   notePanel: {
     alignItems: 'flex-start',
-    backgroundColor: '#EEF5F3',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -948,14 +1107,14 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   noteText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     flex: 1,
     fontSize: 13,
     lineHeight: 19,
   },
   outlineButton: {
     alignItems: 'center',
-    borderColor: '#146C5D',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -965,13 +1124,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   outlineButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   orderButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -980,39 +1139,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   orderButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 14,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#F4F7F5',
-    gap: 18,
+    backgroundColor: '#1E1C1A',
+    gap: 12,
     minHeight: '100%',
-    padding: 16,
+    padding: 14,
   },
   panelSubtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 14,
     lineHeight: 20,
   },
   panelTitle: {
-    color: '#20242A',
-    fontSize: 20,
+    color: '#F5F0E8',
+    fontSize: 18,
     fontWeight: '900',
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 46,
     paddingHorizontal: 14,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1023,29 +1183,29 @@ const styles = StyleSheet.create({
   },
   profilePanel: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    padding: 14,
+    padding: 12,
   },
   profileStatus: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 18,
   },
   quickCard: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     gap: 8,
-    minHeight: 132,
-    minWidth: 180,
-    padding: 14,
+    minHeight: 104,
+    minWidth: 150,
+    padding: 12,
   },
   quickGrid: {
     flexDirection: 'row',
@@ -1054,24 +1214,24 @@ const styles = StyleSheet.create({
   },
   quickIconWrap: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 40,
     justifyContent: 'center',
     width: 40,
   },
   quickSubtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   quickTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 15,
     fontWeight: '900',
   },
   routeDivider: {
-    color: '#8A8F98',
+    color: '#A89F91',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -1082,19 +1242,19 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   routeText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     fontWeight: '800',
   },
   routeTextActive: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -1102,26 +1262,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   secondaryButtonText: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   sectionRow: {
     alignItems: 'flex-start',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
     justifyContent: 'space-between',
-    padding: 13,
+    padding: 10,
   },
   sectionRowCopy: {
     flex: 1,
     gap: 4,
-    minWidth: 190,
+    minWidth: 150,
   },
   sectionRowMeta: {
     alignItems: 'flex-end',
@@ -1132,9 +1292,9 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   sectionRowStatus: {
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 6,
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 11,
     fontWeight: '900',
     overflow: 'hidden',
@@ -1142,23 +1302,72 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   sectionRowSubtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     lineHeight: 17,
   },
   sectionRowTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
   },
   sectionRowValue: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 14,
     fontWeight: '900',
     textAlign: 'right',
   },
-  sidebar: {
+  simpleModeButton: {
+    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
+    borderColor: '#F6C600',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
     gap: 12,
+    minHeight: 74,
+    padding: 12,
+  },
+  simpleModeCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  simpleModeKnob: {
+    backgroundColor: '#B0B0B0',
+    borderRadius: 10,
+    height: 20,
+    width: 20,
+  },
+  simpleModeKnobActive: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#0C0C0C',
+  },
+  simpleModeSwitch: {
+    backgroundColor: '#242426',
+    borderColor: '#B0B0B0',
+    borderRadius: 99,
+    borderWidth: 1,
+    justifyContent: 'center',
+    padding: 3,
+    width: 50,
+  },
+  simpleModeSwitchActive: {
+    backgroundColor: '#F6C600',
+    borderColor: '#F6C600',
+  },
+  simpleModeText: {
+    color: '#B0B0B0',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  simpleModeTitle: {
+    color: '#F5F5F5',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  sidebar: {
+    gap: 10,
     width: '100%',
   },
   sidebarWide: {
@@ -1166,39 +1375,39 @@ const styles = StyleSheet.create({
     width: 340,
   },
   statusPanel: {
-    backgroundColor: '#E9F4F1',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 12,
-    padding: 16,
+    gap: 10,
+    padding: 12,
   },
   statusText: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 14,
     lineHeight: 20,
   },
   statusTitle: {
-    color: '#0B4C42',
+    color: '#D4A853',
     fontSize: 18,
     fontWeight: '900',
   },
   topBar: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
     justifyContent: 'space-between',
-    padding: 14,
+    padding: 12,
   },
   topActions: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
 });

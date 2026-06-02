@@ -1,15 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
   CheckCircle2,
   CreditCard,
-  Percent,
+  ExternalLink,
   ReceiptText,
+  RefreshCw,
   RotateCcw,
   WalletCards,
 } from 'lucide-react-native';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   DriverBillingMode,
@@ -29,20 +30,31 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     payDriverSubscription,
     refundDriverSubscriptionPayment,
     serverMessage,
+    syncDriverSubscriptionPayment,
   } = useAppState();
-  const [selectedMode, setSelectedMode] = useState<DriverBillingMode>(driverSubscription.billingMode);
+  const [selectedMode, setSelectedMode] = useState<DriverBillingMode>('monthly');
   const [busy, setBusy] = useState(false);
   const [refundBusyId, setRefundBusyId] = useState<string | undefined>();
+  const [syncBusyId, setSyncBusyId] = useState<string | undefined>();
   const selectedPlan = driverAccessPlans[selectedMode];
   const isActive = driverSubscription.status === 'active';
   const paidPayments = useMemo(
     () => driverPayments.filter((payment) => payment.status === 'paid'),
     [driverPayments],
   );
+  const pendingProviderPayment = driverPayments.find(
+    (payment) => payment.status === 'pending' && payment.confirmationUrl,
+  );
   const lastRefundablePayment = paidPayments.find((payment) => payment.amount > 0);
+  const hasActiveDriverAccess = isActive && ['monthly', 'commission'].includes(driverSubscription.billingMode);
+  const isSelectedCurrentMode = hasActiveDriverAccess && selectedMode === driverSubscription.billingMode;
+
+  useEffect(() => {
+    setSelectedMode(driverSubscription.billingMode);
+  }, [driverSubscription.billingMode]);
 
   const confirmPlan = async () => {
-    if (isActive && driverSubscription.billingMode === selectedMode) {
+    if (isSelectedCurrentMode) {
       navigation.navigate('OrderFlow', { firstName, role });
       return;
     }
@@ -58,6 +70,12 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     setRefundBusyId(undefined);
   };
 
+  const checkPayment = async (paymentId: string) => {
+    setSyncBusyId(paymentId);
+    await syncDriverSubscriptionPayment(paymentId);
+    setSyncBusyId(undefined);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page}>
@@ -66,19 +84,19 @@ export function SubscriptionScreen({ navigation, route }: Props) {
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
         >
-          <ArrowLeft color="#146C5D" size={20} strokeWidth={2.4} />
+          <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
           <Text style={styles.backButtonText}>Назад</Text>
         </Pressable>
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <WalletCards color="#146C5D" size={30} strokeWidth={2.4} />
+            <WalletCards color="#D4A853" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>Оплата доступа водителя</Text>
+            <Text style={styles.title}>Расчеты самозанятого водителя</Text>
             <Text style={styles.subtitle}>
-              Выберите месячный доступ или комиссию с поездок. Backend сохраняет платеж,
-              продление, возврат, историю и чек подписки.
+              Клиентская оплата поступает водителю напрямую. Приложение считает долю сервиса с
+              завершенных поездок, а водитель переводит ее в конце рабочего дня.
             </Text>
             <Text style={styles.metaLine}>{firstName?.trim() || 'Водитель-партнер'}</Text>
           </View>
@@ -88,14 +106,18 @@ export function SubscriptionScreen({ navigation, route }: Props) {
           <StatusCard
             label="Статус"
             value={formatAccessStatus(driverSubscription.status)}
-            helper={driverSubscription.expiresAt ? `До ${formatDate(driverSubscription.expiresAt)}` : 'Без даты окончания'}
+            helper={
+              driverSubscription.expiresAt
+                ? `Доступ до ${formatDate(driverSubscription.expiresAt)}`
+                : `Доля сервиса с поездок: ${driverSubscription.ordersCommission}%`
+            }
           />
           <StatusCard label="Модель" value={driverSubscription.planName} helper={formatPlanCost(driverSubscription.billingMode)} />
           <StatusCard label="Платежи" value={String(driverPayments.length)} helper="Операции доступа" />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Модель оплаты</Text>
+          <Text style={styles.sectionTitle}>Модель расчетов</Text>
           <View style={styles.planGrid}>
             <PlanChoice
               active={selectedMode === 'monthly'}
@@ -107,7 +129,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             />
             <PlanChoice
               active={selectedMode === 'commission'}
-              icon="percent"
+              icon="commission"
               onPress={() => setSelectedMode('commission')}
               title={driverAccessPlans.commission.name}
               headline={driverAccessPlans.commission.headline}
@@ -118,6 +140,9 @@ export function SubscriptionScreen({ navigation, route }: Props) {
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Выбрано: {selectedPlan.shortName}</Text>
             <Text style={styles.summaryText}>{selectedPlan.description}</Text>
+            <Text style={styles.summaryText}>
+              Изменение модели фиксируется сейчас и применяется с начала следующего расчётного периода.
+            </Text>
             <Text style={styles.summaryText}>{serverMessage}</Text>
           </View>
 
@@ -131,15 +156,47 @@ export function SubscriptionScreen({ navigation, route }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <CreditCard color="#FFFFFF" size={18} strokeWidth={2.4} />
+            <CreditCard color="#F5F0E8" size={18} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>
               {busy
                 ? 'Проводим операцию'
-                : isActive && driverSubscription.billingMode === selectedMode
+                : isSelectedCurrentMode
                 ? 'Перейти к заказам'
+                : hasActiveDriverAccess
+                ? 'Сменить модель'
                 : selectedPlan.primaryAction}
             </Text>
           </Pressable>
+
+          {pendingProviderPayment ? (
+            <View style={styles.providerActions}>
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => {
+                  void Linking.openURL(pendingProviderPayment.confirmationUrl || '');
+                }}
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+              >
+                <ExternalLink color="#D4A853" size={17} strokeWidth={2.4} />
+                <Text style={styles.providerButtonText}>Открыть оплату у провайдера</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={syncBusyId === pendingProviderPayment.id}
+                onPress={() => checkPayment(pendingProviderPayment.id)}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  syncBusyId === pendingProviderPayment.id && styles.disabledButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <RefreshCw color="#D4A853" size={17} strokeWidth={2.4} />
+                <Text style={styles.providerButtonText}>
+                  {syncBusyId === pendingProviderPayment.id ? 'Проверяем оплату' : 'Проверить оплату'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {lastRefundablePayment ? (
             <Pressable
@@ -148,7 +205,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
               onPress={() => refundPayment(lastRefundablePayment.id)}
               style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
             >
-              <RotateCcw color="#A33B2E" size={17} strokeWidth={2.4} />
+              <RotateCcw color="#C17A70" size={17} strokeWidth={2.4} />
               <Text style={styles.refundButtonText}>
                 {refundBusyId === lastRefundablePayment.id ? 'Возвращаем платеж' : 'Вернуть последний платеж'}
               </Text>
@@ -158,7 +215,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
 
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
-            <ReceiptText color="#146C5D" size={20} strokeWidth={2.4} />
+            <ReceiptText color="#D4A853" size={20} strokeWidth={2.4} />
             <Text style={styles.sectionTitle}>История платежей и чеки</Text>
           </View>
           {driverPayments.length > 0 ? (
@@ -174,7 +231,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
 
 type PlanChoiceProps = {
   active: boolean;
-  icon: 'card' | 'percent';
+  icon: 'card' | 'commission';
   title: string;
   headline: string;
   text: string;
@@ -182,7 +239,7 @@ type PlanChoiceProps = {
 };
 
 function PlanChoice({ active, headline, icon, onPress, text, title }: PlanChoiceProps) {
-  const Icon = icon === 'card' ? CreditCard : Percent;
+  const Icon = icon === 'commission' ? ReceiptText : CreditCard;
 
   return (
     <Pressable
@@ -192,7 +249,7 @@ function PlanChoice({ active, headline, icon, onPress, text, title }: PlanChoice
       style={({ pressed }) => [styles.planChoice, active && styles.planChoiceActive, pressed && styles.pressed]}
     >
       <View style={styles.planTop}>
-        <Icon color={active ? '#FFFFFF' : '#146C5D'} size={20} strokeWidth={2.4} />
+        <Icon color={active ? '#1E1C1A' : '#D4A853'} size={20} strokeWidth={2.4} />
         <Text style={[styles.planTitle, active && styles.planTextActive]}>{title}</Text>
       </View>
       <Text style={[styles.planHeadline, active && styles.planTextActive]}>{headline}</Text>
@@ -213,15 +270,18 @@ function StatusCard({ helper, label, value }: { helper: string; label: string; v
 
 function PaymentRow({ payment }: { payment: DriverSubscriptionPayment }) {
   const isRefunded = payment.status === 'refunded';
+  const isPending = payment.status === 'pending';
   const receipt = payment.refundReceipt ?? payment.receipt;
 
   return (
     <View style={styles.paymentRow}>
       <View style={styles.paymentIcon}>
         {isRefunded ? (
-          <RotateCcw color="#A33B2E" size={18} strokeWidth={2.4} />
+          <RotateCcw color="#C17A70" size={18} strokeWidth={2.4} />
+        ) : isPending ? (
+          <CreditCard color="#D4A853" size={18} strokeWidth={2.4} />
         ) : (
-          <CheckCircle2 color="#146C5D" size={18} strokeWidth={2.4} />
+          <CheckCircle2 color="#D4A853" size={18} strokeWidth={2.4} />
         )}
       </View>
       <View style={styles.paymentCopy}>
@@ -240,6 +300,11 @@ function PaymentRow({ payment }: { payment: DriverSubscriptionPayment }) {
             Чек {receipt.fiscalNumber} · {receipt.fiscalStatus}
           </Text>
         ) : null}
+        {payment.providerPaymentStatus || payment.providerError ? (
+          <Text style={styles.paymentText}>
+            Провайдер: {payment.providerPaymentStatus || payment.providerError}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -254,7 +319,7 @@ function formatAccessStatus(status: string) {
     return 'Истек';
   }
 
-  return 'Не оплачен';
+  return 'Не подключен';
 }
 
 function formatPaymentStatus(status: DriverSubscriptionPayment['status']) {
@@ -270,8 +335,11 @@ function formatPaymentStatus(status: DriverSubscriptionPayment['status']) {
 
 function formatPlanCost(mode: DriverBillingMode) {
   const plan = driverAccessPlans[mode];
+  if (plan.monthlyPrice > 0) {
+    return `${plan.monthlyPrice.toLocaleString('ru-RU')} ₽/мес, ${plan.commissionPercent}% к переводу`;
+  }
 
-  return mode === 'monthly' ? `${plan.monthlyPrice} ₽ за 30 дней` : `${plan.commissionPercent}% с поездки`;
+  return `0 ₽/мес, ${plan.commissionPercent}% к переводу`;
 }
 
 function formatMoney(value: number) {
@@ -295,8 +363,8 @@ function formatDate(value: string) {
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -304,21 +372,21 @@ const styles = StyleSheet.create({
     minHeight: 42,
     paddingHorizontal: 12,
   },
-  backButtonText: { color: '#146C5D', fontSize: 14, fontWeight: '900' },
+  backButtonText: { color: '#D4A853', fontSize: 14, fontWeight: '900' },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 16,
     padding: 16,
   },
   disabledButton: { opacity: 0.64 },
-  emptyText: { color: '#59616C', fontSize: 14, lineHeight: 20 },
+  emptyText: { color: '#A89F91', fontSize: 14, lineHeight: 20 },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -328,37 +396,37 @@ const styles = StyleSheet.create({
   heroCopy: { flex: 1, gap: 7, minWidth: 0 },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
-  metaLine: { color: '#146C5D', fontSize: 13, fontWeight: '900' },
-  page: { backgroundColor: '#F4F7F5', gap: 16, minHeight: '100%', padding: 16 },
+  metaLine: { color: '#D4A853', fontSize: 13, fontWeight: '900' },
+  page: { backgroundColor: '#1E1C1A', gap: 16, minHeight: '100%', padding: 16 },
   paymentCopy: { flex: 1, gap: 4, minWidth: 0 },
   paymentIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
     height: 38,
     justifyContent: 'center',
     width: 38,
   },
   paymentRow: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#E1E6EC',
+    backgroundColor: '#37322E',
+    borderColor: '#37322E',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
     padding: 12,
   },
-  paymentText: { color: '#59616C', fontSize: 12, lineHeight: 17 },
-  paymentTitle: { color: '#20242A', fontSize: 14, fontWeight: '900' },
+  paymentText: { color: '#A89F91', fontSize: 12, lineHeight: 17 },
+  paymentTitle: { color: '#F5F0E8', fontSize: 14, fontWeight: '900' },
   planChoice: {
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -366,32 +434,37 @@ const styles = StyleSheet.create({
     minWidth: 230,
     padding: 14,
   },
-  planChoiceActive: { backgroundColor: '#146C5D', borderColor: '#146C5D' },
+  planChoiceActive: { backgroundColor: '#D4A853', borderColor: '#D4A853' },
   planGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  planHeadline: { color: '#146C5D', fontSize: 16, fontWeight: '900' },
-  planText: { color: '#59616C', fontSize: 13, lineHeight: 19 },
-  planTextActive: { color: '#FFFFFF' },
-  planTitle: { color: '#20242A', flex: 1, fontSize: 15, fontWeight: '900' },
+  planHeadline: { color: '#D4A853', fontSize: 16, fontWeight: '900' },
+  planText: { color: '#A89F91', fontSize: 13, lineHeight: 19 },
+  planTextActive: { color: '#F5F0E8' },
+  planTitle: { color: '#F5F0E8', flex: 1, fontSize: 15, fontWeight: '900' },
   planTop: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  pressed: { opacity: 0.76 },
+  pressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
+  },
+  providerActions: { gap: 10 },
+  providerButtonText: { color: '#D4A853', fontSize: 14, fontWeight: '900' },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 56,
     paddingHorizontal: 16,
   },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
-  receiptText: { color: '#146C5D', fontSize: 12, fontWeight: '800' },
-  refundButtonText: { color: '#A33B2E', fontSize: 14, fontWeight: '900' },
-  safeArea: { backgroundColor: '#F4F7F5', flex: 1 },
+  primaryButtonText: { color: '#1E1C1A', fontSize: 15, fontWeight: '900' },
+  receiptText: { color: '#D4A853', fontSize: 12, fontWeight: '800' },
+  refundButtonText: { color: '#C17A70', fontSize: 14, fontWeight: '900' },
+  safeArea: { backgroundColor: '#1E1C1A', flex: 1 },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -401,10 +474,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  sectionTitle: { color: '#20242A', fontSize: 18, fontWeight: '900' },
+  sectionTitle: { color: '#F5F0E8', fontSize: 18, fontWeight: '900' },
   statusCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -413,19 +486,19 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   statusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statusHelper: { color: '#59616C', fontSize: 12, lineHeight: 17 },
-  statusLabel: { color: '#59616C', fontSize: 12, fontWeight: '800' },
-  statusValue: { color: '#20242A', fontSize: 17, fontWeight: '900' },
-  subtitle: { color: '#59616C', fontSize: 15, lineHeight: 22 },
+  statusHelper: { color: '#A89F91', fontSize: 12, lineHeight: 17 },
+  statusLabel: { color: '#A89F91', fontSize: 12, fontWeight: '800' },
+  statusValue: { color: '#F5F0E8', fontSize: 17, fontWeight: '900' },
+  subtitle: { color: '#A89F91', fontSize: 15, lineHeight: 22 },
   summaryBox: {
-    backgroundColor: '#E9F4F1',
-    borderColor: '#C5DDD7',
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 14,
   },
-  summaryText: { color: '#59616C', fontSize: 13, lineHeight: 19 },
-  summaryTitle: { color: '#0B4C42', fontSize: 15, fontWeight: '900' },
-  title: { color: '#20242A', fontSize: 30, fontWeight: '900', lineHeight: 36 },
+  summaryText: { color: '#A89F91', fontSize: 13, lineHeight: 19 },
+  summaryTitle: { color: '#D4A853', fontSize: 15, fontWeight: '900' },
+  title: { color: '#F5F0E8', fontSize: 30, fontWeight: '900', lineHeight: 36 },
 });

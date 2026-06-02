@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ArrowLeft, Camera, FileCheck2, ImagePlus, ShieldCheck, Upload } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { isDriverLikeRole } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import {
   DriverDocumentKind,
@@ -39,6 +40,11 @@ const documentSpecs: Array<{
     title: 'ОСАГО',
     subtitle: 'Полис страхования для автомобиля.',
   },
+  {
+    kind: 'osgop',
+    title: 'ОСГОП',
+    subtitle: 'Обязательный полис для допуска к пассажирским заказам.',
+  },
 ];
 
 const statusLabels: Record<DriverDocumentUpload['status'], string> = {
@@ -65,6 +71,9 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
     (spec) => currentDriver?.documentUploads?.[spec.kind]?.status === 'pending' ||
       currentDriver?.documentUploads?.[spec.kind]?.status === 'approved',
   ).length;
+  const rejectedDocuments = documentSpecs.filter(
+    (spec) => currentDriver?.documentUploads?.[spec.kind]?.status === 'rejected',
+  );
   const canSubmit = Boolean(currentDriver?.id && selectedCount > 0 && !isSubmitting);
 
   const pickDocument = async (kind: DriverDocumentKind, source: 'camera' | 'library') => {
@@ -150,19 +159,19 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#146C5D" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
-          <Text style={styles.roleText}>{role === 'driver' ? 'Водитель' : 'Документы'}</Text>
+          <Text style={styles.roleText}>{isDriverLikeRole(role) ? 'Водитель' : 'Документы'}</Text>
         </View>
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <ShieldCheck color="#146C5D" size={30} strokeWidth={2.4} />
+            <ShieldCheck color="#D4A853" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>Документы водителя</Text>
-            <Text style={styles.subtitle}>
+            <Text numberOfLines={2} style={styles.title}>Документы водителя</Text>
+            <Text numberOfLines={2} style={styles.subtitle}>
               {firstName?.trim() || currentUser?.firstName || 'Водитель'}, отправьте фото документов
               на проверку допуска к заказам.
             </Text>
@@ -170,10 +179,26 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.summaryGrid}>
-          <SummaryCell label="Загружено" value={`${uploadedCount}/4`} />
-          <SummaryCell label="Выбрано" value={`${selectedCount}/4`} />
+          <SummaryCell label="Загружено" value={`${uploadedCount}/${documentSpecs.length}`} />
+          <SummaryCell label="Выбрано" value={`${selectedCount}/${documentSpecs.length}`} />
           <SummaryCell label="Статус" value={currentDriver?.documentsStatus ?? 'missing'} />
         </View>
+
+        {currentDriver?.documentReview?.status === 'rejected' ? (
+          <View style={styles.reviewPanel}>
+            <Text style={styles.reviewTitle}>Нужно повторно загрузить документы</Text>
+            <Text numberOfLines={2} style={styles.reviewText}>
+              {currentDriver.documentReview.reason || 'Администратор отклонил пакет документов.'}
+            </Text>
+            {currentDriver.documentReview.rejectedKinds.length ? (
+              <Text numberOfLines={2} style={styles.reviewText}>
+                Проверьте: {currentDriver.documentReview.rejectedKinds
+                  .map((kind) => documentSpecs.find((spec) => spec.kind === kind)?.title || kind)
+                  .join(', ')}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.documentsList}>
           {documentSpecs.map((spec) => {
@@ -184,20 +209,25 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
               <View key={spec.kind} style={styles.documentCard}>
                 <View style={styles.documentHeader}>
                   <View style={styles.documentIcon}>
-                    <FileCheck2 color="#146C5D" size={23} strokeWidth={2.4} />
+                    <FileCheck2 color="#D4A853" size={23} strokeWidth={2.4} />
                   </View>
                   <View style={styles.documentCopy}>
-                    <Text style={styles.documentTitle}>{spec.title}</Text>
-                    <Text style={styles.documentSubtitle}>{spec.subtitle}</Text>
+                    <Text numberOfLines={1} style={styles.documentTitle}>{spec.title}</Text>
+                    <Text numberOfLines={2} style={styles.documentSubtitle}>{spec.subtitle}</Text>
                   </View>
                   <Text style={styles.statusBadge}>
                     {selected ? 'Выбран' : statusLabels[upload?.status ?? 'missing']}
                   </Text>
                 </View>
 
-                <Text style={styles.fileLine}>
+                <Text numberOfLines={1} style={styles.fileLine}>
                   {selected?.fileName || upload?.fileName || 'Файл еще не выбран'}
                 </Text>
+                {upload?.status === 'rejected' ? (
+                  <Text numberOfLines={2} style={styles.rejectionText}>
+                    {upload.rejectionReason || currentDriver?.documentReview?.reason || 'Файл нужно заменить.'}
+                  </Text>
+                ) : null}
 
                 <View style={styles.documentActions}>
                   <Pressable
@@ -205,7 +235,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
                     onPress={() => pickDocument(spec.kind, 'camera')}
                     style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
                   >
-                    <Camera color="#146C5D" size={17} strokeWidth={2.4} />
+                    <Camera color="#D4A853" size={17} strokeWidth={2.4} />
                     <Text style={styles.secondaryButtonText}>Камера</Text>
                   </Pressable>
                   <Pressable
@@ -213,7 +243,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
                     onPress={() => pickDocument(spec.kind, 'library')}
                     style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
                   >
-                    <ImagePlus color="#146C5D" size={17} strokeWidth={2.4} />
+                    <ImagePlus color="#D4A853" size={17} strokeWidth={2.4} />
                     <Text style={styles.secondaryButtonText}>Галерея</Text>
                   </Pressable>
                 </View>
@@ -223,6 +253,12 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
         </View>
 
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+        {rejectedDocuments.length ? (
+          <Text style={styles.notice}>
+            После замены отклоненных файлов отправьте пакет повторно, статус снова станет "На проверке".
+          </Text>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"
@@ -234,7 +270,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
             pressed && styles.pressed,
           ]}
         >
-          <Upload color="#FFFFFF" size={19} strokeWidth={2.4} />
+          <Upload color="#F5F0E8" size={19} strokeWidth={2.4} />
           <Text style={styles.primaryButtonText}>
             {isSubmitting ? 'Отправляем...' : 'Отправить на проверку'}
           </Text>
@@ -256,8 +292,8 @@ function SummaryCell({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -266,22 +302,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   documentActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   documentCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 12,
-    padding: 14,
+    flex: 1,
+    gap: 8,
+    minWidth: 260,
+    padding: 10,
   },
   documentCopy: {
     flex: 1,
@@ -292,44 +330,46 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   documentIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
-    height: 42,
+    height: 36,
     justifyContent: 'center',
-    width: 42,
+    width: 36,
   },
   documentsList: {
-    gap: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   documentSubtitle: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     lineHeight: 18,
   },
   documentTitle: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 16,
     fontWeight: '900',
   },
   fileLine: {
-    color: '#20242A',
+    color: '#F5F0E8',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 14,
-    padding: 18,
+    gap: 12,
+    padding: 12,
   },
   heroCopy: {
     flex: 1,
@@ -338,58 +378,83 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 8,
-    height: 58,
+    height: 46,
     justifyContent: 'center',
-    width: 58,
+    width: 46,
   },
   notice: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
+  rejectionText: {
+    color: '#C17A70',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  reviewPanel: {
+    backgroundColor: '#37322E',
+    borderColor: '#D4A853',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 7,
+    padding: 12,
+  },
+  reviewText: {
+    color: '#D4A853',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  reviewTitle: {
+    color: '#D4A853',
+    fontSize: 15,
+    fontWeight: '900',
+  },
   page: {
-    backgroundColor: '#F4F7F5',
-    gap: 16,
+    backgroundColor: '#1E1C1A',
+    gap: 12,
     minHeight: '100%',
-    padding: 16,
+    padding: 14,
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.95 }],
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#D4A853',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 50,
     paddingHorizontal: 16,
   },
   primaryButtonMuted: {
-    backgroundColor: '#89958F',
+    backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#1E1C1A',
     fontSize: 15,
     fontWeight: '900',
   },
   roleText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 14,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#1E1C1A',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#146C5D',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -399,14 +464,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   secondaryButtonText: {
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 13,
     fontWeight: '900',
   },
   statusBadge: {
-    backgroundColor: '#E9F4F1',
+    backgroundColor: '#37322E',
     borderRadius: 6,
-    color: '#146C5D',
+    color: '#D4A853',
     fontSize: 11,
     fontWeight: '900',
     overflow: 'hidden',
@@ -414,19 +479,19 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   subtitle: {
-    color: '#59616C',
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#A89F91',
+    fontSize: 14,
+    lineHeight: 20,
   },
   summaryCell: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#2C2926',
+    borderColor: '#D4A853',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     gap: 5,
-    minWidth: 110,
-    padding: 13,
+    minWidth: 104,
+    padding: 10,
   },
   summaryGrid: {
     flexDirection: 'row',
@@ -434,21 +499,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   summaryLabel: {
-    color: '#59616C',
+    color: '#A89F91',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
   },
   summaryValue: {
-    color: '#20242A',
-    fontSize: 20,
+    color: '#F5F0E8',
+    fontSize: 18,
     fontWeight: '900',
   },
   title: {
-    color: '#20242A',
-    fontSize: 30,
+    color: '#F5F0E8',
+    fontSize: 24,
     fontWeight: '900',
-    lineHeight: 36,
+    lineHeight: 30,
   },
   topBar: {
     alignItems: 'center',
