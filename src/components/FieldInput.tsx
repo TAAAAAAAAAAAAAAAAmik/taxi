@@ -22,7 +22,7 @@ export function FieldInput({ field, value, onChangeText }: FieldInputProps) {
         keyboardType={field.keyboardType ?? 'default'}
         onChangeText={onChangeText}
         placeholder={field.placeholder}
-        placeholderTextColor="#A89F91"
+        placeholderTextColor="#557669"
         secureTextEntry={field.secureTextEntry}
         style={styles.input}
         textContentType={field.textContentType}

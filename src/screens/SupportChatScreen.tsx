@@ -74,7 +74,7 @@ export function SupportChatScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
           <Text style={styles.roleText}>{roleCopy[role].title}</Text>
@@ -82,7 +82,7 @@ export function SupportChatScreen({ navigation, route }: Props) {
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Headphones color="#D4A853" size={30} strokeWidth={2.4} />
+            <Headphones color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
             <Text style={styles.title}>Чат поддержки</Text>
@@ -94,7 +94,7 @@ export function SupportChatScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.serverBox}>
-          <ShieldCheck color="#D4A853" size={20} strokeWidth={2.4} />
+          <ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />
           <View style={styles.serverCopy}>
             <Text style={styles.serverTitle}>{serverState.label}</Text>
             <Text style={styles.serverText}>{serverState.description}</Text>
@@ -156,7 +156,7 @@ export function SupportChatScreen({ navigation, route }: Props) {
               multiline
               onChangeText={setMessage}
               placeholder="Напишите поддержке..."
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               style={styles.input}
               value={message}
             />
@@ -165,7 +165,7 @@ export function SupportChatScreen({ navigation, route }: Props) {
               onPress={() => send()}
               style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]}
             >
-              <Send color="#F5F0E8" size={18} strokeWidth={2.4} />
+              <Send color="#12382C" size={18} strokeWidth={2.4} />
             </Pressable>
           </View>
         </View>
@@ -197,8 +197,8 @@ function MessageBubble({ message }: { message: SupportMessage }) {
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -207,13 +207,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   categoryButton: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 40,
@@ -221,16 +221,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   categoryButtonActive: {
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   categoryButtonText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '900',
   },
   categoryButtonTextActive: {
-    color: '#F5F0E8',
+    color: '#12382C',
   },
   categoryRow: {
     flexDirection: 'row',
@@ -238,8 +238,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chatPanel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 14,
@@ -252,8 +252,8 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -267,18 +267,18 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
   input: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 15,
     minHeight: 56,
@@ -286,17 +286,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   messageAuthor: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 11,
     fontWeight: '900',
   },
   messageAuthorUser: {
-    color: '#37322E',
+    color: '#E8F3EF',
   },
   messageBubble: {
     alignSelf: 'flex-start',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 4,
@@ -304,39 +304,39 @@ const styles = StyleSheet.create({
     padding: 11,
   },
   messageBubbleSupport: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
   },
   messageBubbleUser: {
     alignSelf: 'flex-end',
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   messages: {
     gap: 9,
   },
   messageText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     lineHeight: 19,
   },
   messageTextUser: {
-    color: '#F5F0E8',
+    color: '#12382C',
   },
   metaLine: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   panel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -347,14 +347,14 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }],
   },
   quickButton: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     padding: 12,
   },
   quickButtonText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -362,22 +362,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   roleText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   sectionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   sendButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     height: 50,
     justifyContent: 'center',
@@ -385,8 +385,8 @@ const styles = StyleSheet.create({
   },
   serverBox: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -398,22 +398,22 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   serverText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
   serverTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 15,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 15,
     lineHeight: 22,
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 30,
     fontWeight: '900',
     lineHeight: 36,

@@ -82,7 +82,7 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
           <Text style={styles.roleText}>{role === 'client' ? 'Клиент' : 'Профиль'}</Text>
@@ -90,7 +90,7 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Home color="#D4A853" size={30} strokeWidth={2.4} />
+            <Home color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
             <Text style={styles.title}>Домашний адрес</Text>
@@ -103,7 +103,7 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
 
         <View style={styles.panel}>
           <View style={styles.coverageBox}>
-            <MapPinned color="#D4A853" size={20} strokeWidth={2.4} />
+            <MapPinned color="#008D49" size={20} strokeWidth={2.4} />
             <View style={styles.coverageCopy}>
               <Text style={styles.coverageTitle}>{getCoverageTitle(locationPoint)}</Text>
               <Text style={styles.coverageText}>{getCoverageText(locationPoint)}</Text>
@@ -115,7 +115,7 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
             onPress={requestLocation}
             style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
           >
-            <LocateFixed color="#D4A853" size={18} strokeWidth={2.4} />
+            <LocateFixed color="#008D49" size={18} strokeWidth={2.4} />
             <Text style={styles.locationButtonText}>Определить мое место</Text>
           </Pressable>
           {locationMessage ? <Text style={styles.locationMessage}>{locationMessage}</Text> : null}
@@ -129,7 +129,7 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
                 setSaved(false);
               }}
               placeholder="Например: Малояз, Коммунистическая улица, 65/1"
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               style={styles.input}
               value={address}
             />
@@ -160,7 +160,7 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
               <TextInput
                 onChangeText={setEntrance}
                 placeholder="Подъезд 2"
-                placeholderTextColor="#A89F91"
+                placeholderTextColor="#557669"
                 style={styles.input}
                 value={entrance}
               />
@@ -170,7 +170,7 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
               <TextInput
                 onChangeText={setComment}
                 placeholder="Ждать у ворот"
-                placeholderTextColor="#A89F91"
+                placeholderTextColor="#557669"
                 style={styles.input}
                 value={comment}
               />
@@ -187,7 +187,7 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <Save color="#F5F0E8" size={18} strokeWidth={2.4} />
+            <Save color="#12382C" size={18} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>Сохранить дом</Text>
           </Pressable>
 
@@ -208,8 +208,8 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -218,14 +218,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   coverageBox: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -237,12 +237,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   coverageText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
   coverageTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -261,8 +261,8 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -276,31 +276,31 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
   input: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     minHeight: 56,
     paddingHorizontal: 14,
   },
   label: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   locationButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -310,29 +310,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   locationButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   locationMessage: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
   metaLine: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   panel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 14,
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -356,21 +356,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 15,
     fontWeight: '900',
   },
   roleText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   savedBox: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderColor: '#7A9A7E',
     borderRadius: 8,
     borderWidth: 1,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   savedText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
@@ -388,13 +388,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 15,
     lineHeight: 22,
   },
   suggestion: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 3,
@@ -404,17 +404,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   suggestionSubtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   suggestionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 30,
     fontWeight: '900',
     lineHeight: 36,

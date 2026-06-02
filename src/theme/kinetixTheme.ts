@@ -7,9 +7,9 @@ export const kx = {
   touch: kinetixTouchTargets,
   border: {
     default: kinetixColors.amber,
-    subtle: 'rgba(212, 168, 83, 0.46)',
-    reward: kinetixColors.amber,
-    muted: 'rgba(245, 240, 232, 0.14)',
+    subtle: 'rgba(0, 141, 73, 0.18)',
+    reward: kinetixColors.warning,
+    muted: 'rgba(18, 56, 44, 0.12)',
   },
   text: {
     primary: kinetixColors.textPrimary,
@@ -24,7 +24,7 @@ export const kx = {
     page: kinetixColors.graphite,
     card: kinetixColors.surface,
     raised: kinetixColors.surfaceRaised,
-    soft: '#232323',
+    soft: '#E8F3EF',
     input: kinetixColors.surface,
     selected: kinetixColors.surfaceLight,
   },

@@ -91,7 +91,7 @@ export function PasswordResetScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <View style={styles.iconWrap}>
-            <KeyRound color="#D4A853" size={30} strokeWidth={2.4} />
+            <KeyRound color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <Text style={styles.title}>Восстановление пароля</Text>
           <Text style={styles.subtitle}>
@@ -106,7 +106,7 @@ export function PasswordResetScreen({ navigation }: Props) {
               autoCorrect={false}
               onChangeText={setIdentifier}
               placeholder="name@example.com или +7 900 000-00-00"
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               style={styles.input}
               value={identifier}
             />
@@ -129,7 +129,7 @@ export function PasswordResetScreen({ navigation }: Props) {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Icon color={active ? '#1E1C1A' : '#D4A853'} size={17} strokeWidth={2.4} />
+                  <Icon color={active ? '#F4FAF6' : '#008D49'} size={17} strokeWidth={2.4} />
                   <Text style={[styles.deliveryButtonText, active && styles.deliveryButtonTextActive]}>
                     {option.label}
                   </Text>
@@ -148,7 +148,7 @@ export function PasswordResetScreen({ navigation }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <MessageSquareText color="#D4A853" size={18} strokeWidth={2.4} />
+            <MessageSquareText color="#008D49" size={18} strokeWidth={2.4} />
             <Text style={styles.secondaryButtonText}>
               {isSending ? 'Отправляем...' : 'Получить код'}
             </Text>
@@ -165,7 +165,7 @@ export function PasswordResetScreen({ navigation }: Props) {
               maxLength={8}
               onChangeText={setCode}
               placeholder="0000"
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               style={styles.input}
               value={code}
             />
@@ -176,7 +176,7 @@ export function PasswordResetScreen({ navigation }: Props) {
             <TextInput
               onChangeText={setPassword}
               placeholder="Минимум 4 символа"
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               secureTextEntry
               style={styles.input}
               value={password}
@@ -188,7 +188,7 @@ export function PasswordResetScreen({ navigation }: Props) {
             <TextInput
               onChangeText={setPasswordRepeat}
               placeholder="Еще раз новый пароль"
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               secureTextEntry
               style={styles.input}
               value={passwordRepeat}
@@ -205,7 +205,7 @@ export function PasswordResetScreen({ navigation }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <ShieldCheck color="#F5F0E8" size={19} strokeWidth={2.4} />
+            <ShieldCheck color="#12382C" size={19} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>
               {isConfirming ? 'Проверяем...' : 'Сменить пароль'}
             </Text>
@@ -241,8 +241,8 @@ function formatTime(value?: string) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 16,
@@ -250,8 +250,8 @@ const styles = StyleSheet.create({
   },
   deliveryButton: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -263,16 +263,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   deliveryButtonActive: {
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   deliveryButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   deliveryButtonTextActive: {
-    color: '#F5F0E8',
+    color: '#FFFFFF',
   },
   deliveryGrid: {
     flexDirection: 'row',
@@ -280,9 +280,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   demoCode: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 18,
     fontWeight: '900',
     overflow: 'hidden',
@@ -294,24 +294,24 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
   input: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     minHeight: 56,
     paddingHorizontal: 14,
   },
   label: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -321,18 +321,18 @@ const styles = StyleSheet.create({
     minHeight: 42,
   },
   linkButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   notice: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     justifyContent: 'center',
     minHeight: '100%',
     padding: 16,
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -355,18 +355,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 15,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -379,17 +379,17 @@ const styles = StyleSheet.create({
     opacity: 0.56,
   },
   secondaryButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 15,
     lineHeight: 22,
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 28,
     fontWeight: '900',
     lineHeight: 34,

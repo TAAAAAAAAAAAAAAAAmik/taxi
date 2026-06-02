@@ -59,7 +59,7 @@ export function ReferralScreen({ navigation, route }: Props) {
   const activeRule =
     activeInviteRole === 'self_employed_driver'
       ? {
-          icon: <Car color="#D4A853" size={20} strokeWidth={2.4} />,
+          icon: <Car color="#008D49" size={20} strokeWidth={2.4} />,
           reward: rewards?.driverReward ?? 300,
           title: 'Пригласить самозанятого водителя',
           text: `Вы получите ${rewards?.driverReward ?? 300} ₽ после первых ${
@@ -69,7 +69,7 @@ export function ReferralScreen({ navigation, route }: Props) {
           } дней доступа после одобрения.`,
         }
       : {
-          icon: <UserRound color="#D4A853" size={20} strokeWidth={2.4} />,
+          icon: <UserRound color="#008D49" size={20} strokeWidth={2.4} />,
           reward: rewards?.clientReward ?? 60,
           title: 'Пригласить клиента',
           text: `Вы получите ${rewards?.clientReward ?? 60} ₽ после первых ${
@@ -99,7 +99,7 @@ export function ReferralScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
           <Text style={styles.roleText}>{roleCopy[role].title}</Text>
@@ -107,7 +107,7 @@ export function ReferralScreen({ navigation, route }: Props) {
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Share2 color="#D4A853" size={30} strokeWidth={2.4} />
+            <Share2 color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
             <Text style={styles.title}>Пригласить в Такси Салават</Text>
@@ -125,17 +125,17 @@ export function ReferralScreen({ navigation, route }: Props) {
           <Text style={styles.linkText}>{inviteUrl}</Text>
           <View style={styles.codeActions}>
             <ActionButton
-              icon={<Copy color="#F5F0E8" size={16} strokeWidth={2.4} />}
+              icon={<Copy color="#12382C" size={16} strokeWidth={2.4} />}
               label="Код"
               onPress={() => handleCopy('Код', inviteCode)}
             />
             <ActionButton
-              icon={<Copy color="#F5F0E8" size={16} strokeWidth={2.4} />}
+              icon={<Copy color="#12382C" size={16} strokeWidth={2.4} />}
               label="Ссылка"
               onPress={() => handleCopy('Ссылка', inviteUrl)}
             />
             <ActionButton
-              icon={<Send color="#F5F0E8" size={16} strokeWidth={2.4} />}
+              icon={<Send color="#12382C" size={16} strokeWidth={2.4} />}
               label="Поделиться"
               onPress={handleShare}
             />
@@ -145,17 +145,17 @@ export function ReferralScreen({ navigation, route }: Props) {
 
         <View style={styles.statsGrid}>
           <StatCard
-            icon={<Wallet color="#D4A853" size={20} strokeWidth={2.4} />}
+            icon={<Wallet color="#008D49" size={20} strokeWidth={2.4} />}
             label="Бонусный баланс"
             value={`${referralDashboard?.bonusBalance ?? currentUser?.bonusBalance ?? 0} ₽`}
           />
           <StatCard
-            icon={<UsersRound color="#D4A853" size={20} strokeWidth={2.4} />}
+            icon={<UsersRound color="#008D49" size={20} strokeWidth={2.4} />}
             label="Приглашения"
             value={String(referralDashboard?.referrals.length ?? 0)}
           />
           <StatCard
-            icon={<Gift color="#D4A853" size={20} strokeWidth={2.4} />}
+            icon={<Gift color="#008D49" size={20} strokeWidth={2.4} />}
             label="Выбрано"
             value={`${activeRule.reward} ₽`}
           />
@@ -333,7 +333,7 @@ function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
 const styles = StyleSheet.create({
   actionButton: {
     alignItems: 'center',
-    borderColor: '#F5F0E8',
+    borderColor: '#12382C',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -343,14 +343,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   actionButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 12,
     fontWeight: '900',
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -370,38 +370,38 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   codeCard: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     gap: 6,
     padding: 18,
   },
   codeLabel: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   codeValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 36,
     fontWeight: '900',
     lineHeight: 42,
   },
   copyStatus: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
   },
   emptyText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -415,19 +415,19 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
   ledgerAmount: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   ledgerReason: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 13,
     fontWeight: '800',
@@ -435,8 +435,8 @@ const styles = StyleSheet.create({
   },
   ledgerRow: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -444,25 +444,25 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   linkText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   metaLine: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   panel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -473,23 +473,23 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }],
   },
   progressFill: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 999,
     height: '100%',
   },
   progressText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 12,
     fontWeight: '900',
   },
   progressTrack: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 999,
     height: 8,
     overflow: 'hidden',
   },
   referralAmount: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
     textAlign: 'right',
@@ -504,17 +504,17 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   referralRow: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
     padding: 12,
   },
   referralStatus: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 6,
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 11,
     fontWeight: '900',
     overflow: 'hidden',
@@ -522,12 +522,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   referralText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   referralTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   roleText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -547,34 +547,34 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   ruleRow: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 7,
     padding: 12,
   },
   ruleText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
   ruleTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   sectionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   segment: {
-    backgroundColor: '#2C2926',
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 6,
@@ -589,19 +589,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   segmentButtonActive: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
   },
   segmentButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   segmentButtonTextActive: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
   },
   statCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   statLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -620,17 +620,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   statValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 22,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 15,
     lineHeight: 22,
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 30,
     fontWeight: '900',
     lineHeight: 36,

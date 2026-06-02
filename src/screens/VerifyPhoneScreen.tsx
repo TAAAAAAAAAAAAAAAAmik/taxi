@@ -90,7 +90,7 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <View style={styles.iconWrap}>
-            <Phone color="#D4A853" size={30} strokeWidth={2.4} />
+            <Phone color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <Text style={styles.title}>Подтверждение телефона</Text>
           <Text style={styles.subtitle}>
@@ -114,7 +114,7 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <MessageSquareText color={active ? '#1E1C1A' : '#D4A853'} size={17} strokeWidth={2.4} />
+                  <MessageSquareText color={active ? '#F4FAF6' : '#008D49'} size={17} strokeWidth={2.4} />
                   <Text style={[styles.deliveryButtonText, active && styles.deliveryButtonTextActive]}>
                     {option.label}
                   </Text>
@@ -133,7 +133,7 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
               maxLength={6}
               onChangeText={setCode}
               placeholder="0000"
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               style={styles.input}
               value={code}
             />
@@ -149,7 +149,7 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <ShieldCheck color="#F5F0E8" size={19} strokeWidth={2.4} />
+            <ShieldCheck color="#12382C" size={19} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>
               {isVerifying ? 'Проверяем...' : 'Подтвердить телефон'}
             </Text>
@@ -161,7 +161,7 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
             onPress={sendCode}
             style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
           >
-            <MessageSquareText color="#D4A853" size={18} strokeWidth={2.4} />
+            <MessageSquareText color="#008D49" size={18} strokeWidth={2.4} />
             <Text style={styles.secondaryButtonText}>
               {isSending ? 'Отправляем...' : 'Отправить код повторно'}
             </Text>
@@ -174,17 +174,17 @@ export function VerifyPhoneScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 16,
     padding: 18,
   },
   demoCode: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 18,
     fontWeight: '900',
     overflow: 'hidden',
@@ -193,8 +193,8 @@ const styles = StyleSheet.create({
   },
   deliveryButton: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -206,16 +206,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   deliveryButtonActive: {
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   deliveryButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   deliveryButtonTextActive: {
-    color: '#F5F0E8',
+    color: '#12382C',
   },
   deliveryGrid: {
     flexDirection: 'row',
@@ -227,18 +227,18 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
   input: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0,
@@ -246,18 +246,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   label: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   notice: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     justifyContent: 'center',
     minHeight: '100%',
     padding: 16,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -280,18 +280,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 15,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -301,22 +301,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 15,
     lineHeight: 22,
   },
   target: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 16,
     fontWeight: '900',
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 28,
     fontWeight: '900',
     lineHeight: 34,

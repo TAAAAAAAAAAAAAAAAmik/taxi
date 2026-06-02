@@ -64,7 +64,7 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
               onPress={() => navigation.goBack()}
               style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
             >
-              <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
+              <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
               <Text style={styles.backButtonText}>Назад</Text>
             </Pressable>
             <Pressable
@@ -85,7 +85,7 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <ReceiptText color="#D4A853" size={30} strokeWidth={2.4} />
+            <ReceiptText color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
             <Text style={styles.title}>История заказов</Text>
@@ -201,7 +201,7 @@ function OrderCard({
         <Text style={styles.status}>{statusLabels[order.status] ?? order.status}</Text>
       </View>
       <View style={styles.routeRow}>
-        <Route color="#D4A853" size={18} strokeWidth={2.4} />
+        <Route color="#008D49" size={18} strokeWidth={2.4} />
         <View style={styles.routeCopy}>
           <Text style={styles.routeText}>{order.pickup}</Text>
           <Text style={styles.routeText}>{order.destination}</Text>
@@ -209,7 +209,7 @@ function OrderCard({
       </View>
       <View style={styles.orderFooter}>
         <View style={styles.footerItem}>
-          <Clock3 color="#A89F91" size={16} strokeWidth={2.4} />
+          <Clock3 color="#557669" size={16} strokeWidth={2.4} />
           <Text style={styles.footerText}>{new Date(order.createdAt).toLocaleDateString('ru-RU')}</Text>
         </View>
         <Text style={styles.total}>{order.total} ₽</Text>
@@ -221,7 +221,7 @@ function OrderCard({
       {isCompleted ? (
         <View style={styles.afterTripBox}>
           <View style={styles.afterTripRow}>
-            <ReceiptText color="#D4A853" size={17} strokeWidth={2.4} />
+            <ReceiptText color="#008D49" size={17} strokeWidth={2.4} />
             <View style={styles.afterTripCopy}>
               <Text style={styles.afterTripTitle}>
                 Чек {order.receipt?.id ?? `RC-${order.id.replace(/\D/g, '')}`}
@@ -234,7 +234,7 @@ function OrderCard({
           </View>
 
           <View style={styles.afterTripRow}>
-            <Star color="#D4A853" fill="#D4A853" size={17} strokeWidth={2.4} />
+            <Star color="#008D49" fill="#008D49" size={17} strokeWidth={2.4} />
             <View style={styles.afterTripCopy}>
               <Text style={styles.afterTripTitle}>
                 {order.review ? `${order.review.rating}/5 · ${order.review.mood}` : 'Отзыв ожидает'}
@@ -249,7 +249,7 @@ function OrderCard({
 
           {isDriverRole ? (
             <View style={styles.afterTripRow}>
-              <Wallet color="#D4A853" size={17} strokeWidth={2.4} />
+              <Wallet color="#008D49" size={17} strokeWidth={2.4} />
               <View style={styles.afterTripCopy}>
                 <Text style={styles.afterTripTitle}>Сверка с сервисом</Text>
                 <Text style={styles.afterTripText}>
@@ -267,7 +267,7 @@ function OrderCard({
               onPress={onReportServiceShareTransfer}
               style={({ pressed }) => [styles.favoriteButton, pressed && styles.pressed]}
             >
-              <Wallet color="#D4A853" size={17} strokeWidth={2.4} />
+              <Wallet color="#008D49" size={17} strokeWidth={2.4} />
               <Text style={styles.favoriteButtonText}>Я перевел долю сервиса</Text>
             </Pressable>
           ) : null}
@@ -278,7 +278,7 @@ function OrderCard({
               onPress={onFavorite}
               style={({ pressed }) => [styles.favoriteButton, pressed && styles.pressed]}
             >
-              <Heart color="#D4A853" size={17} strokeWidth={2.4} />
+              <Heart color="#008D49" size={17} strokeWidth={2.4} />
               <Text style={styles.favoriteButtonText}>
                 {favorite ? 'Водитель в избранном' : 'Добавить водителя в избранные'}
               </Text>
@@ -312,8 +312,8 @@ function formatServiceShareStatus(status: AppOrder['serviceShareStatus']) {
 
 const styles = StyleSheet.create({
   afterTripBox: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -330,19 +330,19 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   afterTripText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   afterTripTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '900',
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -351,32 +351,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   empty: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 6,
     padding: 16,
   },
   emptyText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
   },
   emptyTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   favoriteButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   favoriteButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -396,14 +396,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   footerText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
@@ -427,13 +427,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   metaLine: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   orderCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -452,17 +452,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   orderId: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
   },
   paymentLine: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 12,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 16,
     minHeight: '100%',
     padding: 16,
@@ -473,19 +473,19 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: 12,
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 14,
     fontWeight: '900',
   },
   completedText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   roleText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -511,18 +511,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   routeText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   statCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   statLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -541,14 +541,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   statValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 22,
     fontWeight: '900',
   },
   status: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 6,
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 11,
     fontWeight: '900',
     overflow: 'hidden',
@@ -556,12 +556,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 15,
     lineHeight: 22,
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 30,
     fontWeight: '900',
     lineHeight: 36,
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   total: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
   },

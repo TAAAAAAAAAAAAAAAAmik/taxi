@@ -331,7 +331,7 @@ export function AdminPanelScreen({ navigation }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
         </View>
@@ -339,7 +339,7 @@ export function AdminPanelScreen({ navigation }: Props) {
         {!unlocked ? (
           <View style={styles.loginCard}>
             <View style={styles.iconWrap}>
-              <LockKeyhole color="#D4A853" size={30} strokeWidth={2.4} />
+              <LockKeyhole color="#008D49" size={30} strokeWidth={2.4} />
             </View>
             <Text numberOfLines={2} style={styles.title}>Админ-панель</Text>
             <Text numberOfLines={3} style={styles.subtitle}>
@@ -358,7 +358,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 }}
                 onSubmitEditing={() => handleSubmit()}
                 placeholder="Введите личный пароль"
-                placeholderTextColor="#A89F91"
+                placeholderTextColor="#557669"
                 secureTextEntry
                 style={styles.input}
                 value={password}
@@ -373,7 +373,7 @@ export function AdminPanelScreen({ navigation }: Props) {
               onPress={() => handleSubmit()}
               style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
             >
-              <ShieldCheck color="#F5F0E8" size={18} strokeWidth={2.4} />
+              <ShieldCheck color="#12382C" size={18} strokeWidth={2.4} />
               <Text style={styles.primaryButtonText}>Войти в админ-панель</Text>
             </Pressable>
 
@@ -383,7 +383,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 onPress={handleDemoSubmit}
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
               >
-                <LockKeyhole color="#D4A853" size={18} strokeWidth={2.4} />
+                <LockKeyhole color="#008D49" size={18} strokeWidth={2.4} />
                 <Text style={styles.secondaryButtonText}>Демо-админ</Text>
               </Pressable>
             ) : null}
@@ -405,7 +405,7 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <ShieldCheck color="#D4A853" size={20} strokeWidth={2.4} />
+                <ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Backend</Text>
               </View>
               <Text style={styles.sectionText}>
@@ -444,7 +444,7 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <Wallet color="#D4A853" size={20} strokeWidth={2.4} />
+                <Wallet color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Расчеты с водителем</Text>
               </View>
               <PlanRow title={driverAccessPlans.monthly.name} value={driverAccessPlans.monthly.headline} />
@@ -490,7 +490,7 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <Gift color="#D4A853" size={20} strokeWidth={2.4} />
+                <Gift color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Рефералы</Text>
               </View>
               <Text numberOfLines={2} style={styles.sectionText}>
@@ -533,7 +533,7 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <ShieldCheck color="#D4A853" size={20} strokeWidth={2.4} />
+                <ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Водители</Text>
               </View>
               {expiringPolicyUploads.length ? (
@@ -694,7 +694,7 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <MapPinned color="#D4A853" size={20} strokeWidth={2.4} />
+                <MapPinned color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Адресный слой</Text>
               </View>
               <Text numberOfLines={2} style={styles.sectionText}>
@@ -710,14 +710,14 @@ export function AdminPanelScreen({ navigation }: Props) {
                 <TextInput
                   onChangeText={(value) => updateAddressForm('title', value)}
                   placeholder="Название"
-                  placeholderTextColor="#A89F91"
+                  placeholderTextColor="#557669"
                   style={[styles.input, styles.inlineInput]}
                   value={addressForm.title}
                 />
                 <TextInput
                   onChangeText={(value) => updateAddressForm('category', value)}
                   placeholder="тип: street/house/poi"
-                  placeholderTextColor="#A89F91"
+                  placeholderTextColor="#557669"
                   style={[styles.input, styles.inlineInput]}
                   value={addressForm.category}
                 />
@@ -725,7 +725,7 @@ export function AdminPanelScreen({ navigation }: Props) {
               <TextInput
                 onChangeText={(value) => updateAddressForm('subtitle', value)}
                 placeholder="Описание или адрес"
-                placeholderTextColor="#A89F91"
+                placeholderTextColor="#557669"
                 style={styles.input}
                 value={addressForm.subtitle}
               />
@@ -733,7 +733,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 <TextInput
                   onChangeText={(value) => updateAddressForm('settlement', value)}
                   placeholder="населенный пункт"
-                  placeholderTextColor="#A89F91"
+                  placeholderTextColor="#557669"
                   style={[styles.input, styles.inlineInput]}
                   value={addressForm.settlement}
                 />
@@ -741,7 +741,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                   keyboardType="decimal-pad"
                   onChangeText={(value) => updateAddressForm('latitude', value)}
                   placeholder="широта"
-                  placeholderTextColor="#A89F91"
+                  placeholderTextColor="#557669"
                   style={[styles.input, styles.inlineInput]}
                   value={addressForm.latitude}
                 />
@@ -749,7 +749,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                   keyboardType="decimal-pad"
                   onChangeText={(value) => updateAddressForm('longitude', value)}
                   placeholder="долгота"
-                  placeholderTextColor="#A89F91"
+                  placeholderTextColor="#557669"
                   style={[styles.input, styles.inlineInput]}
                   value={addressForm.longitude}
                 />
@@ -814,7 +814,7 @@ export function AdminPanelScreen({ navigation }: Props) {
 
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <ReceiptText color="#D4A853" size={20} strokeWidth={2.4} />
+                <ReceiptText color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Последние заказы</Text>
               </View>
               {orders.length > 0 ? (
@@ -1097,7 +1097,7 @@ function DocumentUploadSummary({
               onPress={() => onOpenDocument(item.kind)}
               style={({ pressed }) => [styles.documentAccessButton, pressed && styles.pressed]}
             >
-              <Eye color="#D4A853" size={14} strokeWidth={2.4} />
+              <Eye color="#008D49" size={14} strokeWidth={2.4} />
               <Text style={styles.documentAccessButtonText}>Открыть</Text>
             </Pressable>
           ) : null}
@@ -1158,16 +1158,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   complianceLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 11,
     fontWeight: '800',
   },
   complianceLabelReady: {
-    color: '#D4A853',
+    color: '#008D49',
   },
   compliancePill: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 2,
@@ -1176,19 +1176,19 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   compliancePillReady: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
   },
   complianceValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 11,
     fontWeight: '900',
   },
   complianceValueReady: {
-    color: '#D4A853',
+    color: '#008D49',
   },
   dangerButton: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderColor: '#C17A70',
   },
   dangerButtonText: {
@@ -1197,7 +1197,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   auditBox: {
-    borderColor: '#37322E',
+    borderColor: '#E8F3EF',
     borderTopWidth: 1,
     gap: 3,
     marginTop: 6,
@@ -1211,8 +1211,8 @@ const styles = StyleSheet.create({
   documentAccessButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1221,7 +1221,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
   },
   documentAccessButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 11,
     fontWeight: '900',
   },
@@ -1232,8 +1232,8 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   documentUploadBox: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 3,
@@ -1244,19 +1244,19 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   documentUploadText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   documentUploadTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '900',
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1265,7 +1265,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1278,32 +1278,32 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
     padding: 12,
   },
   helperText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 18,
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
     width: 46,
   },
   input: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     minHeight: 48,
     paddingHorizontal: 12,
@@ -1322,33 +1322,33 @@ const styles = StyleSheet.create({
     minWidth: 220,
   },
   label: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   loginCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
     padding: 12,
   },
   orderRow: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 4,
     padding: 10,
   },
   orderText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 18,
   },
   orderTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1356,26 +1356,26 @@ const styles = StyleSheet.create({
     opacity: 0.48,
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 12,
     minHeight: '100%',
     padding: 14,
   },
   planRow: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 4,
     padding: 10,
   },
   planTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   planValue: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -1384,18 +1384,18 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }],
   },
   reasonInput: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     minHeight: 42,
     paddingHorizontal: 10,
   },
   reviewBox: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 6,
@@ -1404,7 +1404,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -1413,7 +1413,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -1423,12 +1423,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   sectionCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
@@ -1440,24 +1440,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     lineHeight: 18,
   },
   sectionTextMuted: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   sectionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 17,
     fontWeight: '900',
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1467,14 +1467,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   secondaryButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   smallButton: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -1482,13 +1482,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   smallButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 12,
     fontWeight: '900',
   },
   statCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1497,17 +1497,17 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   statHelper: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   statLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
   statValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 22,
     fontWeight: '900',
   },
@@ -1517,12 +1517,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 24,
     fontWeight: '900',
     lineHeight: 30,

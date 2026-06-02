@@ -228,7 +228,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
         <View style={styles.headerBand}>
           <View style={styles.brandRow}>
             <View style={styles.brandMark}>
-              <Car color="#F5F0E8" size={24} strokeWidth={2.4} />
+              <Car color="#12382C" size={24} strokeWidth={2.4} />
             </View>
             <View style={styles.brandCopy}>
               <Text style={styles.appName}>Такси Салават</Text>
@@ -339,7 +339,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
             {fieldsBySection.map((group) => (
               <View key={group.section} style={styles.formSection}>
                 <View style={styles.formSectionHeader}>
-                  <FileText color="#D4A853" size={18} strokeWidth={2.4} />
+                  <FileText color="#008D49" size={18} strokeWidth={2.4} />
                   <Text style={styles.formSectionTitle}>{sectionTitles[group.section]}</Text>
                 </View>
                 <View style={styles.fieldGrid}>
@@ -358,7 +358,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
 
             <View style={styles.formSection}>
               <View style={styles.formSectionHeader}>
-                <ClipboardCheck color="#D4A853" size={18} strokeWidth={2.4} />
+                <ClipboardCheck color="#008D49" size={18} strokeWidth={2.4} />
                 <Text style={styles.formSectionTitle}>Согласия</Text>
               </View>
               <View>
@@ -441,18 +441,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   appMeta: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     marginTop: 2,
   },
   appName: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
@@ -489,8 +489,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   formSection: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -502,13 +502,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   formSectionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 17,
     fontWeight: '900',
   },
   headerBand: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -518,30 +518,30 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   heroText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
     maxWidth: 640,
   },
   heroTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 26,
     fontWeight: '900',
     lineHeight: 30,
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 12,
     minHeight: '100%',
     padding: 14,
   },
   panelText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     lineHeight: 19,
   },
   panelTextMuted: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
@@ -559,13 +559,13 @@ const styles = StyleSheet.create({
     width: 210,
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -581,12 +581,12 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   sectionHint: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 18,
   },
   sectionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -600,14 +600,14 @@ const styles = StyleSheet.create({
   },
   stepBadge: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 28,
     justifyContent: 'center',
     width: 28,
   },
   stepBadgeText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -617,15 +617,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stepText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 18,
   },
   steps: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 56,
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#5A544E',
   },
   submitText: {
-    color: '#F5F0E8',
+    color: '#FFFFFF',
     flexShrink: 1,
     fontSize: 15,
     fontWeight: '900',

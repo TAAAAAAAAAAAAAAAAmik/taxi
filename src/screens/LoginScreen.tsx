@@ -178,7 +178,7 @@ export function LoginScreen({ navigation }: Props) {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Icon color={active ? '#1E1C1A' : '#D4A853'} size={18} strokeWidth={2.4} />
+                  <Icon color={active ? '#F4FAF6' : '#008D49'} size={18} strokeWidth={2.4} />
                   <Text style={[styles.roleButtonText, active && styles.roleButtonTextActive]}>
                     {roleCopy[item].title}
                   </Text>
@@ -206,7 +206,7 @@ export function LoginScreen({ navigation }: Props) {
                         pressed && styles.pressed,
                       ]}
                     >
-                      <Icon color="#D4A853" size={18} strokeWidth={2.4} />
+                      <Icon color="#008D49" size={18} strokeWidth={2.4} />
                       <Text style={styles.demoButtonText}>{account.label}</Text>
                     </Pressable>
                   );
@@ -222,7 +222,7 @@ export function LoginScreen({ navigation }: Props) {
               autoCorrect={false}
               onChangeText={setIdentifier}
               placeholder="name@example.com или +7 900 000-00-00"
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               style={styles.input}
               value={identifier}
             />
@@ -233,7 +233,7 @@ export function LoginScreen({ navigation }: Props) {
             <TextInput
               onChangeText={setPassword}
               placeholder="Введите пароль"
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               secureTextEntry
               style={styles.input}
               value={password}
@@ -250,7 +250,7 @@ export function LoginScreen({ navigation }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <LogIn color="#F5F0E8" size={19} strokeWidth={2.4} />
+            <LogIn color="#12382C" size={19} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>{isSubmitting ? 'Проверяем...' : 'Войти'}</Text>
           </Pressable>
 
@@ -266,7 +266,7 @@ export function LoginScreen({ navigation }: Props) {
                 pressed && styles.pressed,
               ]}
             >
-              <MessageSquareText color="#D4A853" size={18} strokeWidth={2.4} />
+              <MessageSquareText color="#008D49" size={18} strokeWidth={2.4} />
               <Text style={styles.secondaryButtonText}>
                 {isSubmitting ? 'Отправляем...' : 'Получить SMS-код'}
               </Text>
@@ -282,7 +282,7 @@ export function LoginScreen({ navigation }: Props) {
                 maxLength={6}
                 onChangeText={setSmsCode}
                 placeholder="0000"
-                placeholderTextColor="#A89F91"
+                placeholderTextColor="#557669"
                 style={styles.input}
                 value={smsCode}
               />
@@ -298,7 +298,7 @@ export function LoginScreen({ navigation }: Props) {
                 pressed && styles.pressed,
               ]}
             >
-              <ShieldCheck color="#F5F0E8" size={19} strokeWidth={2.4} />
+              <ShieldCheck color="#12382C" size={19} strokeWidth={2.4} />
               <Text style={styles.primaryButtonText}>
                 {isSubmitting ? 'Проверяем...' : 'Войти по SMS'}
               </Text>
@@ -328,7 +328,7 @@ export function LoginScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('AdminPanel')}
             style={({ pressed }) => [styles.adminButton, pressed && styles.pressed]}
           >
-            <LockKeyhole color="#F5F0E8" size={18} strokeWidth={2.4} />
+            <LockKeyhole color="#12382C" size={18} strokeWidth={2.4} />
             <Text style={styles.adminButtonText}>Админ-панель</Text>
           </Pressable>
         </View>
@@ -340,8 +340,8 @@ export function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   adminButton: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   adminButtonText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -366,8 +366,8 @@ const styles = StyleSheet.create({
   },
   demoButton: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   demoButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     flexShrink: 1,
     fontSize: 13,
     fontWeight: '900',
@@ -394,33 +394,33 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   form: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 16,
     padding: 16,
   },
   header: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
     padding: 18,
   },
   input: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     minHeight: 56,
     paddingHorizontal: 14,
   },
   label: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -430,12 +430,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   linkButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 16,
     minHeight: '100%',
     padding: 16,
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -458,14 +458,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 15,
     fontWeight: '900',
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -478,14 +478,14 @@ const styles = StyleSheet.create({
     opacity: 0.56,
   },
   secondaryButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   demoCode: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 16,
     fontWeight: '900',
     overflow: 'hidden',
@@ -493,15 +493,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   notice: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   roleButton: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -513,18 +513,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   roleButtonActive: {
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   roleButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     flexShrink: 1,
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
   },
   roleButtonTextActive: {
-    color: '#F5F0E8',
+    color: '#FFFFFF',
   },
   roleGrid: {
     flexDirection: 'row',
@@ -539,26 +539,26 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   sectionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   serverText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 15,
     lineHeight: 22,
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 30,
     fontWeight: '900',
   },

@@ -159,7 +159,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
           <Text style={styles.roleText}>{isDriverLikeRole(role) ? 'Водитель' : 'Документы'}</Text>
@@ -167,7 +167,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <ShieldCheck color="#D4A853" size={30} strokeWidth={2.4} />
+            <ShieldCheck color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
             <Text numberOfLines={2} style={styles.title}>Документы водителя</Text>
@@ -209,7 +209,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
               <View key={spec.kind} style={styles.documentCard}>
                 <View style={styles.documentHeader}>
                   <View style={styles.documentIcon}>
-                    <FileCheck2 color="#D4A853" size={23} strokeWidth={2.4} />
+                    <FileCheck2 color="#008D49" size={23} strokeWidth={2.4} />
                   </View>
                   <View style={styles.documentCopy}>
                     <Text numberOfLines={1} style={styles.documentTitle}>{spec.title}</Text>
@@ -235,7 +235,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
                     onPress={() => pickDocument(spec.kind, 'camera')}
                     style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
                   >
-                    <Camera color="#D4A853" size={17} strokeWidth={2.4} />
+                    <Camera color="#008D49" size={17} strokeWidth={2.4} />
                     <Text style={styles.secondaryButtonText}>Камера</Text>
                   </Pressable>
                   <Pressable
@@ -243,7 +243,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
                     onPress={() => pickDocument(spec.kind, 'library')}
                     style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
                   >
-                    <ImagePlus color="#D4A853" size={17} strokeWidth={2.4} />
+                    <ImagePlus color="#008D49" size={17} strokeWidth={2.4} />
                     <Text style={styles.secondaryButtonText}>Галерея</Text>
                   </Pressable>
                 </View>
@@ -270,7 +270,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
             pressed && styles.pressed,
           ]}
         >
-          <Upload color="#F5F0E8" size={19} strokeWidth={2.4} />
+          <Upload color="#12382C" size={19} strokeWidth={2.4} />
           <Text style={styles.primaryButtonText}>
             {isSubmitting ? 'Отправляем...' : 'Отправить на проверку'}
           </Text>
@@ -292,8 +292,8 @@ function SummaryCell({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -312,8 +312,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   documentCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   },
   documentIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 36,
     justifyContent: 'center',
@@ -346,25 +346,25 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   documentSubtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 18,
   },
   documentTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
   },
   fileLine: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -378,14 +378,14 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
     width: 46,
   },
   notice: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
@@ -397,25 +397,25 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   reviewPanel: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 7,
     padding: 12,
   },
   reviewText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     lineHeight: 18,
   },
   reviewTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 15,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 12,
     minHeight: '100%',
     padding: 14,
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -438,23 +438,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 15,
     fontWeight: '900',
   },
   roleText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -464,14 +464,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   secondaryButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   statusBadge: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 6,
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 11,
     fontWeight: '900',
     overflow: 'hidden',
@@ -479,13 +479,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
   },
   summaryCell: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -499,18 +499,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   summaryLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
   },
   summaryValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 24,
     fontWeight: '900',
     lineHeight: 30,

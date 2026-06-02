@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
+import { BashkortostanEmblem } from './src/components/BashkortostanEmblem';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { AppStateProvider } from './src/state/AppState';
 
@@ -10,7 +11,7 @@ export default function App() {
 
   return (
     <AppStateProvider>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       {splashVisible ? <KinetixSplash onDone={() => setSplashVisible(false)} /> : <AppNavigator />}
     </AppStateProvider>
   );
@@ -32,61 +33,36 @@ function KinetixSplash({ onDone }: { onDone: () => void }) {
     });
   }, [onDone, progress]);
 
-  const dotScale = progress.interpolate({
-    inputRange: [0, 0.25, 0.45, 1],
-    outputRange: [1, 12, 18, 22],
+  const cardOpacity = progress.interpolate({
+    inputRange: [0, 0.25, 1],
+    outputRange: [0, 1, 1],
   });
-  const ringOpacity = progress.interpolate({
-    inputRange: [0, 0.18, 0.62, 1],
-    outputRange: [0, 1, 1, 0],
+  const cardTranslate = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 0],
   });
-  const logoOpacity = progress.interpolate({
-    inputRange: [0, 0.5, 0.72, 1],
-    outputRange: [0, 0, 1, 1],
-  });
-  const logoTranslate = progress.interpolate({
-    inputRange: [0, 0.55, 1],
-    outputRange: [14, 14, 0],
-  });
-  const pulseScale = progress.interpolate({
-    inputRange: [0, 0.72, 1],
-    outputRange: [0.3, 0.3, 3.2],
-  });
-  const pulseOpacity = progress.interpolate({
-    inputRange: [0, 0.72, 1],
-    outputRange: [0, 0.45, 0],
+  const barScale = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.18, 1],
   });
 
   return (
     <View style={styles.splash}>
       <Animated.View
         style={[
-          styles.splashPulse,
+          styles.splashCard,
           {
-            opacity: pulseOpacity,
-            transform: [{ scale: pulseScale }],
-          },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.splashRing,
-          {
-            opacity: ringOpacity,
-            transform: [{ scale: dotScale }],
-          },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.logoWrap,
-          {
-            opacity: logoOpacity,
-            transform: [{ translateY: logoTranslate }],
+            opacity: cardOpacity,
+            transform: [{ translateY: cardTranslate }],
           },
         ]}
       >
-        <Text style={styles.logo}>Kinetix</Text>
+        <BashkortostanEmblem size={132} />
+        <Text style={styles.logo}>Такси Салават</Text>
+        <Text style={styles.splashText}>Салаватский район · Республика Башкортостан</Text>
+        <View style={styles.progressTrack}>
+          <Animated.View style={[styles.progressFill, { transform: [{ scaleX: barScale }] }]} />
+        </View>
       </Animated.View>
     </View>
   );
@@ -94,34 +70,50 @@ function KinetixSplash({ onDone }: { onDone: () => void }) {
 
 const styles = StyleSheet.create({
   logo: {
-    color: '#F6C600',
-    fontSize: 34,
+    color: '#12382C',
+    fontSize: 28,
     fontWeight: '900',
     letterSpacing: 0,
+    marginTop: 12,
   },
-  logoWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  progressFill: {
+    backgroundColor: '#008D49',
+    borderRadius: 999,
+    height: 6,
+    transformOrigin: 'left',
+    width: '100%',
+  },
+  progressTrack: {
+    backgroundColor: '#DCECE5',
+    borderRadius: 999,
+    height: 6,
+    marginTop: 20,
+    overflow: 'hidden',
+    width: 190,
   },
   splash: {
     alignItems: 'center',
-    backgroundColor: '#0C0C0C',
+    backgroundColor: '#F4FAF6',
     flex: 1,
     justifyContent: 'center',
+    padding: 24,
   },
-  splashPulse: {
-    borderColor: '#F6C600',
-    borderRadius: 120,
-    borderWidth: 1,
-    height: 160,
-    position: 'absolute',
-    width: 160,
-  },
-  splashRing: {
-    backgroundColor: '#F6C600',
+  splashCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0, 141, 73, 0.16)',
     borderRadius: 8,
-    height: 16,
-    position: 'absolute',
-    width: 16,
+    borderWidth: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    width: '100%',
+    maxWidth: 360,
+  },
+  splashText: {
+    color: '#557669',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+    textAlign: 'center',
   },
 });

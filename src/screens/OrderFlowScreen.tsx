@@ -449,7 +449,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               onPress={() => setSimpleMode(!simpleMode)}
               style={({ pressed }) => [styles.clientModeButton, pressed && styles.pressed]}
             >
-              <SlidersHorizontal color="#F6C600" size={18} strokeWidth={2.4} />
+              <SlidersHorizontal color="#008D49" size={18} strokeWidth={2.4} />
               <Text style={styles.clientModeText}>Простой</Text>
             </Pressable>
           </View>
@@ -461,7 +461,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               onChangeText={(value) => updateValue('destination', value)}
               onFocus={() => setActiveAddressFieldId('destination')}
               placeholder="Куда едем?"
-              placeholderTextColor="#B0B0B0"
+              placeholderTextColor="#557669"
               returnKeyType="done"
               style={[styles.clientDestinationInput, simpleMode && styles.clientDestinationInputSimple]}
               value={values.destination ?? ''}
@@ -598,19 +598,19 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>Назад</Text>
           </Pressable>
 
           <View style={styles.rolePill}>
-            <UserRound color="#D4A853" size={17} strokeWidth={2.4} />
+            <UserRound color="#008D49" size={17} strokeWidth={2.4} />
             <Text style={styles.rolePillText}>{roleCopy[role].title}</Text>
           </View>
         </View>
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Route color="#D4A853" size={30} strokeWidth={2.4} />
+            <Route color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
             <Text numberOfLines={2} style={styles.title}>{config.title}</Text>
@@ -626,7 +626,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
         <View style={styles.statusBox}>
           <ShieldCheck
-            color={realtimeStatus === 'live' ? '#D4A853' : '#5C8D89'}
+            color={realtimeStatus === 'live' ? '#008D49' : '#5C8D89'}
             size={20}
             strokeWidth={2.4}
           />
@@ -663,7 +663,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
           <View style={styles.mainColumn}>
             <View style={styles.panel}>
               <SectionHeader
-                icon={<MapPinned color="#D4A853" size={20} strokeWidth={2.4} />}
+                icon={<MapPinned color="#008D49" size={20} strokeWidth={2.4} />}
                 title={config.routeTitle}
               />
               {usesRegionalAddressBook ? (
@@ -680,7 +680,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                     onPress={requestLocationRoutes}
                     style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
                   >
-                    <LocateFixed color="#D4A853" size={17} strokeWidth={2.4} />
+                    <LocateFixed color="#008D49" size={17} strokeWidth={2.4} />
                     <Text style={styles.locationButtonText}>Определить мое место</Text>
                   </Pressable>
                   {locationMessage ? <Text style={styles.regionText}>{locationMessage}</Text> : null}
@@ -705,7 +705,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   ]}
                 >
                   <View style={styles.searchCarsTop}>
-                    <Car color="#D4A853" size={20} strokeWidth={2.4} />
+                    <Car color="#008D49" size={20} strokeWidth={2.4} />
                     <Text style={styles.searchCarsTitle}>Поиск машины</Text>
                   </View>
                   <Text style={styles.searchCarsValue}>
@@ -747,7 +747,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                       onPress={refreshServerData}
                       style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
                     >
-                      <Route color="#D4A853" size={17} strokeWidth={2.4} />
+                      <Route color="#008D49" size={17} strokeWidth={2.4} />
                       <Text style={styles.locationButtonText}>Обновить ленту</Text>
                     </Pressable>
                     {availableDriverOrders.slice(0, 4).map((order) => (
@@ -812,7 +812,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
             <View style={styles.panel}>
               <SectionHeader
-                icon={<Car color="#D4A853" size={20} strokeWidth={2.4} />}
+                icon={<Car color="#008D49" size={20} strokeWidth={2.4} />}
                 title={config.tariffTitle}
               />
               <View style={styles.tariffGrid}>
@@ -832,7 +832,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
             <View style={styles.panel}>
               <SectionHeader
-                icon={<SlidersHorizontal color="#D4A853" size={20} strokeWidth={2.4} />}
+                icon={<SlidersHorizontal color="#008D49" size={20} strokeWidth={2.4} />}
                 title={config.detailsTitle}
               />
               <View style={styles.fields}>
@@ -865,7 +865,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
           <View style={[styles.summaryColumn, isWide && styles.summaryColumnWide]}>
             <View style={styles.summaryPanel}>
               <SectionHeader
-                icon={<ShieldCheck color="#D4A853" size={20} strokeWidth={2.4} />}
+                icon={<ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />}
                 title={config.summaryTitle}
               />
               <RouteEstimatePreview
@@ -904,13 +904,13 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   >
                     {method.includes('Налич') ? (
                       <Banknote
-                        color={method === paymentMethod ? '#1E1C1A' : '#D4A853'}
+                        color={method === paymentMethod ? '#F4FAF6' : '#008D49'}
                         size={18}
                         strokeWidth={2.4}
                       />
                     ) : (
                       <CreditCard
-                        color={method === paymentMethod ? '#1E1C1A' : '#D4A853'}
+                        color={method === paymentMethod ? '#F4FAF6' : '#008D49'}
                         size={18}
                         strokeWidth={2.4}
                       />
@@ -941,7 +941,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                     ]}
                   >
                     <ShieldCheck
-                      color={safetyPinRequired ? '#1E1C1A' : '#D4A853'}
+                      color={safetyPinRequired ? '#F4FAF6' : '#008D49'}
                       size={18}
                       strokeWidth={2.4}
                     />
@@ -958,7 +958,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               ) : null}
 
               <View style={styles.statusBox}>
-                <Clock3 color="#D4A853" size={18} strokeWidth={2.4} />
+                <Clock3 color="#008D49" size={18} strokeWidth={2.4} />
                 <View style={styles.statusCopy}>
                   <Text style={styles.statusTitle}>{config.statusTitle}</Text>
                   <Text style={styles.statusText}>{config.statusText}</Text>
@@ -998,7 +998,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   onPress={handlePrimaryAction}
                   style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
                 >
-                  <Navigation color="#F5F0E8" size={18} strokeWidth={2.4} />
+                  <Navigation color="#12382C" size={18} strokeWidth={2.4} />
                   <Text style={styles.primaryButtonText}>
                     {isSubmitting ? 'Отправляем...' : config.primaryAction}
                   </Text>
@@ -1286,7 +1286,7 @@ function RouteEstimatePreview({ destination, estimate, pickup, status }: RouteEs
   return (
     <View style={styles.routeEstimateBox}>
       <View style={styles.routeEstimateHeader}>
-        <Route color="#D4A853" size={18} strokeWidth={2.4} />
+        <Route color="#008D49" size={18} strokeWidth={2.4} />
         <Text style={styles.routeEstimateTitle}>{confidenceText}</Text>
       </View>
       <View style={styles.routeEstimateBody}>
@@ -1350,7 +1350,7 @@ function OrderInput({
         onChangeText={onChangeText}
         onFocus={onFocus}
         placeholder={field.placeholder}
-        placeholderTextColor="#A89F91"
+        placeholderTextColor="#557669"
         style={styles.input}
         value={value}
       />
@@ -1391,7 +1391,7 @@ function RoutePresetCard({ onPress, route }: RoutePresetCardProps) {
       style={({ pressed }) => [styles.routePresetCard, pressed && styles.pressed]}
     >
       <View style={styles.routePresetTop}>
-        <Route color="#D4A853" size={18} strokeWidth={2.4} />
+        <Route color="#008D49" size={18} strokeWidth={2.4} />
       <Text style={styles.routePresetTitle}>{route.title}</Text>
     </View>
     <Text style={styles.routePresetSubtitle}>{route.subtitle}</Text>
@@ -1422,7 +1422,7 @@ function TariffCard({ active, onPress, tariff }: TariffCardProps) {
     >
       <View style={styles.tariffTop}>
         <Text style={[styles.tariffTitle, active && styles.tariffTitleActive]}>{tariff.title}</Text>
-        {active ? <Check color="#F5F0E8" size={18} strokeWidth={2.8} /> : null}
+        {active ? <Check color="#12382C" size={18} strokeWidth={2.8} /> : null}
       </View>
       <Text style={[styles.tariffSubtitle, active && styles.tariffSubtitleActive]}>
         {tariff.subtitle}
@@ -1456,7 +1456,7 @@ function OptionToggle({ active, onPress, option }: OptionToggleProps) {
       ]}
     >
       <View style={[styles.optionCheck, active && styles.optionCheckActive]}>
-        {active ? <Check color="#F5F0E8" size={14} strokeWidth={3} /> : null}
+        {active ? <Check color="#12382C" size={14} strokeWidth={3} /> : null}
       </View>
       <View style={styles.optionCopy}>
         <Text style={styles.optionLabel}>{option.label}</Text>
@@ -1489,14 +1489,14 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   clientBrand: {
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0,
   },
   clientCallButton: {
     alignItems: 'center',
-    backgroundColor: '#F6C600',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 56,
@@ -1509,7 +1509,7 @@ const styles = StyleSheet.create({
     minHeight: 82,
   },
   clientCallButtonText: {
-    color: '#0C0C0C',
+    color: '#F4FAF6',
     fontSize: 19,
     fontWeight: '900',
   },
@@ -1522,10 +1522,10 @@ const styles = StyleSheet.create({
   },
   clientDestinationInput: {
     backgroundColor: '#1C1C1E',
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 22,
     fontWeight: '800',
     minHeight: 62,
@@ -1543,7 +1543,7 @@ const styles = StyleSheet.create({
   clientEstimate: {
     alignItems: 'center',
     backgroundColor: '#1C1C1E',
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1552,7 +1552,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   clientEstimateLabel: {
-    color: '#B0B0B0',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -1562,17 +1562,17 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   clientEstimateText: {
-    color: '#B0B0B0',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
   },
   clientEstimateValue: {
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 24,
     fontWeight: '900',
   },
   clientMeta: {
-    color: '#B0B0B0',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
     marginTop: 2,
@@ -1580,7 +1580,7 @@ const styles = StyleSheet.create({
   clientModeButton: {
     alignItems: 'center',
     backgroundColor: '#1C1C1E',
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1589,12 +1589,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   clientModeText: {
-    color: '#F6C600',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   clientPage: {
-    backgroundColor: '#0C0C0C',
+    backgroundColor: '#F4FAF6',
     flex: 1,
     gap: 12,
     padding: 14,
@@ -1609,7 +1609,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   clientRealtimeDot: {
-    backgroundColor: '#B0B0B0',
+    backgroundColor: '#557669',
     borderRadius: 5,
     height: 10,
     width: 10,
@@ -1618,19 +1618,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CD964',
   },
   clientRealtimeText: {
-    color: '#B0B0B0',
+    color: '#557669',
     flex: 1,
     fontSize: 12,
     fontWeight: '800',
   },
   clientSafeArea: {
-    backgroundColor: '#0C0C0C',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   clientShortcutButton: {
     alignItems: 'center',
     backgroundColor: '#1C1C1E',
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1646,7 +1646,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   clientShortcutText: {
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1660,17 +1660,17 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   clientSuggestionText: {
-    color: '#B0B0B0',
+    color: '#557669',
     fontSize: 12,
   },
   clientSuggestionTitle: {
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   clientSuggestions: {
     backgroundColor: '#1C1C1E',
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
@@ -1687,7 +1687,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   clientTariffCardActive: {
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderWidth: 2,
   },
   clientTariffList: {
@@ -1695,18 +1695,18 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   clientTariffPrice: {
-    color: '#F6C600',
+    color: '#008D49',
     fontSize: 20,
     fontWeight: '900',
     marginTop: 'auto',
   },
   clientTariffSubtitle: {
-    color: '#B0B0B0',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   clientTariffTitle: {
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1718,8 +1718,8 @@ const styles = StyleSheet.create({
   },
   addressSuggestion: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1732,38 +1732,38 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   addressSuggestionDot: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 6,
     height: 10,
     width: 10,
   },
   addressSuggestionSettlement: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 11,
     fontWeight: '900',
   },
   addressSuggestions: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
     padding: 8,
   },
   addressSuggestionSubtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   addressSuggestionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1772,7 +1772,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1783,19 +1783,19 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   groupLabel: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   helper: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1809,42 +1809,42 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
     width: 46,
   },
   homeAddressButton: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 3,
     padding: 10,
   },
   homeAddressText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   homeAddressTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   input: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     minHeight: 56,
     paddingHorizontal: 14,
   },
   label: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1857,8 +1857,8 @@ const styles = StyleSheet.create({
   },
   locationButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1868,7 +1868,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   locationButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -1879,8 +1879,8 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1891,13 +1891,13 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   optionButtonActive: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
   },
   optionCheck: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 6,
     borderWidth: 1.5,
     height: 24,
@@ -1905,8 +1905,8 @@ const styles = StyleSheet.create({
     width: 24,
   },
   optionCheckActive: {
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   optionCopy: {
     flex: 1,
@@ -1919,24 +1919,24 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   optionLabel: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   optionPrice: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 16,
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 12,
     minHeight: '100%',
     padding: 14,
   },
   panel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -1944,8 +1944,8 @@ const styles = StyleSheet.create({
   },
   paymentButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1954,20 +1954,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   paymentButtonActive: {
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   paymentGroup: {
     gap: 9,
   },
   paymentText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 14,
     fontWeight: '900',
   },
   paymentTextActive: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
   },
   pressed: {
     opacity: 0.92,
@@ -1975,7 +1975,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -1984,56 +1984,56 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 15,
     fontWeight: '900',
     textAlign: 'center',
   },
   resultBox: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 12,
   },
   resultBoxSuccess: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderColor: '#7A9A7E',
   },
   resultText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   resultTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   searchCarsBox: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 6,
     padding: 12,
   },
   searchCarsBoxEmpty: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderColor: '#C17A70',
   },
   searchCarsBoxReady: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderColor: '#7A9A7E',
   },
   searchCarsText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
   searchCarsTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 15,
     fontWeight: '900',
@@ -2044,42 +2044,42 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchCarsValue: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 22,
     fontWeight: '900',
   },
   regionBox: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 12,
   },
   regionLine: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   regionMeta: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 12,
     fontWeight: '900',
   },
   regionText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
   regionTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   rolePill: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 7,
@@ -2087,7 +2087,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   rolePillText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -2097,7 +2097,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   routeEstimateBox: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     gap: 12,
     padding: 12,
@@ -2108,7 +2108,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   routeEstimateTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -2118,12 +2118,12 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   routeMetricLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 11,
     lineHeight: 15,
   },
   routeMetricValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -2133,12 +2133,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   routePointText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   routePointTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '900',
     lineHeight: 18,
@@ -2149,8 +2149,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   routePresetCard: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -2164,17 +2164,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   routePresetMeta: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 12,
     fontWeight: '900',
   },
   routePresetSubtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   routePresetTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 14,
     fontWeight: '900',
@@ -2189,7 +2189,7 @@ const styles = StyleSheet.create({
     width: 16,
   },
   routeTrackDot: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 5,
     height: 10,
     width: 10,
@@ -2198,19 +2198,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#5C8D89',
   },
   routeTrackLine: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     flex: 1,
     marginVertical: 3,
     width: 2,
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -2218,7 +2218,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -2228,15 +2228,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 18,
     fontWeight: '900',
   },
   statusBox: {
     alignItems: 'flex-start',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2248,17 +2248,17 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statusText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   statusTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
   },
@@ -2268,14 +2268,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   suggestionChip: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     minHeight: 36,
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
   suggestionText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -2287,13 +2287,13 @@ const styles = StyleSheet.create({
     width: 350,
   },
   summaryLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
   },
   summaryPanel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -2301,7 +2301,7 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     alignItems: 'center',
-    borderBottomColor: '#37322E',
+    borderBottomColor: '#E8F3EF',
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2312,15 +2312,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   summaryValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flexShrink: 1,
     fontSize: 15,
     fontWeight: '900',
     textAlign: 'right',
   },
   tariffCard: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -2329,16 +2329,16 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   tariffCardActive: {
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   tariffEta: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
   tariffEtaActive: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
   },
   tariffGrid: {
     flexDirection: 'row',
@@ -2352,29 +2352,29 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   tariffPrice: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   tariffPriceActive: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
   },
   tariffSubtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   tariffSubtitleActive: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
   },
   tariffTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 16,
     fontWeight: '900',
   },
   tariffTitleActive: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
   },
   tariffTop: {
     alignItems: 'center',
@@ -2382,8 +2382,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   timeline: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2393,22 +2393,22 @@ const styles = StyleSheet.create({
   },
   timelineDot: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 28,
     justifyContent: 'center',
     width: 28,
   },
   timelineDotActive: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
   },
   timelineIndex: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '900',
   },
   timelineIndexActive: {
-    color: '#F5F0E8',
+    color: '#12382C',
   },
   timelineStep: {
     alignItems: 'center',
@@ -2416,12 +2416,12 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   timelineText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '800',
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 24,
     fontWeight: '900',
     lineHeight: 30,
@@ -2434,7 +2434,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   userLine: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },

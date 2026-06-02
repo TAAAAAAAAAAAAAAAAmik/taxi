@@ -180,7 +180,7 @@ export function DashboardScreen({ navigation, route }: Props) {
             maxLength={6}
             onChangeText={setDeleteCode}
             placeholder="Код из SMS/email"
-            placeholderTextColor="#A89F91"
+            placeholderTextColor="#557669"
             style={styles.deleteInput}
             value={deleteCode}
           />
@@ -293,7 +293,7 @@ function getOrderServiceShareAmount(order: AppOrder, fallbackRate: number) {
 const styles = StyleSheet.create({
   cancelButton: {
     alignItems: 'center',
-    borderColor: '#D4A853',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     minHeight: 46,
   },
   cancelButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -319,22 +319,22 @@ const styles = StyleSheet.create({
     minHeight: 46,
   },
   deleteButtonText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   deleteInput: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     minHeight: 50,
     paddingHorizontal: 12,
   },
   deletePanel: {
-    backgroundColor: '#2C2926',
+    backgroundColor: '#FFFFFF',
     borderColor: '#C17A70',
     borderRadius: 8,
     borderWidth: 1,
@@ -346,12 +346,12 @@ const styles = StyleSheet.create({
     right: 16,
   },
   deleteText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 18,
   },
   deleteTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }],
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
 });

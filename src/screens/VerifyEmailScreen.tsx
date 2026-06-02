@@ -76,7 +76,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <View style={styles.iconWrap}>
-            <Mail color="#D4A853" size={30} strokeWidth={2.4} />
+            <Mail color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <Text style={styles.title}>Подтверждение почты</Text>
           <Text style={styles.subtitle}>
@@ -94,7 +94,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
               maxLength={8}
               onChangeText={setCode}
               placeholder="A1B2"
-              placeholderTextColor="#A89F91"
+              placeholderTextColor="#557669"
               style={styles.input}
               value={code}
             />
@@ -110,7 +110,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <ShieldCheck color="#F5F0E8" size={19} strokeWidth={2.4} />
+            <ShieldCheck color="#12382C" size={19} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>
               {isVerifying ? 'Проверяем...' : 'Открыть кабинет'}
             </Text>
@@ -122,7 +122,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
             onPress={sendCode}
             style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
           >
-            <Send color="#D4A853" size={18} strokeWidth={2.4} />
+            <Send color="#008D49" size={18} strokeWidth={2.4} />
             <Text style={styles.secondaryButtonText}>
               {isSending ? 'Отправляем...' : 'Отправить письмо повторно'}
             </Text>
@@ -135,17 +135,17 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 16,
     padding: 18,
   },
   demoCode: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 18,
     fontWeight: '900',
     overflow: 'hidden',
@@ -157,18 +157,18 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
   input: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 0,
@@ -176,18 +176,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   label: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   notice: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     justifyContent: 'center',
     minHeight: '100%',
     padding: 16,
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -210,18 +210,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 15,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -231,22 +231,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 15,
     lineHeight: 22,
   },
   target: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 16,
     fontWeight: '900',
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 28,
     fontWeight: '900',
     lineHeight: 34,

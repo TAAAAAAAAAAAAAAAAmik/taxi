@@ -84,13 +84,13 @@ export function SubscriptionScreen({ navigation, route }: Props) {
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
         >
-          <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
+          <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
           <Text style={styles.backButtonText}>Назад</Text>
         </Pressable>
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <WalletCards color="#D4A853" size={30} strokeWidth={2.4} />
+            <WalletCards color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
             <Text style={styles.title}>Расчеты самозанятого водителя</Text>
@@ -156,7 +156,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <CreditCard color="#F5F0E8" size={18} strokeWidth={2.4} />
+            <CreditCard color="#12382C" size={18} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>
               {busy
                 ? 'Проводим операцию'
@@ -177,7 +177,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
                 }}
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
               >
-                <ExternalLink color="#D4A853" size={17} strokeWidth={2.4} />
+                <ExternalLink color="#008D49" size={17} strokeWidth={2.4} />
                 <Text style={styles.providerButtonText}>Открыть оплату у провайдера</Text>
               </Pressable>
               <Pressable
@@ -190,7 +190,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
                   pressed && styles.pressed,
                 ]}
               >
-                <RefreshCw color="#D4A853" size={17} strokeWidth={2.4} />
+                <RefreshCw color="#008D49" size={17} strokeWidth={2.4} />
                 <Text style={styles.providerButtonText}>
                   {syncBusyId === pendingProviderPayment.id ? 'Проверяем оплату' : 'Проверить оплату'}
                 </Text>
@@ -215,7 +215,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
 
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
-            <ReceiptText color="#D4A853" size={20} strokeWidth={2.4} />
+            <ReceiptText color="#008D49" size={20} strokeWidth={2.4} />
             <Text style={styles.sectionTitle}>История платежей и чеки</Text>
           </View>
           {driverPayments.length > 0 ? (
@@ -249,7 +249,7 @@ function PlanChoice({ active, headline, icon, onPress, text, title }: PlanChoice
       style={({ pressed }) => [styles.planChoice, active && styles.planChoiceActive, pressed && styles.pressed]}
     >
       <View style={styles.planTop}>
-        <Icon color={active ? '#1E1C1A' : '#D4A853'} size={20} strokeWidth={2.4} />
+        <Icon color={active ? '#F4FAF6' : '#008D49'} size={20} strokeWidth={2.4} />
         <Text style={[styles.planTitle, active && styles.planTextActive]}>{title}</Text>
       </View>
       <Text style={[styles.planHeadline, active && styles.planTextActive]}>{headline}</Text>
@@ -279,9 +279,9 @@ function PaymentRow({ payment }: { payment: DriverSubscriptionPayment }) {
         {isRefunded ? (
           <RotateCcw color="#C17A70" size={18} strokeWidth={2.4} />
         ) : isPending ? (
-          <CreditCard color="#D4A853" size={18} strokeWidth={2.4} />
+          <CreditCard color="#008D49" size={18} strokeWidth={2.4} />
         ) : (
-          <CheckCircle2 color="#D4A853" size={18} strokeWidth={2.4} />
+          <CheckCircle2 color="#008D49" size={18} strokeWidth={2.4} />
         )}
       </View>
       <View style={styles.paymentCopy}>
@@ -363,8 +363,8 @@ function formatDate(value: string) {
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -372,21 +372,21 @@ const styles = StyleSheet.create({
     minHeight: 42,
     paddingHorizontal: 12,
   },
-  backButtonText: { color: '#D4A853', fontSize: 14, fontWeight: '900' },
+  backButtonText: { color: '#008D49', fontSize: 14, fontWeight: '900' },
   card: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 16,
     padding: 16,
   },
   disabledButton: { opacity: 0.64 },
-  emptyText: { color: '#A89F91', fontSize: 14, lineHeight: 20 },
+  emptyText: { color: '#557669', fontSize: 14, lineHeight: 20 },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -396,37 +396,37 @@ const styles = StyleSheet.create({
   heroCopy: { flex: 1, gap: 7, minWidth: 0 },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
-  metaLine: { color: '#D4A853', fontSize: 13, fontWeight: '900' },
-  page: { backgroundColor: '#1E1C1A', gap: 16, minHeight: '100%', padding: 16 },
+  metaLine: { color: '#008D49', fontSize: 13, fontWeight: '900' },
+  page: { backgroundColor: '#F4FAF6', gap: 16, minHeight: '100%', padding: 16 },
   paymentCopy: { flex: 1, gap: 4, minWidth: 0 },
   paymentIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 38,
     justifyContent: 'center',
     width: 38,
   },
   paymentRow: {
-    backgroundColor: '#37322E',
-    borderColor: '#37322E',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#E8F3EF',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
     padding: 12,
   },
-  paymentText: { color: '#A89F91', fontSize: 12, lineHeight: 17 },
-  paymentTitle: { color: '#F5F0E8', fontSize: 14, fontWeight: '900' },
+  paymentText: { color: '#557669', fontSize: 12, lineHeight: 17 },
+  paymentTitle: { color: '#12382C', fontSize: 14, fontWeight: '900' },
   planChoice: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -434,22 +434,22 @@ const styles = StyleSheet.create({
     minWidth: 230,
     padding: 14,
   },
-  planChoiceActive: { backgroundColor: '#D4A853', borderColor: '#D4A853' },
+  planChoiceActive: { backgroundColor: '#008D49', borderColor: '#008D49' },
   planGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  planHeadline: { color: '#D4A853', fontSize: 16, fontWeight: '900' },
-  planText: { color: '#A89F91', fontSize: 13, lineHeight: 19 },
-  planTextActive: { color: '#F5F0E8' },
-  planTitle: { color: '#F5F0E8', flex: 1, fontSize: 15, fontWeight: '900' },
+  planHeadline: { color: '#008D49', fontSize: 16, fontWeight: '900' },
+  planText: { color: '#557669', fontSize: 13, lineHeight: 19 },
+  planTextActive: { color: '#12382C' },
+  planTitle: { color: '#12382C', flex: 1, fontSize: 15, fontWeight: '900' },
   planTop: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   pressed: {
     opacity: 0.92,
     transform: [{ scale: 0.95 }],
   },
   providerActions: { gap: 10 },
-  providerButtonText: { color: '#D4A853', fontSize: 14, fontWeight: '900' },
+  providerButtonText: { color: '#008D49', fontSize: 14, fontWeight: '900' },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -457,14 +457,14 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: 16,
   },
-  primaryButtonText: { color: '#1E1C1A', fontSize: 15, fontWeight: '900' },
-  receiptText: { color: '#D4A853', fontSize: 12, fontWeight: '800' },
+  primaryButtonText: { color: '#F4FAF6', fontSize: 15, fontWeight: '900' },
+  receiptText: { color: '#008D49', fontSize: 12, fontWeight: '800' },
   refundButtonText: { color: '#C17A70', fontSize: 14, fontWeight: '900' },
-  safeArea: { backgroundColor: '#1E1C1A', flex: 1 },
+  safeArea: { backgroundColor: '#F4FAF6', flex: 1 },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -474,10 +474,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  sectionTitle: { color: '#F5F0E8', fontSize: 18, fontWeight: '900' },
+  sectionTitle: { color: '#12382C', fontSize: 18, fontWeight: '900' },
   statusCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -486,19 +486,19 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   statusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statusHelper: { color: '#A89F91', fontSize: 12, lineHeight: 17 },
-  statusLabel: { color: '#A89F91', fontSize: 12, fontWeight: '800' },
-  statusValue: { color: '#F5F0E8', fontSize: 17, fontWeight: '900' },
-  subtitle: { color: '#A89F91', fontSize: 15, lineHeight: 22 },
+  statusHelper: { color: '#557669', fontSize: 12, lineHeight: 17 },
+  statusLabel: { color: '#557669', fontSize: 12, fontWeight: '800' },
+  statusValue: { color: '#12382C', fontSize: 17, fontWeight: '900' },
+  subtitle: { color: '#557669', fontSize: 15, lineHeight: 22 },
   summaryBox: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 14,
   },
-  summaryText: { color: '#A89F91', fontSize: 13, lineHeight: 19 },
-  summaryTitle: { color: '#D4A853', fontSize: 15, fontWeight: '900' },
-  title: { color: '#F5F0E8', fontSize: 30, fontWeight: '900', lineHeight: 36 },
+  summaryText: { color: '#557669', fontSize: 13, lineHeight: 19 },
+  summaryTitle: { color: '#008D49', fontSize: 15, fontWeight: '900' },
+  title: { color: '#12382C', fontSize: 30, fontWeight: '900', lineHeight: 36 },
 });

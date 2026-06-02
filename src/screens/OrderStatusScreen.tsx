@@ -259,19 +259,19 @@ export function OrderStatusScreen({ navigation, route }: Props) {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#D4A853" size={20} strokeWidth={2.4} />
+            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
             <Text style={styles.backButtonText}>К заказу</Text>
           </Pressable>
 
           <View style={styles.rolePill}>
-            <UserRound color="#D4A853" size={17} strokeWidth={2.4} />
+            <UserRound color="#008D49" size={17} strokeWidth={2.4} />
             <Text style={styles.rolePillText}>{roleCopy[role].title}</Text>
           </View>
         </View>
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Route color="#D4A853" size={30} strokeWidth={2.4} />
+            <Route color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
             <Text numberOfLines={2} style={styles.title}>{config.title}</Text>
@@ -318,9 +318,9 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <View style={styles.statusHeader}>
                 <View style={styles.statusIcon}>
                   {isCompleted ? (
-                    <Check color="#F5F0E8" size={24} strokeWidth={3} />
+                    <Check color="#12382C" size={24} strokeWidth={3} />
                   ) : (
-                    <CircleDot color="#F5F0E8" size={24} strokeWidth={2.6} />
+                    <CircleDot color="#12382C" size={24} strokeWidth={2.6} />
                   )}
                 </View>
                 <View style={styles.statusCopy}>
@@ -388,7 +388,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                           isActive && styles.stepDotActive,
                         ]}
                       >
-                        {isDone ? <Check color="#F5F0E8" size={14} strokeWidth={3} /> : null}
+                        {isDone ? <Check color="#12382C" size={14} strokeWidth={3} /> : null}
                       </View>
                       <View style={styles.stepCopy}>
                         <Text style={[styles.stepTitle, isActive && styles.stepTitleActive]}>
@@ -405,7 +405,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
             {isCompleted && role === 'client' ? (
               <View style={styles.goodRoadPanel}>
                 <View style={styles.goodRoadCar}>
-                  <Car color="#0C0C0C" size={28} strokeWidth={2.6} />
+                  <Car color="#F4FAF6" size={28} strokeWidth={2.6} />
                 </View>
                 <View style={styles.goodRoadCopy}>
                   <Text style={styles.goodRoadTitle}>Спасибо, что вы с Kinetix</Text>
@@ -466,8 +466,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                           style={({ pressed }) => [styles.starButton, pressed && styles.pressed]}
                         >
                           <Star
-                            color={rating <= reviewRating ? '#D4A853' : '#D4A853'}
-                            fill={rating <= reviewRating ? '#D4A853' : 'transparent'}
+                            color={rating <= reviewRating ? '#008D49' : '#008D49'}
+                            fill={rating <= reviewRating ? '#008D49' : 'transparent'}
                             size={26}
                             strokeWidth={2.4}
                           />
@@ -529,7 +529,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                       multiline
                       onChangeText={setReviewComment}
                       placeholder="Что запомнилось? Например: аккуратно ехал, помог с багажом"
-                      placeholderTextColor="#A89F91"
+                      placeholderTextColor="#557669"
                       style={styles.reviewInput}
                       value={reviewComment}
                     />
@@ -547,7 +547,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                         onPress={addDriverToFavorites}
                         style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
                       >
-                        <Heart color="#D4A853" size={17} strokeWidth={2.4} />
+                        <Heart color="#008D49" size={17} strokeWidth={2.4} />
                         <Text style={styles.secondaryButtonText}>
                           {favoriteAdded ? 'В избранном' : 'В избранные'}
                         </Text>
@@ -562,20 +562,20 @@ export function OrderStatusScreen({ navigation, route }: Props) {
           <View style={[styles.sideColumn, isWide && styles.sideColumnWide]}>
             <View style={styles.panel}>
               <SectionHeader title="Маршрут" />
-              <InfoRow icon={<MapPinned color="#D4A853" size={18} />} label="Подача" value={displayedOrder.pickup} />
+              <InfoRow icon={<MapPinned color="#008D49" size={18} />} label="Подача" value={displayedOrder.pickup} />
               <InfoRow
-                icon={<Route color="#D4A853" size={18} />}
+                icon={<Route color="#008D49" size={18} />}
                 label="Назначение"
                 value={displayedOrder.destination}
               />
-              <InfoRow icon={<Clock3 color="#D4A853" size={18} />} label="Тариф" value={displayedOrder.tariff} />
+              <InfoRow icon={<Clock3 color="#008D49" size={18} />} label="Тариф" value={displayedOrder.tariff} />
             </View>
 
             <View style={styles.panel}>
               <SectionHeader title={config.participantTitle} />
               <View style={styles.participant}>
                 <View style={styles.participantIcon}>
-                  <UserRound color="#D4A853" size={22} strokeWidth={2.4} />
+                  <UserRound color="#008D49" size={22} strokeWidth={2.4} />
                 </View>
                 <View style={styles.participantCopy}>
                   <Text style={styles.participantName}>{participantName}</Text>
@@ -584,14 +584,14 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               </View>
               <View style={styles.miniActions}>
                 <MiniAction
-                  icon={<Phone color="#D4A853" size={16} />}
+                  icon={<Phone color="#008D49" size={16} />}
                   label="Связь"
                   onPress={() => {
                     setContactOpen((current) => !current);
                     setContactResult(null);
                   }}
                 />
-                <MiniAction icon={<ShieldCheck color="#D4A853" size={16} />} label="Безопасность" />
+                <MiniAction icon={<ShieldCheck color="#008D49" size={16} />} label="Безопасность" />
               </View>
               {contactOpen ? (
                 <View style={styles.contactPanel}>
@@ -601,7 +601,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                     onPress={() => chooseContact('chat')}
                     style={({ pressed }) => [styles.contactButton, pressed && styles.pressed]}
                   >
-                    <MessageCircle color="#D4A853" size={17} strokeWidth={2.4} />
+                    <MessageCircle color="#008D49" size={17} strokeWidth={2.4} />
                     <Text style={styles.contactButtonText}>{config.chatActionLabel}</Text>
                   </Pressable>
                   <Pressable
@@ -609,7 +609,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                     onPress={() => chooseContact('call')}
                     style={({ pressed }) => [styles.contactButton, pressed && styles.pressed]}
                   >
-                    <Phone color="#D4A853" size={17} strokeWidth={2.4} />
+                    <Phone color="#008D49" size={17} strokeWidth={2.4} />
                     <Text style={styles.contactButtonText}>{config.callActionLabel}</Text>
                   </Pressable>
                   <Text style={styles.contactPhone}>Мобильный номер: {contactPhone}</Text>
@@ -622,7 +622,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <SectionHeader title="Оплата и детали" />
               <View style={[styles.paymentStatusBox, isPaid && styles.paymentStatusBoxPaid]}>
                 <View style={styles.paymentStatusTop}>
-                  <CreditCard color={isPaid ? '#D4A853' : '#5C8D89'} size={18} strokeWidth={2.4} />
+                  <CreditCard color={isPaid ? '#008D49' : '#5C8D89'} size={18} strokeWidth={2.4} />
                   <Text style={styles.paymentStatusTitle}>{paymentStatusLabels[paymentStatus]}</Text>
                 </View>
                 <Text style={styles.paymentStatusText}>
@@ -648,13 +648,13 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                 ) : null}
               </View>
               <InfoRow
-                icon={<CreditCard color="#D4A853" size={18} />}
+                icon={<CreditCard color="#008D49" size={18} />}
                 label="Способ"
                 value={displayedOrder.paymentMethod}
               />
-              <InfoRow icon={<ReceiptText color="#D4A853" size={18} />} label="Сумма" value={`${displayedOrder.total} ₽`} />
+              <InfoRow icon={<ReceiptText color="#008D49" size={18} />} label="Сумма" value={`${displayedOrder.total} ₽`} />
               <InfoRow
-                icon={<ShieldCheck color="#D4A853" size={18} />}
+                icon={<ShieldCheck color="#008D49" size={18} />}
                 label="Опции"
                 value={displayedOrder.options.length > 0 ? displayedOrder.options.join(', ') : 'Без дополнительных опций'}
               />
@@ -676,7 +676,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <View style={styles.detailList}>
                 {config.details.map((detail) => (
                   <View key={detail} style={styles.detailItem}>
-                    <Check color="#D4A853" size={15} strokeWidth={3} />
+                    <Check color="#008D49" size={15} strokeWidth={3} />
                     <Text style={styles.detailText}>{detail}</Text>
                   </View>
                 ))}
@@ -760,7 +760,7 @@ function TripPulseMap({
       {showDriver ? (
         <View style={styles.driverSheet}>
           <View style={styles.driverAvatar}>
-            <Car color="#0C0C0C" size={22} strokeWidth={2.6} />
+            <Car color="#F4FAF6" size={22} strokeWidth={2.6} />
           </View>
           <View style={styles.driverSheetCopy}>
             <Text style={styles.driverSheetTitle}>{driver.name}</Text>
@@ -886,8 +886,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -896,14 +896,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   contactButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -912,34 +912,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   contactButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     flex: 1,
     fontSize: 13,
     fontWeight: '900',
   },
   contactPanel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 9,
     padding: 12,
   },
   contactPhone: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
   contactResult: {
-    backgroundColor: '#2C2926',
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 12,
     lineHeight: 17,
     padding: 10,
   },
   contactTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -952,7 +952,7 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   detailText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 13,
     fontWeight: '800',
@@ -960,7 +960,7 @@ const styles = StyleSheet.create({
   },
   driverAvatar: {
     alignItems: 'center',
-    backgroundColor: '#F6C600',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     height: 44,
     justifyContent: 'center',
@@ -969,7 +969,7 @@ const styles = StyleSheet.create({
   driverSheet: {
     alignItems: 'center',
     backgroundColor: '#1C1C1E',
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -983,23 +983,23 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   driverSheetText: {
-    color: '#B0B0B0',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 18,
   },
   driverSheetTitle: {
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
   },
   etaText: {
-    color: '#F6C600',
+    color: '#008D49',
     fontSize: 16,
     fontWeight: '900',
   },
   goodRoadCar: {
     alignItems: 'center',
-    backgroundColor: '#F6C600',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     height: 54,
     justifyContent: 'center',
@@ -1010,26 +1010,26 @@ const styles = StyleSheet.create({
   },
   goodRoadPanel: {
     backgroundColor: '#1C1C1E',
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
     padding: 12,
   },
   goodRoadText: {
-    color: '#B0B0B0',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
   },
   goodRoadTitle: {
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 20,
     fontWeight: '900',
   },
   hero: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1043,7 +1043,7 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
@@ -1056,14 +1056,14 @@ const styles = StyleSheet.create({
   },
   infoIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 36,
     justifyContent: 'center',
     width: 36,
   },
   infoLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -1073,7 +1073,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   infoValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
     lineHeight: 19,
@@ -1102,8 +1102,8 @@ const styles = StyleSheet.create({
   },
   livePanel: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1111,13 +1111,13 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   liveText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
   },
   liveTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1127,28 +1127,28 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   mapLine: {
-    backgroundColor: '#F6C600',
+    backgroundColor: '#008D49',
     borderRadius: 99,
     flex: 1,
     height: 3,
   },
   mapPanel: {
-    backgroundColor: '#0C0C0C',
-    borderColor: '#F6C600',
+    backgroundColor: '#F4FAF6',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     overflow: 'hidden',
     padding: 12,
   },
   mapPoint: {
-    backgroundColor: '#F6C600',
+    backgroundColor: '#008D49',
     borderRadius: 7,
     height: 14,
     width: 14,
   },
   mapPointFinish: {
-    backgroundColor: '#F5F5F5',
-    borderColor: '#F6C600',
+    backgroundColor: '#12382C',
+    borderColor: '#008D49',
     borderRadius: 7,
     borderWidth: 2,
     height: 14,
@@ -1166,14 +1166,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   metaLine: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   miniAction: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1190,19 +1190,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   miniActionText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 12,
     minHeight: '100%',
     padding: 14,
   },
   panel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -1210,8 +1210,8 @@ const styles = StyleSheet.create({
   },
   paymentActionButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -1219,29 +1219,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   paymentActionButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   paymentStatusBox: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
     padding: 12,
   },
   paymentStatusBoxPaid: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderColor: '#7A9A7E',
   },
   paymentStatusText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   paymentStatusTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1262,19 +1262,19 @@ const styles = StyleSheet.create({
   },
   participantIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 42,
     justifyContent: 'center',
     width: 42,
   },
   participantMeta: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   participantName: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 15,
     fontWeight: '900',
   },
@@ -1284,7 +1284,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 48,
@@ -1294,35 +1294,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#5A544E',
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 14,
     fontWeight: '900',
   },
   progressFill: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 99,
     height: '100%',
   },
   progressText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
   progressTrack: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 99,
     height: 9,
     overflow: 'hidden',
   },
   pulseDot: {
-    backgroundColor: '#F6C600',
+    backgroundColor: '#008D49',
     borderRadius: 10,
     height: 20,
     position: 'absolute',
     width: 20,
   },
   pulseRay: {
-    backgroundColor: '#F6C600',
+    backgroundColor: '#008D49',
     borderRadius: 99,
     height: 4,
     position: 'absolute',
@@ -1332,7 +1332,7 @@ const styles = StyleSheet.create({
     width: 42,
   },
   pulseRing: {
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderRadius: 42,
     borderWidth: 2,
     height: 84,
@@ -1346,8 +1346,8 @@ const styles = StyleSheet.create({
     width: 96,
   },
   receiptBox: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 7,
@@ -1360,18 +1360,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   receiptText: {
-    color: '#A89F91',
+    color: '#557669',
     flex: 1,
     fontSize: 12,
     lineHeight: 17,
   },
   receiptTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   receiptValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 12,
     fontWeight: '900',
   },
@@ -1381,8 +1381,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   reviewChip: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 38,
@@ -1390,8 +1390,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
   },
   reviewChipActive: {
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   reviewChips: {
     flexDirection: 'row',
@@ -1399,32 +1399,32 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   reviewChipText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '900',
   },
   reviewChipTextActive: {
-    color: '#F5F0E8',
+    color: '#12382C',
   },
   reviewInput: {
-    backgroundColor: '#2C2926',
-    borderColor: '#A89F91',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#557669',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     minHeight: 82,
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
   reviewIntro: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
   reviewPanel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -1436,18 +1436,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   routeTextMain: {
-    color: '#B0B0B0',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 19,
   },
   routeTitle: {
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   rolePill: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 7,
@@ -1455,18 +1455,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   rolePillText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   safeArea: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1476,17 +1476,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   sectionTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   savedReviewBox: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderColor: '#7A9A7E',
     borderRadius: 8,
     borderWidth: 1,
@@ -1494,7 +1494,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   savedReviewText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 19,
   },
@@ -1504,7 +1504,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   spark: {
-    backgroundColor: '#F6C600',
+    backgroundColor: '#008D49',
     borderRadius: 4,
     height: 8,
     width: 8,
@@ -1538,27 +1538,27 @@ const styles = StyleSheet.create({
   },
   statusIcon: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
     width: 46,
   },
   statusPanel: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
     padding: 12,
   },
   statusText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
   },
   statusTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 27,
@@ -1576,19 +1576,19 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   stepDescription: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   stepDot: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 24,
     marginTop: 1,
     width: 24,
   },
   stepDotActive: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
   },
   stepDotDone: {
     alignItems: 'center',
@@ -1604,20 +1604,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   stepTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   stepTitleActive: {
-    color: '#D4A853',
+    color: '#008D49',
   },
   subtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
   },
   title: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 24,
     fontWeight: '900',
     lineHeight: 30,

@@ -191,7 +191,7 @@ export function PostRegistrationMenu({
       <View style={styles.topBar}>
         <View style={styles.brandRow}>
           <View style={styles.brandMark}>
-            <Car color="#F5F0E8" size={24} strokeWidth={2.4} />
+            <Car color="#12382C" size={24} strokeWidth={2.4} />
           </View>
         <View style={styles.brandCopy}>
           <Text style={styles.appName}>Такси Салават</Text>
@@ -209,7 +209,7 @@ export function PostRegistrationMenu({
             onPress={onOpenOrderFlow}
             style={({ pressed }) => [styles.orderButton, pressed && styles.pressed]}
           >
-            <Route color="#1E1C1A" size={18} strokeWidth={2.4} />
+            <Route color="#F4FAF6" size={18} strokeWidth={2.4} />
             <Text style={styles.orderButtonText}>{isDriverRole ? 'Заказы' : 'Вызвать'}</Text>
           </Pressable>
           <Pressable
@@ -217,7 +217,7 @@ export function PostRegistrationMenu({
             onPress={onOpenOrderHistory}
             style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
           >
-            <ReceiptText color="#D4A853" size={17} strokeWidth={2.4} />
+            <ReceiptText color="#008D49" size={17} strokeWidth={2.4} />
             <Text style={styles.outlineButtonText}>История</Text>
           </Pressable>
           {isSelfEmployedDriver ? (
@@ -226,7 +226,7 @@ export function PostRegistrationMenu({
               onPress={onOpenSubscription}
               style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
             >
-              <Wallet color="#D4A853" size={17} strokeWidth={2.4} />
+              <Wallet color="#008D49" size={17} strokeWidth={2.4} />
               <Text style={styles.outlineButtonText}>Расчеты</Text>
             </Pressable>
           ) : null}
@@ -242,7 +242,7 @@ export function PostRegistrationMenu({
             onPress={onLogout}
             style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
           >
-            <LogOut color="#D4A853" size={17} strokeWidth={2.4} />
+            <LogOut color="#008D49" size={17} strokeWidth={2.4} />
             <Text style={styles.outlineButtonText}>Выйти</Text>
           </Pressable>
         </View>
@@ -276,7 +276,7 @@ export function PostRegistrationMenu({
                 style={({ pressed }) => [styles.availableCarsButton, pressed && styles.pressed]}
               >
                 <View style={styles.availableCarsIcon}>
-                  <Car color="#F5F0E8" size={28} strokeWidth={2.5} />
+                  <Car color="#12382C" size={28} strokeWidth={2.5} />
                 </View>
                 <View style={styles.availableCarsCopy}>
                   <Text style={styles.availableCarsLabel}>Машин доступно сейчас</Text>
@@ -321,7 +321,7 @@ export function PostRegistrationMenu({
                 ]}
               >
                 <Car
-                  color={driverLine?.isOnline ? '#D4A853' : '#F5F0E8'}
+                  color={driverLine?.isOnline ? '#008D49' : '#12382C'}
                   size={26}
                   strokeWidth={2.5}
                 />
@@ -438,7 +438,7 @@ function MenuButton({ active, compact = false, item, onPress }: MenuButtonProps)
       ]}
     >
       <View style={[styles.menuIconWrap, compact && styles.menuIconWrapCompact, active && styles.menuIconWrapActive]}>
-        <Icon color={active ? '#1E1C1A' : '#D4A853'} size={19} strokeWidth={2.3} />
+        <Icon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.3} />
       </View>
       <View style={styles.menuCopy}>
         <View style={styles.menuTitleRow}>
@@ -468,7 +468,7 @@ function QuickActionCard({ action, onActionTarget }: QuickActionCardProps) {
       style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}
     >
       <View style={styles.quickIconWrap}>
-        <Icon color="#D4A853" size={21} strokeWidth={2.3} />
+        <Icon color="#008D49" size={21} strokeWidth={2.3} />
       </View>
       <Text numberOfLines={2} style={styles.quickTitle}>{action.title}</Text>
       <Text numberOfLines={2} style={styles.quickSubtitle}>{action.subtitle}</Text>
@@ -496,7 +496,7 @@ function SectionPageView({ appTitle, driverStats, onActionTarget, page }: Sectio
 
       <View style={styles.heroPanel}>
         <View style={styles.heroIcon}>
-          <Icon color="#D4A853" size={28} strokeWidth={2.4} />
+          <Icon color="#008D49" size={28} strokeWidth={2.4} />
         </View>
         <View style={styles.heroCopy}>
           <Text numberOfLines={2} style={styles.heroTitle}>{page.title}</Text>
@@ -557,7 +557,7 @@ function SectionPageView({ appTitle, driverStats, onActionTarget, page }: Sectio
       </View>
 
       <View style={styles.notePanel}>
-        <ShieldCheck color="#D4A853" size={18} strokeWidth={2.4} />
+        <ShieldCheck color="#008D49" size={18} strokeWidth={2.4} />
         <Text style={styles.noteText}>{page.note}</Text>
       </View>
     </>
@@ -690,56 +690,56 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   accessPanel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 12,
   },
   accessText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   accessTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '900',
   },
   appMeta: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     marginTop: 2,
   },
   liveText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 12,
     fontWeight: '900',
     marginTop: 2,
   },
   appName: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     height: 42,
     justifyContent: 'center',
     width: 42,
   },
   avatarText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
   availableCarsButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -753,33 +753,33 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   availableCarsHint: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   availableCarsIcon: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
     width: 46,
   },
   availableCarsLabel: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 13,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   availableCarsValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 34,
     fontWeight: '900',
     lineHeight: 38,
   },
   badge: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 6,
     color: '#C17A70',
     fontSize: 10,
@@ -793,7 +793,7 @@ const styles = StyleSheet.create({
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
@@ -807,8 +807,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   contentPanel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -816,8 +816,8 @@ const styles = StyleSheet.create({
   },
   driverLineButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
-    borderColor: '#D4A853',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -830,8 +830,8 @@ const styles = StyleSheet.create({
     borderColor: '#5A544E',
   },
   driverLineButtonOnline: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
   },
   driverLineCopy: {
     flex: 1,
@@ -839,47 +839,47 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   driverLineHint: {
-    color: '#37322E',
+    color: '#E8F3EF',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   driverLineIcon: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
     width: 46,
   },
   driverLineIconOnline: {
-    backgroundColor: '#2C2926',
+    backgroundColor: '#FFFFFF',
   },
   driverLineLabel: {
-    color: '#37322E',
+    color: '#E8F3EF',
     fontSize: 13,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   driverLineTextOnline: {
-    color: '#D4A853',
+    color: '#008D49',
   },
   driverLineValue: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 24,
     fontWeight: '900',
     lineHeight: 28,
   },
   driverStatsCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
     padding: 14,
   },
   driverStatsHint: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
@@ -887,13 +887,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   driverStatsTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
   },
   financePanel: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -906,7 +906,7 @@ const styles = StyleSheet.create({
   },
   heroIcon: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 44,
     justifyContent: 'center',
@@ -914,8 +914,8 @@ const styles = StyleSheet.create({
   },
   heroPanel: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -923,18 +923,18 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   heroText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 18,
   },
   heroTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 20,
     fontWeight: '900',
     lineHeight: 24,
   },
   hello: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
   },
@@ -953,8 +953,8 @@ const styles = StyleSheet.create({
   },
   livePanel: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -962,7 +962,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   livePanelText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 13,
     fontWeight: '800',
@@ -979,8 +979,8 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -993,8 +993,8 @@ const styles = StyleSheet.create({
     width: 152,
   },
   menuButtonActive: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
   },
   menuCopy: {
     flex: 1,
@@ -1003,7 +1003,7 @@ const styles = StyleSheet.create({
   },
   menuIconWrap: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 32,
     justifyContent: 'center',
@@ -1014,7 +1014,7 @@ const styles = StyleSheet.create({
     width: 34,
   },
   menuIconWrapActive: {
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
   },
   menuList: {
     gap: 8,
@@ -1024,18 +1024,18 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   menuSubtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   menuTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flexShrink: 1,
     fontSize: 14,
     fontWeight: '900',
   },
   menuTitleActive: {
-    color: '#D4A853',
+    color: '#008D49',
   },
   menuTitleRow: {
     alignItems: 'center',
@@ -1044,8 +1044,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metricCard: {
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1054,12 +1054,12 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   metricHelper: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 16,
   },
   metricLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -1070,14 +1070,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   metricValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 20,
     fontWeight: '900',
   },
   miniStat: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1086,20 +1086,20 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   miniStatLabel: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     fontWeight: '800',
   },
   miniStatValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
     textAlign: 'right',
   },
   notePanel: {
     alignItems: 'flex-start',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1107,14 +1107,14 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   noteText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     flex: 1,
     fontSize: 13,
     lineHeight: 19,
   },
   outlineButton: {
     alignItems: 'center',
-    borderColor: '#D4A853',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1124,13 +1124,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   outlineButtonText: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   orderButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     flexDirection: 'row',
     gap: 8,
@@ -1139,23 +1139,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   orderButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 14,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#1E1C1A',
+    backgroundColor: '#F4FAF6',
     gap: 12,
     minHeight: '100%',
     padding: 14,
   },
   panelSubtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
   },
   panelTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1165,14 +1165,14 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#D4A853',
+    backgroundColor: '#008D49',
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 46,
     paddingHorizontal: 14,
   },
   primaryButtonText: {
-    color: '#1E1C1A',
+    color: '#F4FAF6',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1183,8 +1183,8 @@ const styles = StyleSheet.create({
   },
   profilePanel: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1192,13 +1192,13 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   profileStatus: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     lineHeight: 18,
   },
   quickCard: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1214,24 +1214,24 @@ const styles = StyleSheet.create({
   },
   quickIconWrap: {
     alignItems: 'center',
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     height: 40,
     justifyContent: 'center',
     width: 40,
   },
   quickSubtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   quickTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 15,
     fontWeight: '900',
   },
   routeDivider: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -1242,19 +1242,19 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   routeText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 13,
     fontWeight: '800',
   },
   routeTextActive: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 13,
     fontWeight: '900',
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -1262,14 +1262,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   secondaryButtonText: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   sectionRow: {
     alignItems: 'flex-start',
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1292,9 +1292,9 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   sectionRowStatus: {
-    backgroundColor: '#37322E',
+    backgroundColor: '#E8F3EF',
     borderRadius: 6,
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 11,
     fontWeight: '900',
     overflow: 'hidden',
@@ -1302,17 +1302,17 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   sectionRowSubtitle: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   sectionRowTitle: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
   sectionRowValue: {
-    color: '#F5F0E8',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
     textAlign: 'right',
@@ -1320,7 +1320,7 @@ const styles = StyleSheet.create({
   simpleModeButton: {
     alignItems: 'center',
     backgroundColor: '#1C1C1E',
-    borderColor: '#F6C600',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1334,18 +1334,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   simpleModeKnob: {
-    backgroundColor: '#B0B0B0',
+    backgroundColor: '#557669',
     borderRadius: 10,
     height: 20,
     width: 20,
   },
   simpleModeKnobActive: {
     alignSelf: 'flex-end',
-    backgroundColor: '#0C0C0C',
+    backgroundColor: '#F4FAF6',
   },
   simpleModeSwitch: {
     backgroundColor: '#242426',
-    borderColor: '#B0B0B0',
+    borderColor: '#557669',
     borderRadius: 99,
     borderWidth: 1,
     justifyContent: 'center',
@@ -1353,16 +1353,16 @@ const styles = StyleSheet.create({
     width: 50,
   },
   simpleModeSwitchActive: {
-    backgroundColor: '#F6C600',
-    borderColor: '#F6C600',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   simpleModeText: {
-    color: '#B0B0B0',
+    color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
   simpleModeTitle: {
-    color: '#F5F5F5',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1375,27 +1375,27 @@ const styles = StyleSheet.create({
     width: 340,
   },
   statusPanel: {
-    backgroundColor: '#37322E',
-    borderColor: '#D4A853',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
     padding: 12,
   },
   statusText: {
-    color: '#A89F91',
+    color: '#557669',
     fontSize: 14,
     lineHeight: 20,
   },
   statusTitle: {
-    color: '#D4A853',
+    color: '#008D49',
     fontSize: 18,
     fontWeight: '900',
   },
   topBar: {
     alignItems: 'center',
-    backgroundColor: '#2C2926',
-    borderColor: '#D4A853',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',

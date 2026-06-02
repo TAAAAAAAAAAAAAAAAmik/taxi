@@ -25,7 +25,7 @@ export function RoleCard({ title, subtitle, active, Icon, onPress }: RoleCardPro
       ]}
     >
       <View style={[styles.iconWrap, active && styles.activeIconWrap]}>
-        <Icon color={active ? kx.color.graphite : kx.color.amber} size={20} strokeWidth={2.2} />
+        <Icon color={active ? '#FFFFFF' : kx.color.amber} size={20} strokeWidth={2.2} />
       </View>
       <View style={styles.copy}>
         <Text style={[styles.title, active && styles.activeTitle]}>{title}</Text>
@@ -37,14 +37,14 @@ export function RoleCard({ title, subtitle, active, Icon, onPress }: RoleCardPro
 
 const styles = StyleSheet.create({
   activeCard: {
-    backgroundColor: kx.surface.selected,
+    backgroundColor: '#DDF1E7',
     borderColor: kx.color.amber,
   },
   activeIconWrap: {
     backgroundColor: kx.color.amber,
   },
   activeTitle: {
-    color: kx.color.graphite,
+    color: kx.text.primary,
   },
   card: {
     alignItems: 'flex-start',
