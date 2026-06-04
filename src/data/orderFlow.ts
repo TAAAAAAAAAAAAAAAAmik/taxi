@@ -64,6 +64,8 @@ const baseTariffs: OrderTariff[] = [
   },
 ];
 
+const clientTariffs: OrderTariff[] = [baseTariffs[0]];
+
 export const orderFlowConfig: Record<string, OrderFlowConfig> = {
   client: {
     title: 'Оформление поездки',
@@ -107,7 +109,7 @@ export const orderFlowConfig: Record<string, OrderFlowConfig> = {
       { id: 'luggage', label: 'Багаж', price: 80 },
       { id: 'pet', label: 'Животное', price: 100 },
     ],
-    tariffs: baseTariffs,
+    tariffs: clientTariffs,
     paymentMethods: ['Перевод водителю', 'Наличные водителю'],
     timeline: ['Маршрут', 'Расчет', 'Поиск водителя', 'Подача', 'Поездка'],
     suggestions: ['Малояз', 'Янгантау', 'Кургазак', 'Мурсалимкино'],

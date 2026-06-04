@@ -434,14 +434,26 @@ export function OrderFlowScreen({ navigation, route }: Props) {
         address: 'Малояз, администрация',
       },
     ];
+    const clientAddressSuggestions =
+      activeAddressFieldId === 'destination'
+        ? mergeAddressSuggestions([
+            ...findSalavatAddressSuggestions(values.destination ?? '', 6),
+            ...serverAddressSuggestions,
+          ]).slice(0, 4)
+        : [];
 
     return (
       <SafeAreaView style={styles.clientSafeArea}>
         <View style={[styles.clientPage, simpleMode && styles.clientPageSimple]}>
           <View style={styles.clientTopRow}>
-            <View>
-              <Text style={styles.clientBrand}>Такси Салават</Text>
-              <Text style={styles.clientMeta}>Малояз · Эконом 120 ₽</Text>
+            <View style={styles.clientBrandRow}>
+              <View style={styles.clientBrandMark}>
+                <Car color="#F4FAF6" size={22} strokeWidth={2.5} />
+              </View>
+              <View style={styles.clientBrandCopy}>
+                <Text style={styles.clientBrand}>Такси Салават</Text>
+                <Text numberOfLines={1} style={styles.clientMeta}>Малояз · Эконом 120 ₽</Text>
+              </View>
             </View>
             <Pressable
               accessibilityRole="switch"
@@ -466,9 +478,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               style={[styles.clientDestinationInput, simpleMode && styles.clientDestinationInputSimple]}
               value={values.destination ?? ''}
             />
-            {activeAddressFieldId === 'destination' && serverAddressSuggestions.length > 0 ? (
+            {clientAddressSuggestions.length > 0 ? (
               <View style={styles.clientSuggestions}>
-                {serverAddressSuggestions.slice(0, 4).map((suggestion) => (
+                {clientAddressSuggestions.map((suggestion) => (
                   <Pressable
                     accessibilityRole="button"
                     key={suggestion.id}
@@ -502,6 +514,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 <Text style={[styles.clientShortcutText, simpleMode && styles.clientShortcutTextSimple]}>
                   {item.title}
                 </Text>
+                <Text numberOfLines={1} style={styles.clientShortcutHint}>{item.address}</Text>
               </Pressable>
             ))}
           </View>
@@ -528,11 +541,28 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                       pressed && styles.pressed,
                     ]}
                   >
-                    <Text style={styles.clientTariffTitle}>{tariff.title}</Text>
-                    <Text style={styles.clientTariffSubtitle}>
+                    <Text
+                      style={[
+                        styles.clientTariffTitle,
+                        tariff.id === selectedTariffId && styles.clientTariffTitleActive,
+                      ]}
+                    >
+                      {tariff.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.clientTariffSubtitle,
+                        tariff.id === selectedTariffId && styles.clientTariffSubtitleActive,
+                      ]}
+                    >
                       {tariff.id === 'economy' ? 'Фикс по Малоязу' : tariff.subtitle}
                     </Text>
-                    <Text style={styles.clientTariffPrice}>
+                    <Text
+                      style={[
+                        styles.clientTariffPrice,
+                        tariff.id === selectedTariffId && styles.clientTariffPriceActive,
+                      ]}
+                    >
                       {tariff.id === selectedTariffId ? routeEstimate.total : tariff.price} ₽
                     </Text>
                   </Pressable>
@@ -579,6 +609,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 pressed && styles.pressed,
               ]}
             >
+              <Navigation color="#F4FAF6" size={21} strokeWidth={2.6} />
               <Text style={[styles.clientCallButtonText, simpleMode && styles.clientCallButtonTextSimple]}>
                 {isSubmitting ? 'Ищем машину' : 'Вызвать'}
               </Text>
@@ -1494,13 +1525,39 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0,
   },
+  clientBrandCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  clientBrandMark: {
+    alignItems: 'center',
+    backgroundColor: '#008D49',
+    borderRadius: 8,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  clientBrandRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+    minWidth: 0,
+  },
   clientCallButton: {
     alignItems: 'center',
     backgroundColor: '#008D49',
     borderRadius: 8,
+    elevation: 3,
+    flexDirection: 'row',
+    gap: 9,
     justifyContent: 'center',
     minHeight: 56,
     paddingHorizontal: 18,
+    shadowColor: '#006F3A',
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
   },
   clientCallButtonDisabled: {
     opacity: 0.58,
@@ -1543,7 +1600,7 @@ const styles = StyleSheet.create({
   clientEstimate: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: '#D6E8DF',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1605,8 +1662,15 @@ const styles = StyleSheet.create({
   },
   clientRealtime: {
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D6E8DF',
+    borderRadius: 8,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
+    minHeight: 38,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
   },
   clientRealtimeDot: {
     backgroundColor: '#557669',
@@ -1615,7 +1679,7 @@ const styles = StyleSheet.create({
     width: 10,
   },
   clientRealtimeDotLive: {
-    backgroundColor: '#4CD964',
+    backgroundColor: '#008D49',
   },
   clientRealtimeText: {
     color: '#557669',
@@ -1628,12 +1692,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   clientShortcutButton: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: '#D6E8DF',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
+    gap: 3,
     justifyContent: 'center',
     minHeight: 46,
     paddingHorizontal: 12,
@@ -1644,6 +1709,12 @@ const styles = StyleSheet.create({
   clientShortcutRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  clientShortcutHint: {
+    color: '#557669',
+    flexShrink: 1,
+    fontSize: 12,
+    lineHeight: 16,
   },
   clientShortcutText: {
     color: '#12382C',
@@ -1670,7 +1741,7 @@ const styles = StyleSheet.create({
   },
   clientSuggestions: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: '#D6E8DF',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
@@ -1687,8 +1758,9 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   clientTariffCardActive: {
+    backgroundColor: '#008D49',
     borderColor: '#008D49',
-    borderWidth: 2,
+    borderWidth: 1,
   },
   clientTariffList: {
     gap: 10,
@@ -1700,15 +1772,24 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 'auto',
   },
+  clientTariffPriceActive: {
+    color: '#FFFFFF',
+  },
   clientTariffSubtitle: {
     color: '#557669',
     fontSize: 12,
     lineHeight: 17,
   },
+  clientTariffSubtitleActive: {
+    color: '#E8F3EF',
+  },
   clientTariffTitle: {
     color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
+  },
+  clientTariffTitleActive: {
+    color: '#FFFFFF',
   },
   clientTopRow: {
     alignItems: 'center',

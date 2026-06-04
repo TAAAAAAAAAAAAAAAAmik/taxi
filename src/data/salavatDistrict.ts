@@ -388,26 +388,30 @@ export function isInsideSalavatDistrict(point: GeoPoint) {
 }
 
 function houseRecordToSuggestion(record: SalavatHouseRecord): SalavatAddressSuggestion {
+  const displayStreet = getDisplayStreet(record.settlement, record.street);
+
   return {
     id: `house-${slug(record.settlement)}-${slug(record.street)}-${slug(record.house)}`,
-    title: `${record.street}, дом ${record.house}`,
-    subtitle: record.fullAddress,
+    title: `${displayStreet}, дом ${record.house}`,
+    subtitle: `${record.settlement}, ${displayStreet}, ${record.house}`,
     settlement: record.settlement,
     category: 'address',
-    aliases: record.aliases,
+    aliases: [...record.aliases, `${displayStreet} ${record.house}`],
     source: record.source,
     coordinates: record.coordinates,
   };
 }
 
 function streetRecordToSuggestion(record: SalavatStreetRecord): SalavatAddressSuggestion {
+  const displayStreet = getDisplayStreet(record.settlement, record.street);
+
   return {
     id: `street-${slug(record.settlement)}-${slug(record.street)}`,
-    title: record.street,
-    subtitle: `${record.settlement}, ${record.street}`,
+    title: displayStreet,
+    subtitle: `${record.settlement}, ${displayStreet}`,
     settlement: record.settlement,
     category: 'street',
-    aliases: record.aliases,
+    aliases: [...record.aliases, displayStreet],
     source: record.source,
     coordinates: record.coordinates,
   };
@@ -452,15 +456,19 @@ function createExactHouseSuggestion(query: string): SalavatAddressSuggestion | n
     return null;
   }
 
+  const displayStreet = getDisplayStreet(bestRecord.settlement, bestRecord.street);
+
   return {
     id: `address-${slug(bestRecord.settlement)}-${slug(bestRecord.street)}-${slug(house)}-exact`,
-    title: `${bestRecord.street}, дом ${house}`,
-    subtitle: `${bestRecord.settlement}, ${bestRecord.street}, ${house}`,
+    title: `${displayStreet}, дом ${house}`,
+    subtitle: `${bestRecord.settlement}, ${displayStreet}, ${house}`,
     settlement: bestRecord.settlement,
     category: 'address',
     aliases: [
       `${bestRecord.street} ${house}`,
+      `${displayStreet} ${house}`,
       `${bestRecord.settlement} ${bestRecord.street} ${house}`,
+      `${bestRecord.settlement} ${displayStreet} ${house}`,
       ...bestRecord.aliases.map((alias) => `${alias} ${house}`),
     ],
     source: bestRecord.source,
@@ -493,7 +501,7 @@ function getAddressScore(address: SalavatAddressSuggestion, query: string) {
 
   if (
     queryParts.length > 1 &&
-    queryParts.every((part) => searchable.some((value) => value.includes(part)))
+    matchesQueryParts(searchable, queryParts)
   ) {
     return 3;
   }
@@ -519,7 +527,7 @@ function getHouseRecordScore(record: SalavatHouseRecord, streetQuery: string, ho
 
   if (
     queryParts.length > 1 &&
-    queryParts.every((part) => searchable.some((value) => value.includes(part)))
+    matchesQueryParts(searchable, queryParts)
   ) {
     return 6;
   }
@@ -541,7 +549,7 @@ function getStreetRecordScore(record: SalavatStreetRecord, query: string) {
 
   if (
     queryParts.length > 1 &&
-    queryParts.every((part) => searchable.some((value) => value.includes(part)))
+    matchesQueryParts(searchable, queryParts)
   ) {
     return 4;
   }
@@ -560,6 +568,48 @@ function mergeSuggestions(items: SalavatAddressSuggestion[]) {
     seen.add(item.id);
     return true;
   });
+}
+
+function matchesQueryParts(searchable: string[], queryParts: string[]) {
+  return queryParts.every((part) =>
+    searchable.some((value) => {
+      if (value.includes(part)) {
+        return true;
+      }
+
+      return value
+        .split(' ')
+        .filter(Boolean)
+        .some((token) => token.length === 1 && part.startsWith(token));
+    }),
+  );
+}
+
+function getDisplayStreet(settlement: string, street: string) {
+  const normalizedStreet = normalize(street);
+  const streetParts = normalizedStreet.split(' ').filter(Boolean);
+  const [initial, ...restParts] = streetParts;
+
+  if (!initial || initial.length !== 1 || restParts.length === 0) {
+    return street;
+  }
+
+  const expandedStreet = salavatDistrictStreets.find((candidate) => {
+    if (candidate.settlement !== settlement || candidate.street === street) {
+      return false;
+    }
+
+    const candidateParts = normalize(candidate.street).split(' ').filter(Boolean);
+    const [firstName, ...candidateRestParts] = candidateParts;
+
+    return (
+      firstName?.startsWith(initial) &&
+      firstName.length > 1 &&
+      candidateRestParts.join(' ') === restParts.join(' ')
+    );
+  });
+
+  return expandedStreet?.street ?? street;
 }
 
 function normalize(value: string) {
