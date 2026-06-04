@@ -25,7 +25,7 @@ export type MonthlySubscriptionPlan = {
 export const monthlySubscriptionPlans: Record<SubscriptionOwnerType, MonthlySubscriptionPlan> = {
   self_employed_driver: {
     accessDays: 30,
-    amount: 3000,
+    amount: 0,
     currency: '₽',
     ownerType: 'self_employed_driver',
     type: 'driver_monthly',
@@ -94,17 +94,17 @@ export const driverAccessPlans: Record<
   }
 > = {
   monthly: {
-    accessDays: 30,
+    accessDays: 0,
     commissionPercent: 0,
     currency: '₽',
     description:
-      'Водитель платит 3000 ₽ в месяц и работает без комиссии с поездок до конца расчетного периода.',
-    headline: '3000 ₽/мес, без комиссии',
+      'Legacy-режим ручного допуска без онлайн-оплаты. Для нового пилота используется дневная доля сервиса.',
+    headline: 'Legacy-доступ без онлайн-оплаты',
     id: 'monthly',
     monthlyPrice: monthlySubscriptionPlans.self_employed_driver.amount,
-    name: 'Ежемесячная подписка',
-    primaryAction: 'Оплатить подписку',
-    shortName: 'Подписка',
+    name: 'Ручной legacy-доступ',
+    primaryAction: 'Зафиксировать вручную',
+    shortName: 'Legacy',
   },
   commission: {
     commissionPercent: driverCommissionPercent,
@@ -115,19 +115,19 @@ export const driverAccessPlans: Record<
     id: 'commission',
     monthlyPrice: 0,
     name: 'Доля сервиса с поездки',
-    primaryAction: 'Подключить долю сервиса',
+    primaryAction: 'Подключить ручную сверку',
     shortName: 'Доля сервиса',
   },
 };
 
-export const driverSubscriptionPlan = driverAccessPlans.monthly;
+export const driverSubscriptionPlan = driverAccessPlans.commission;
 
 export const driverSubscriptionBenefits = [
-  'Подписка: 3000 ₽ в месяц без комиссии с поездок.',
+  'Платежных систем в пилоте нет: клиент платит водителю напрямую.',
   `Доля сервиса: ${driverCommissionPercent}% с каждой завершенной поездки без ежемесячной оплаты.`,
   'Клиентская оплата поступает водителю, а приложение считает сумму к вечернему переводу сервису.',
-  'Водитель может поменять модель, изменение применяется со следующего расчетного периода.',
-  'Водитель сам получает оплату за поездку и подтверждает перевод доли сервиса.',
+  'Водитель сам получает оплату за поездку и закрывает дневную сверку.',
+  'Администратор подтверждает перевод доли сервиса вручную.',
 ];
 
 export const driverSubscriptionRules = [
@@ -141,14 +141,14 @@ export const driverSubscriptionRules = [
 
 export const driverSubscriptionEconomics = [
   {
-    label: 'Подписка',
-    value: `${monthlySubscriptionPlans.self_employed_driver.amount} ${monthlySubscriptionPlans.self_employed_driver.currency}/мес`,
-    helper: 'Без комиссии с поездок',
-  },
-  {
     label: 'Доля сервиса',
     value: `${driverCommissionPercent}%`,
     helper: 'Водитель переводит ее в конце рабочего дня',
+  },
+  {
+    label: 'Онлайн-оплата',
+    value: 'Нет',
+    helper: 'Клиент рассчитывается напрямую с водителем',
   },
   {
     label: 'Главная задача',

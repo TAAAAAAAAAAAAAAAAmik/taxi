@@ -65,7 +65,7 @@ export function VerifyEmailScreen({ navigation, route }: Props) {
       return;
     }
 
-    navigation.replace(role === 'client' ? 'OrderFlow' : 'Dashboard', {
+    navigation.replace('Dashboard', {
       firstName,
       role,
     });

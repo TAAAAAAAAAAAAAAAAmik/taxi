@@ -6,7 +6,6 @@ import {
   Car,
   Check,
   Clock3,
-  CreditCard,
   LocateFixed,
   MapPinned,
   Navigation,
@@ -14,6 +13,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   UserRound,
+  Wallet,
 } from 'lucide-react-native';
 import {
   Pressable,
@@ -909,7 +909,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                         strokeWidth={2.4}
                       />
                     ) : (
-                      <CreditCard
+                        <Wallet
                         color={method === paymentMethod ? '#F4FAF6' : '#008D49'}
                         size={18}
                         strokeWidth={2.4}

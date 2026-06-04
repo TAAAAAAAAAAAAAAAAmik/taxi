@@ -61,7 +61,7 @@ export function ReferralScreen({ navigation, route }: Props) {
       ? {
           icon: <Car color="#008D49" size={20} strokeWidth={2.4} />,
           reward: rewards?.driverReward ?? 300,
-          title: 'Пригласить самозанятого водителя',
+          title: 'Пригласить водителя',
           text: `Вы получите ${rewards?.driverReward ?? 300} ₽ после первых ${
             rewards?.driverQualificationOrders ?? 10
           } завершенных заказов водителя. Водитель получает ${
@@ -171,7 +171,7 @@ export function ReferralScreen({ navigation, route }: Props) {
             />
             <SegmentButton
               active={activeInviteRole === 'self_employed_driver'}
-              label="Самозанятый водитель"
+              label="Водитель"
               onPress={() => setActiveInviteRole('self_employed_driver')}
             />
           </View>
@@ -309,7 +309,7 @@ function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
             {relation}: {referral.inviteeName ?? (isSelfEmployedDriverRole(referral.inviteeRole) ? 'водитель' : 'клиент')}
           </Text>
           <Text style={styles.referralText}>
-            {isSelfEmployedDriverRole(referral.inviteeRole) ? 'Самозанятый водитель' : 'Клиент'} · {referral.code}
+              {isSelfEmployedDriverRole(referral.inviteeRole) ? 'Водитель' : 'Клиент'} · {referral.code}
           </Text>
         </View>
         <View style={styles.referralMeta}>

@@ -1443,7 +1443,7 @@ export async function fetchDriverBilling(driverId: string) {
 export async function payDriverSubscription(
   driverId: string,
   billingMode: DriverBillingMode,
-  paymentMethod = 'Банковская карта',
+  paymentMethod = 'Ручная сверка',
 ) {
   return request<DriverBillingDashboard>(`/drivers/${encodeURIComponent(driverId)}/billing/pay`, {
     body: JSON.stringify({ billingMode, paymentMethod }),

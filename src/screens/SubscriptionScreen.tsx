@@ -32,7 +32,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     serverMessage,
     syncDriverSubscriptionPayment,
   } = useAppState();
-  const [selectedMode, setSelectedMode] = useState<DriverBillingMode>('monthly');
+  const [selectedMode, setSelectedMode] = useState<DriverBillingMode>('commission');
   const [busy, setBusy] = useState(false);
   const [refundBusyId, setRefundBusyId] = useState<string | undefined>();
   const [syncBusyId, setSyncBusyId] = useState<string | undefined>();
@@ -50,7 +50,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
   const isSelectedCurrentMode = hasActiveDriverAccess && selectedMode === driverSubscription.billingMode;
 
   useEffect(() => {
-    setSelectedMode(driverSubscription.billingMode);
+    setSelectedMode('commission');
   }, [driverSubscription.billingMode]);
 
   const confirmPlan = async () => {
@@ -66,7 +66,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
 
   const refundPayment = async (paymentId: string) => {
     setRefundBusyId(paymentId);
-    await refundDriverSubscriptionPayment(paymentId, 'Возврат водителю из экрана подписки');
+    await refundDriverSubscriptionPayment(paymentId, 'Отмена ручной операции из экрана расчетов');
     setRefundBusyId(undefined);
   };
 
@@ -93,10 +93,10 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             <WalletCards color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>Расчеты самозанятого водителя</Text>
+            <Text style={styles.title}>Расчеты водителя</Text>
             <Text style={styles.subtitle}>
               Клиентская оплата поступает водителю напрямую. Приложение считает долю сервиса с
-              завершенных поездок, а водитель переводит ее в конце рабочего дня.
+              завершенных поездок, а водитель переводит ее в конце рабочего дня. Онлайн-оплаты в пилоте нет.
             </Text>
             <Text style={styles.metaLine}>{firstName?.trim() || 'Водитель-партнер'}</Text>
           </View>
@@ -112,21 +112,13 @@ export function SubscriptionScreen({ navigation, route }: Props) {
                 : `Доля сервиса с поездок: ${driverSubscription.ordersCommission}%`
             }
           />
-          <StatusCard label="Модель" value={driverSubscription.planName} helper={formatPlanCost(driverSubscription.billingMode)} />
-          <StatusCard label="Платежи" value={String(driverPayments.length)} helper="Операции доступа" />
+          <StatusCard label="Модель" value={driverAccessPlans.commission.name} helper={formatPlanCost('commission')} />
+          <StatusCard label="Сверки" value={String(driverPayments.length)} helper="Ручные операции" />
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Модель расчетов</Text>
           <View style={styles.planGrid}>
-            <PlanChoice
-              active={selectedMode === 'monthly'}
-              icon="card"
-              onPress={() => setSelectedMode('monthly')}
-              title={driverAccessPlans.monthly.name}
-              headline={driverAccessPlans.monthly.headline}
-              text={driverAccessPlans.monthly.description}
-            />
             <PlanChoice
               active={selectedMode === 'commission'}
               icon="commission"
@@ -141,7 +133,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             <Text style={styles.summaryTitle}>Выбрано: {selectedPlan.shortName}</Text>
             <Text style={styles.summaryText}>{selectedPlan.description}</Text>
             <Text style={styles.summaryText}>
-              Изменение модели фиксируется сейчас и применяется с начала следующего расчётного периода.
+              Администратор сверяет дневную сумму и подтверждает перевод доли сервиса вручную.
             </Text>
             <Text style={styles.summaryText}>{serverMessage}</Text>
           </View>
@@ -178,7 +170,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
               >
                 <ExternalLink color="#008D49" size={17} strokeWidth={2.4} />
-                <Text style={styles.providerButtonText}>Открыть оплату у провайдера</Text>
+                <Text style={styles.providerButtonText}>Открыть внешнюю операцию</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -192,7 +184,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
               >
                 <RefreshCw color="#008D49" size={17} strokeWidth={2.4} />
                 <Text style={styles.providerButtonText}>
-                  {syncBusyId === pendingProviderPayment.id ? 'Проверяем оплату' : 'Проверить оплату'}
+                  {syncBusyId === pendingProviderPayment.id ? 'Проверяем операцию' : 'Проверить операцию'}
                 </Text>
               </Pressable>
             </View>
@@ -207,7 +199,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             >
               <RotateCcw color="#C17A70" size={17} strokeWidth={2.4} />
               <Text style={styles.refundButtonText}>
-                {refundBusyId === lastRefundablePayment.id ? 'Возвращаем платеж' : 'Вернуть последний платеж'}
+                {refundBusyId === lastRefundablePayment.id ? 'Отменяем операцию' : 'Отменить последнюю операцию'}
               </Text>
             </Pressable>
           ) : null}
@@ -216,12 +208,12 @@ export function SubscriptionScreen({ navigation, route }: Props) {
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
             <ReceiptText color="#008D49" size={20} strokeWidth={2.4} />
-            <Text style={styles.sectionTitle}>История платежей и чеки</Text>
+            <Text style={styles.sectionTitle}>История ручных сверок</Text>
           </View>
           {driverPayments.length > 0 ? (
             driverPayments.map((payment) => <PaymentRow key={payment.id} payment={payment} />)
           ) : (
-            <Text style={styles.emptyText}>Платежей пока нет. После оплаты здесь появится операция и чек.</Text>
+            <Text style={styles.emptyText}>Сверок пока нет. После первых поездок здесь появится сумма к дневному переводу.</Text>
           )}
         </View>
       </ScrollView>
@@ -302,7 +294,7 @@ function PaymentRow({ payment }: { payment: DriverSubscriptionPayment }) {
         ) : null}
         {payment.providerPaymentStatus || payment.providerError ? (
           <Text style={styles.paymentText}>
-            Провайдер: {payment.providerPaymentStatus || payment.providerError}
+            Источник: {payment.providerPaymentStatus || payment.providerError}
           </Text>
         ) : null}
       </View>

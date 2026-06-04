@@ -78,8 +78,7 @@ export function WelcomeScreen({ navigation }: Props) {
         <View style={styles.hero}>
           <Text style={styles.title}>Своя служба для района</Text>
           <Text numberOfLines={3} style={styles.subtitle}>
-            Пассажиры вызывают поездку, самозанятые водители работают напрямую:
-            3000 ₽ в месяц без комиссии или {driverCommissionPercent}% с поездки.
+            Пассажиры вызывают поездку, водитель получает оплату напрямую и закрывает дневную долю сервиса {driverCommissionPercent}%.
           </Text>
         </View>
 
@@ -87,13 +86,13 @@ export function WelcomeScreen({ navigation }: Props) {
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>Пассажиру</Text>
             <Text numberOfLines={2} style={styles.infoText}>
-              Заказ, история, оплата и поддержка без лишних экранов.
+              Главная кнопка вызова, адреса района и поддержка без лишних экранов.
             </Text>
           </View>
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>Водителю</Text>
             <Text numberOfLines={2} style={styles.infoText}>
-              Документы, рейтинг и выбор модели оплаты.
+              Документы, рейтинг, заказы и ручная сверка доли сервиса.
             </Text>
           </View>
           <View style={styles.infoCard}>

@@ -32,11 +32,11 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
   client: {
     home: {
       title: 'Главная',
-      subtitle: 'Быстрый заказ поездки и текущий статус аккаунта.',
+      subtitle: 'Крупная кнопка вызова такси, адреса Салаватского района и текущий статус аккаунта.',
       icon: 'home',
       statusTitle: 'Готовим первый заказ',
-      statusText: 'После подтверждения телефона откроется выбор адресов и способа оплаты.',
-      primaryAction: 'Выбрать маршрут',
+      statusText: 'После входа клиент остается на главной и вызывает такси одной крупной кнопкой.',
+      primaryAction: 'Вызвать такси',
       primaryTarget: 'order',
       secondaryAction: 'Добавить адрес',
       metrics: [
@@ -85,20 +85,20 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
         },
         {
           id: 'payment',
-          title: 'Добавить оплату',
-          subtitle: 'Карта, наличные или корпоративный способ оплаты.',
-          value: '2 мин',
-          status: 'По желанию',
+          title: 'Оплата водителю',
+          subtitle: 'В пилоте клиент оплачивает поездку напрямую водителю.',
+          value: 'Без карты',
+          status: 'Пилот',
         },
       ],
-      note: 'На этой странице позже появится карта, выбор тарифа и расчет стоимости поездки.',
+      note: 'Главная не должна отправлять клиента сразу в заказ: сначала кнопка вызова, затем выбор маршрута.',
     },
     rides: {
       title: 'Мои поездки',
-      subtitle: 'История заказов, чеки, маршруты и повтор поездки.',
+      subtitle: 'История заказов, маршруты, стоимость и повтор поездки.',
       icon: 'route',
       statusTitle: 'Поездок пока нет',
-      statusText: 'После первого заказа здесь появятся маршрут, водитель, чек и оценка.',
+      statusText: 'После первого заказа здесь появятся маршрут, водитель, стоимость и оценка.',
       primaryAction: 'Создать заказ',
       primaryTarget: 'order',
       secondaryAction: 'Открыть чеки',
@@ -106,7 +106,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
       metrics: [
         { label: 'Всего поездок', value: '0', helper: 'История пустая' },
         { label: 'Последняя', value: '-', helper: 'Пока не было заказов' },
-        { label: 'Чеки', value: '0', helper: 'Будут доступны после оплаты' },
+        { label: 'Расчет', value: '0 ₽', helper: 'Оплата водителю' },
       ],
       quickActions: [
         {
@@ -118,8 +118,8 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
         },
         {
           id: 'receipts',
-          title: 'Чеки',
-          subtitle: 'Документы по оплате поездок.',
+          title: 'Стоимость',
+          subtitle: 'Сумма поездки и способ оплаты водителю.',
           icon: 'file',
         },
         {
@@ -139,32 +139,35 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
           status: 'Пусто',
         },
       ],
-      note: 'Для реального запуска этот раздел подключается к API поездок и платежным чекам.',
+      note: 'Для пилота здесь нужна прозрачная история поездок без хранения банковских карт.',
     },
     payment: {
-      title: 'Оплата',
-      subtitle: 'Карты, наличные, промокоды и платежные настройки.',
-      icon: 'credit-card',
-      statusTitle: 'Способ оплаты не выбран',
-      statusText: 'Клиент сможет оплатить наличными или добавить карту после подключения платежного провайдера.',
-      primaryAction: 'Добавить карту',
-      secondaryAction: 'Ввести промокод',
+      title: 'Оплата водителю',
+      subtitle: 'Клиент платит водителю напрямую после поездки.',
+      icon: 'wallet',
+      statusTitle: 'Платежная система не используется',
+      statusText: 'В пилоте приложение не принимает оплату: водитель получает деньги напрямую, сервис хранит только сумму поездки.',
+      primaryAction: 'Вызвать такси',
+      primaryTarget: 'order',
+      secondaryAction: 'История поездок',
+      secondaryTarget: 'history',
       metrics: [
-        { label: 'Карты', value: '0', helper: 'Нет сохраненных карт' },
+        { label: 'Карты', value: 'Нет', helper: 'Не храним платежные данные' },
         { label: 'Промокоды', value: '0', helper: 'Активных нет' },
-        { label: 'Баланс', value: '0 ₽', helper: 'Бонусы появятся позже' },
+        { label: 'Баланс', value: '0 ₽', helper: 'Только внутренние бонусы' },
       ],
       quickActions: [
         {
-          id: 'add-card',
-          title: 'Банковская карта',
-          subtitle: 'Привязка через платежный шлюз.',
-          icon: 'credit-card',
+          id: 'new-order',
+          title: 'Вызвать такси',
+          subtitle: 'Перейти к маршруту и тарифу.',
+          icon: 'map',
+          target: 'order',
         },
         {
           id: 'cash',
-          title: 'Наличные',
-          subtitle: 'Оплата водителю после поездки.',
+          title: 'Напрямую водителю',
+          subtitle: 'Наличные или перевод по договоренности с водителем.',
           icon: 'wallet',
         },
         {
@@ -174,24 +177,24 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
           icon: 'star',
         },
       ],
-      listTitle: 'Платежные способы',
+      listTitle: 'Как проходит расчет',
       rows: [
         {
           id: 'cash',
-          title: 'Наличные',
-          subtitle: 'Базовый способ оплаты без привязки карты.',
+          title: 'Оплата водителю',
+          subtitle: 'Клиент платит водителю напрямую после поездки.',
           value: 'Доступно',
           status: 'Активно',
         },
         {
-          id: 'card',
-          title: 'Банковская карта',
-          subtitle: 'Нужна интеграция с платежным провайдером.',
+          id: 'no-provider',
+          title: 'Без онлайн-оплаты',
+          subtitle: 'Банковские карты и списания внутри приложения не используются.',
           value: '0 карт',
-          status: 'Не настроено',
+          status: 'Отключено',
         },
       ],
-      note: 'Для App Store и Google Play важно раскрыть платежные условия и не хранить карточные данные напрямую.',
+      note: 'Важно честно показывать клиенту: приложение считает поездку, но оплату принимает водитель.',
     },
     referrals: {
       title: 'Пригласить',
@@ -248,7 +251,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
           status: 'Ценно',
         },
       ],
-      note: 'На первом этапе бонусы живут внутри приложения. Внешний вывод денег добавляется только после антифрода, налоговой модели и платежного провайдера.',
+      note: 'На первом этапе бонусы живут внутри приложения и не выводятся наружу.',
     },
     support: {
       title: 'Поддержка',
@@ -436,8 +439,8 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
       subtitle: 'Доступные заказы, фильтры, текущая смена и история выполнения после допуска.',
       icon: 'briefcase',
       statusTitle: 'Заказы закрыты до допуска',
-      statusText: 'Сначала нужно подтвердить документы, договор, реестр, налоговый профиль и активировать подписку. После этого водитель принимает заказы.',
-      primaryAction: 'Оплатить подписку',
+      statusText: 'Сначала нужно подтвердить документы, договор, реестр и ручную модель расчетов. После этого водитель принимает заказы.',
+      primaryAction: 'Открыть расчеты',
       primaryTarget: 'subscription',
       secondaryAction: 'Открыть демо-заказ',
       secondaryTarget: 'order',
@@ -471,9 +474,9 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
       rows: [
         {
           id: 'access',
-          title: 'Модель доступа',
-          subtitle: `3000 ₽ в месяц без комиссии или ${driverAccessPlans.commission.commissionPercent}% с поездки.`,
-          value: '0/1',
+            title: 'Модель расчетов',
+            subtitle: `${driverAccessPlans.commission.commissionPercent}% с поездки к дневному переводу сервису.`,
+            value: `${driverAccessPlans.commission.commissionPercent}%`,
           status: 'Нужно',
         },
         {
@@ -491,7 +494,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
           status: 'Нужно',
         },
       ],
-      note: 'После подключения API здесь появятся реальные заказы и управление сменой.',
+        note: 'После подключения API здесь появятся реальные заказы, смена и ручная сверка доли сервиса.',
     },
     documents: {
       title: 'Документы',
@@ -779,20 +782,21 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
       subtitle: 'Состояние автопарка, подключение и основные показатели.',
       icon: 'home',
       statusTitle: 'Автопарк на модерации',
-      statusText: 'После проверки организации откроется управление водителями и автомобилями.',
+        statusText: 'После проверки ИП откроется управление водителями и автомобилями.',
       primaryAction: 'Завершить проверку',
       secondaryAction: 'Пригласить водителя',
       metrics: [
         { label: 'Водители', value: '0', helper: 'Можно пригласить' },
         { label: 'Авто', value: '0', helper: 'Нужны документы' },
-        { label: 'Статус', value: 'Модерация', helper: 'Проверка юрлица' },
+          { label: 'Статус', value: 'Модерация', helper: 'Проверка ИП' },
       ],
       quickActions: [
         {
-          id: 'invite',
-          title: 'Пригласить водителя',
-          subtitle: 'Отправить регистрационную ссылку.',
-          icon: 'users',
+            id: 'invite',
+            title: 'Пригласить водителя',
+            subtitle: 'Отправить регистрационную ссылку.',
+            icon: 'users',
+            target: 'fleetDriverInvite',
         },
         {
           id: 'add-car',
@@ -811,8 +815,8 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
       rows: [
         {
           id: 'company',
-          title: 'Проверить организацию',
-          subtitle: 'ИНН, ОГРН, адрес и реквизиты.',
+            title: 'Проверить ИП',
+            subtitle: 'ИНН, ОГРНИП, адрес регистрации и расчетный счет.',
           value: '0/4',
           status: 'Нужно',
         },
@@ -831,7 +835,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
       subtitle: 'Подключение, статусы, документы и доступ к заказам.',
       icon: 'users',
       statusTitle: 'Водителей пока нет',
-      statusText: 'Партнер сможет пригласить водителя по ссылке после проверки автопарка.',
+        statusText: 'Таксопарк добавляет водителя через PARK-код: водитель открывает анкету, заполняет документы и попадает в список парка.',
       primaryAction: 'Пригласить водителя',
       secondaryAction: 'Импортировать список',
       metrics: [
@@ -840,12 +844,13 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
         { label: 'Проверка', value: '0', helper: 'Нет заявок' },
       ],
       quickActions: [
-        {
-          id: 'invite',
-          title: 'Инвайт',
-          subtitle: 'Ссылка для регистрации водителя.',
-          icon: 'users',
-        },
+          {
+            id: 'invite',
+            title: 'Инвайт водителя',
+            subtitle: 'Открыть анкету водителя таксопарка с PARK-кодом.',
+            icon: 'users',
+            target: 'fleetDriverInvite',
+          },
         {
           id: 'statuses',
           title: 'Статусы',
@@ -864,12 +869,12 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
         {
           id: 'empty',
           title: 'Список пуст',
-          subtitle: 'После приглашения здесь появятся карточки водителей.',
+          subtitle: 'Нажмите “Добавить водителя таксопарка”, водитель заполнит анкету по PARK-коду.',
           value: '0',
           status: 'Пусто',
         },
       ],
-      note: 'У автопарка должны быть права видеть только водителей своей организации.',
+        note: 'У таксопарка должны быть права видеть только водителей своей организации и менять только их статус допуска.',
     },
     cars: {
       title: 'Автомобили',
@@ -1088,7 +1093,7 @@ sectionPages.park_driver = {
     metrics: [
       { label: 'B2B-доступ', value: 'Ручной', helper: 'Активирует администратор' },
       { label: 'Статус', value: 'Активен', helper: 'После допуска парком' },
-      { label: 'Комиссия', value: '0%', helper: 'По подписке парка' },
+        { label: 'Комиссия', value: '0%', helper: 'По договору парка' },
     ],
     quickActions: [
       {
@@ -1126,7 +1131,7 @@ sectionPages.park_driver = {
     secondaryTarget: 'documents',
     metrics: [
       { label: 'Оплата', value: 'Парк', helper: 'Водитель не платит собственный доступ' },
-      { label: 'Комиссия', value: '0%', helper: 'По подписке парка' },
+        { label: 'Комиссия', value: '0%', helper: 'По договору парка' },
       { label: 'Допуск', value: 'Проверка', helper: 'Документы и статус парка' },
     ],
     quickActions: [

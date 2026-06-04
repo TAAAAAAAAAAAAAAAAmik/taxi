@@ -517,7 +517,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                       {referral.inviterName} → {referral.inviteeName}
                     </Text>
                     <Text numberOfLines={1} style={styles.orderText}>
-                      {isSelfEmployedDriverRole(referral.inviteeRole) ? 'Самозанятый водитель' : 'Клиент'} · {referral.status} ·{' '}
+                      {isSelfEmployedDriverRole(referral.inviteeRole) ? 'Водитель' : 'Клиент'} · {referral.status} ·{' '}
                       {referral.rewardAmount} ₽
                     </Text>
                     <Text numberOfLines={1} style={styles.orderText}>

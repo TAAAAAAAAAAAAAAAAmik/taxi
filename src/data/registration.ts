@@ -41,7 +41,7 @@ export const sectionTitles: Record<RegistrationSection, string> = {
   vehicle: 'Автомобиль',
   legal: 'Правовой допуск',
   business: 'Автопарк',
-  payments: 'Выплаты',
+  payments: 'Расчеты',
 };
 
 export const roleCopy: Record<
@@ -60,27 +60,27 @@ export const roleCopy: Record<
     reviewStatus: 'Профиль готов к подтверждению телефона и почты',
   },
   self_employed_driver: {
-    title: 'Водитель-самозанятый',
-    subtitle: `Частный водитель получает оплату от клиента напрямую и переводит сервису ${driverAccessPlans.commission.commissionPercent}% с завершенных поездок в конце рабочего дня.`,
-    submitLabel: 'Отправить заявку самозанятого водителя',
+    title: 'Водитель',
+    subtitle: `Берет заказы без платежной системы: клиент платит водителю напрямую, а водитель переводит сервису ${driverAccessPlans.commission.commissionPercent}% с завершенных поездок в конце рабочего дня.`,
+    submitLabel: 'Отправить заявку водителя',
     reviewStatus:
-      `После проверки документов будет доступна модель расчетов: 0 ₽/мес и ${driverAccessPlans.commission.commissionPercent}% к дневному переводу.`,
+      `После проверки документов откроется лента заказов и дневная сверка ${driverAccessPlans.commission.commissionPercent}% к переводу сервису.`,
   },
   park_admin: {
     title: 'Таксопарк',
-    subtitle: 'Юрлицо или ИП управляет своими водителями, автомобилями, заказами и финансами.',
-    submitLabel: 'Отправить заявку таксопарка',
-    reviewStatus: 'Анкета уйдет на проверку юридических данных и расчетного счета',
+    subtitle: 'Только ИП: парк управляет своими водителями, автомобилями, заказами и ручной сверкой.',
+    submitLabel: 'Зарегистрировать таксопарк',
+    reviewStatus: 'Анкета уйдет на проверку ИП, ОГРНИП и расчетного счета',
   },
   park_driver: {
     title: 'Водитель таксопарка',
-    subtitle: 'Работает по приглашению таксопарка без собственной оплаты доступа.',
+    subtitle: 'Работает по приглашению зарегистрированного таксопарка и проходит быструю привязку к парку.',
     submitLabel: 'Присоединиться к таксопарку',
     reviewStatus: 'Доступ откроется после активации таксопарком и проверки документов',
   },
   driver: {
-    title: 'Водитель-самозанятый',
-    subtitle: 'Устаревшая роль, будет сохранена как самозанятый водитель.',
+    title: 'Водитель',
+    subtitle: 'Устаревшая роль, будет сохранена как водитель.',
     submitLabel: 'Отправить заявку водителя',
     reviewStatus:
       'После проверки автомобиля администратор открывает доступ к заказам',
@@ -167,7 +167,7 @@ const driverFields: RegistrationField[] = [
     section: 'identity',
     required: true,
     keyboardType: 'number-pad',
-    helper: 'Нужен для проверки статуса самозанятого, ИП или трудового договора.',
+    helper: 'Нужен для анкеты, ручной проверки и сверки расчетов.',
   },
   {
     id: 'driverLicense',
@@ -188,10 +188,11 @@ const driverFields: RegistrationField[] = [
   },
   {
     id: 'taxStatus',
-    label: 'Статус для работы',
-    placeholder: 'Самозанятый, ИП или трудовой договор',
+    label: 'Подтверждение условий расчетов',
+    placeholder: 'Понимаю: клиент платит мне напрямую, долю сервиса перевожу в конце дня',
     section: 'legal',
     required: true,
+    helper: 'Платежных систем в пилоте нет: приложение считает сумму к ручному переводу сервису.',
   },
   {
     id: 'noLegalRestrictionsDeclaration',
@@ -246,8 +247,8 @@ const driverFields: RegistrationField[] = [
   },
   {
     id: 'payoutAccount',
-    label: 'Реквизиты для выплат',
-    placeholder: 'Банк, БИК, счет',
+    label: 'Карта или счет для оплаты от клиента',
+    placeholder: 'Банк, карта или счет, куда клиент переводит оплату',
     section: 'payments',
     required: true,
   },
@@ -256,31 +257,31 @@ const driverFields: RegistrationField[] = [
 const fleetFields: RegistrationField[] = [
   {
     id: 'companyName',
-    label: 'Название организации',
-    placeholder: 'ООО Такси',
+    label: 'Наименование ИП / таксопарка',
+    placeholder: 'ИП Иванов Иван Иванович',
     section: 'business',
     required: true,
   },
   {
     id: 'inn',
-    label: 'ИНН',
-    placeholder: '10 или 12 цифр',
+    label: 'ИНН ИП',
+    placeholder: '12 цифр',
     section: 'business',
     required: true,
     keyboardType: 'number-pad',
   },
   {
     id: 'ogrn',
-    label: 'ОГРН / ОГРНИП',
-    placeholder: 'Регистрационный номер',
+    label: 'ОГРНИП',
+    placeholder: '15 цифр',
     section: 'business',
     required: true,
     keyboardType: 'number-pad',
   },
   {
     id: 'legalAddress',
-    label: 'Юридический адрес',
-    placeholder: 'Город, улица, дом',
+    label: 'Адрес регистрации ИП',
+    placeholder: 'Салаватский район, населенный пункт, улица, дом',
     section: 'business',
     required: true,
   },
@@ -293,8 +294,8 @@ const fleetFields: RegistrationField[] = [
   },
   {
     id: 'fleetPayoutAccount',
-    label: 'Расчетный счет',
-    placeholder: 'Банк, БИК, счет',
+    label: 'Расчетный счет ИП',
+    placeholder: 'Банк, БИК, расчетный счет ИП',
     section: 'payments',
     required: true,
   },
@@ -331,7 +332,7 @@ const parkDriverFields: RegistrationField[] = [
     placeholder: 'Подтверждаю работу через таксопарк',
     section: 'legal',
     required: true,
-    helper: 'Доступ к заказам оплачивает и контролирует таксопарк.',
+    helper: 'Таксопарк добавляет водителя по коду и контролирует его допуск к заказам.',
   },
 ];
 
@@ -365,17 +366,18 @@ export const verificationSteps: Record<AccountRole, string[]> = {
   self_employed_driver: [
     'Проверка телефона и почты',
     'Проверка паспорта, ИНН и ВУ',
-    'Проверка налогового статуса',
+    'Подтверждение ручной модели расчетов',
     'Проверка автомобиля, СТС, ОСАГО и ОСГОП',
     `Клиентская оплата поступает водителю напрямую`,
     `Доля сервиса ${driverAccessPlans.commission.commissionPercent}% с завершенной поездки к дневному переводу`,
   ],
   park_admin: [
     'Проверка контакта',
-    'Проверка юрлица или ИП',
-    'Проверка расчетного счета',
-    'Ручная B2B-активация после договора',
-    'Подключение водителей и автомобилей',
+    'Проверка ИП и ОГРНИП',
+    'Проверка расчетного счета ИП',
+    'Ручная активация таксопарка после договора',
+    'Создание приглашений для водителей парка',
+    'Подключение автомобилей и выпуск на линию',
   ],
   park_driver: [
     'Проверка приглашения таксопарка',
@@ -390,13 +392,13 @@ export const verificationSteps: Record<AccountRole, string[]> = {
     'Проверка стажа не менее 3 лет',
     'Проверка автомобиля и СТС',
     'Ручное решение администратора по допуску',
-    'Оплата модели доступа',
+    'Дневная сверка доли сервиса',
     'Открытие заказов',
   ],
   fleet: [
     'Проверка контакта',
-    'Проверка юрлица',
-    'Настройка выплат',
+    'Проверка ИП',
+    'Настройка расчетного счета',
     'Подключение водителей',
   ],
 };

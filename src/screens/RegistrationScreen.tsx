@@ -56,20 +56,24 @@ const roleIcons = {
   fleet: Building2,
 };
 
-const orderedRoles: AccountRole[] = ['client', 'self_employed_driver', 'park_admin'];
+const orderedRoles: AccountRole[] = ['client', 'self_employed_driver', 'park_admin', 'park_driver'];
 const sectionOrder = ['account', 'identity', 'legal', 'vehicle', 'business', 'payments'] as const;
 
 export function RegistrationScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
   const { registerAccount, serverMessage } = useAppState();
   const referralCodeFromLink = normalizeReferralCodeParam(route.params?.referralCode);
-  const roleFromLink = normalizeRoleParam(route.params?.role);
+  const roleFromLink = normalizeRoleParam(route.params?.role, referralCodeFromLink);
   const [role, setRole] = useState<AccountRole>(roleFromLink);
   const [values, setValues] = useState<FormValues>(() => {
     const initialValues: FormValues = {};
 
     if (referralCodeFromLink) {
       initialValues.referralCode = referralCodeFromLink;
+
+      if (isFleetInviteCode(referralCodeFromLink)) {
+        initialValues.parkInviteCode = referralCodeFromLink;
+      }
     }
 
     return initialValues;
@@ -96,7 +100,13 @@ export function RegistrationScreen({ navigation, route }: Props) {
     setValues((current) =>
       current.referralCode === referralCodeFromLink
         ? current
-        : { ...current, referralCode: referralCodeFromLink },
+        : {
+            ...current,
+            referralCode: referralCodeFromLink,
+            ...(isFleetInviteCode(referralCodeFromLink)
+              ? { parkInviteCode: current.parkInviteCode || referralCodeFromLink }
+              : {}),
+          },
     );
   }, [referralCodeFromLink]);
 
@@ -134,8 +144,11 @@ export function RegistrationScreen({ navigation, route }: Props) {
     setServerNotice(null);
 
     const normalizedReferralCode = normalizeReferralCodeParam(values.referralCode);
+    const shouldValidateReferralCode = Boolean(
+      normalizedReferralCode && !isFleetInviteCode(normalizedReferralCode),
+    );
 
-    if (normalizedReferralCode) {
+    if (shouldValidateReferralCode) {
       try {
         const referralValidation = await validateReferralCode(
           normalizedReferralCode,
@@ -179,7 +192,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
       phone: values.phone,
       passportSeriesNumber: values.passportSeriesNumber,
       payoutAccount: values.payoutAccount,
-      referralCode: normalizedReferralCode,
+      referralCode: shouldValidateReferralCode ? normalizedReferralCode : undefined,
       role: normalizeAccountRole(role),
       stsNumber: values.stsNumber,
       taxiParkDriverAgreement: values.taxiParkDriverAgreement,
@@ -240,7 +253,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
             <Text numberOfLines={2} style={styles.heroTitle}>Создание аккаунта</Text>
             <Text numberOfLines={3} style={styles.heroText}>
               Выберите роль, заполните анкету и подтвердите {skipPhoneVerification ? 'почту' : 'телефон с почтой'}.
-              Водитель получает доступ к заказам после проверки документов и выбора модели: подписка 3000 ₽ или комиссия 7%.
+              Водитель получает доступ после проверки документов, таксопарк регистрируется только как ИП, водитель таксопарка подключается по приглашению.
             </Text>
           </View>
         </View>
@@ -314,7 +327,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
                   : getInviteLinkTemplate()}
               </Text>
               <Text numberOfLines={2} style={styles.panelTextMuted}>
-                Ссылка открывает регистрацию и автоматически подставляет реферальный код.
+                Ссылка открывает регистрацию, подставляет код и для PARK-кода сразу включает роль водителя таксопарка.
               </Text>
             </InfoPanel>
           </View>
@@ -426,7 +439,11 @@ function normalizeReferralCodeParam(value?: string) {
     .replace(/[^A-ZА-Я0-9]/g, '');
 }
 
-function normalizeRoleParam(value?: AccountRole) {
+function normalizeRoleParam(value?: AccountRole, referralCode?: string) {
+  if (!value && isFleetInviteCode(referralCode)) {
+    return 'park_driver';
+  }
+
   return normalizeAccountRole(value);
 }
 
@@ -434,6 +451,10 @@ function getInviteLinkTemplate() {
   const linksOrigin = normalizePublicOrigin(getPublicEnv('EXPO_PUBLIC_LINKS_DOMAIN'));
 
   return linksOrigin ? `${linksOrigin}/invite/{code}` : 'taxipartner://invite/{code}';
+}
+
+function isFleetInviteCode(value?: string) {
+  return Boolean(value?.startsWith('PARK'));
 }
 
 const styles = StyleSheet.create({

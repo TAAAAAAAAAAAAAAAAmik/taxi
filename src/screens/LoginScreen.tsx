@@ -48,7 +48,7 @@ const demoAccounts: Array<{
   },
   {
     identifier: 'demo-driver@example.test',
-    label: 'Самозанятый водитель',
+    label: 'Водитель',
     password: 'Kinetix123',
     role: 'self_employed_driver',
   },
@@ -81,7 +81,7 @@ export function LoginScreen({ navigation }: Props) {
 
     const resolvedRole = normalizeAccountRole(user.role);
 
-    navigation.replace(resolvedRole === 'client' ? 'OrderFlow' : 'Dashboard', {
+    navigation.replace('Dashboard', {
       firstName: user.firstName || undefined,
       role: resolvedRole,
     });

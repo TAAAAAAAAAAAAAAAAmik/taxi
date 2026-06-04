@@ -80,7 +80,7 @@ export function PasswordResetScreen({ navigation }: Props) {
 
     const nextRole = normalizeDashboardRole(user.role);
 
-    navigation.replace(nextRole === 'client' ? 'OrderFlow' : 'Dashboard', {
+    navigation.replace('Dashboard', {
       firstName: user.firstName || undefined,
       role: nextRole,
     });

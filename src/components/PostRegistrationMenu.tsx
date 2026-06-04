@@ -44,6 +44,7 @@ import { SectionPage, SectionRow, sectionPages } from '../data/sectionPages';
 type PostRegistrationMenuProps = {
   role: AccountRole;
   firstName?: string;
+  fleetInviteCode?: string;
   availableCarsCount?: number;
   driverStats?: DriverStatsSummary;
   realtimeMessage?: string;
@@ -63,6 +64,7 @@ type PostRegistrationMenuProps = {
   onToggleSimpleMode?: () => void;
   onOpenOrderFlow: () => void;
   onOpenDriverDocuments: () => void;
+  onOpenFleetDriverRegistration?: () => void;
   onOpenOrderHistory: () => void;
   onOpenReferral: () => void;
   onOpenSavedPlace: () => void;
@@ -105,6 +107,7 @@ export function PostRegistrationMenu({
   driverStats,
   driverLine,
   firstName,
+  fleetInviteCode,
   realtimeMessage,
   realtimeStatus = 'connecting',
   realtimeUpdatedAt,
@@ -116,6 +119,7 @@ export function PostRegistrationMenu({
   onToggleSimpleMode,
   onOpenOrderHistory,
   onOpenDriverDocuments,
+  onOpenFleetDriverRegistration,
   onOpenOrderFlow,
   onOpenReferral,
   onOpenSavedPlace,
@@ -153,6 +157,11 @@ export function PostRegistrationMenu({
 
     if (target === 'documents') {
       onOpenDriverDocuments();
+      return;
+    }
+
+    if (target === 'fleetDriverInvite') {
+      onOpenFleetDriverRegistration?.();
       return;
     }
 
@@ -270,6 +279,21 @@ export function PostRegistrationMenu({
           {role === 'client' ? (
             <>
               <Pressable
+                accessibilityRole="button"
+                onPress={onOpenOrderFlow}
+                style={({ pressed }) => [styles.callTaxiButton, pressed && styles.pressed]}
+              >
+                <View style={styles.callTaxiIcon}>
+                  <MapPinned color="#12382C" size={30} strokeWidth={2.5} />
+                </View>
+                <View style={styles.callTaxiCopy}>
+                  <Text style={styles.callTaxiLabel}>Главная кнопка</Text>
+                  <Text style={styles.callTaxiTitle}>Вызвать такси</Text>
+                  <Text style={styles.callTaxiHint}>Адреса и тарифы только по Салаватскому району.</Text>
+                </View>
+              </Pressable>
+
+              <Pressable
                 accessibilityLabel={`Доступно машин: ${availableCarsCount}`}
                 accessibilityRole="button"
                 onPress={onOpenOrderFlow}
@@ -300,6 +324,13 @@ export function PostRegistrationMenu({
                 </View>
               </Pressable>
             </>
+          ) : null}
+
+          {role === 'park_admin' && onOpenFleetDriverRegistration ? (
+            <FleetInvitePanel
+              inviteCode={fleetInviteCode ?? 'PARK-SALAVAT'}
+              onOpenFleetDriverRegistration={onOpenFleetDriverRegistration}
+            />
           ) : null}
 
           {isSelfEmployedDriver ? (
@@ -564,6 +595,39 @@ function SectionPageView({ appTitle, driverStats, onActionTarget, page }: Sectio
   );
 }
 
+function FleetInvitePanel({
+  inviteCode,
+  onOpenFleetDriverRegistration,
+}: {
+  inviteCode: string;
+  onOpenFleetDriverRegistration: () => void;
+}) {
+  return (
+    <View style={styles.fleetInvitePanel}>
+      <View style={styles.fleetInviteHeader}>
+        <View style={styles.fleetInviteIcon}>
+          <UsersRound color="#008D49" size={21} strokeWidth={2.4} />
+        </View>
+        <View style={styles.fleetInviteCopy}>
+          <Text style={styles.fleetInviteTitle}>Подключить водителя</Text>
+          <Text style={styles.fleetInviteText}>Откройте анкету, водитель заполнит ее как сотрудник вашего парка.</Text>
+        </View>
+      </View>
+      <View style={styles.fleetInviteCodeBox}>
+        <Text style={styles.fleetInviteCodeLabel}>Код парка</Text>
+        <Text selectable style={styles.fleetInviteCodeValue}>{inviteCode}</Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpenFleetDriverRegistration}
+        style={({ pressed }) => [styles.fleetInviteButton, pressed && styles.pressed]}
+      >
+        <Text style={styles.fleetInviteButtonText}>Добавить водителя таксопарка</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function DriverStatsCard({ stats }: { stats: DriverStatsSummary }) {
   return (
     <View style={styles.driverStatsCard}>
@@ -753,30 +817,72 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   availableCarsHint: {
-    color: '#12382C',
+    color: '#E8F3EF',
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
   },
   availableCarsIcon: {
     alignItems: 'center',
-    backgroundColor: '#008D49',
+    backgroundColor: '#F4FAF6',
     borderRadius: 8,
     height: 46,
     justifyContent: 'center',
     width: 46,
   },
   availableCarsLabel: {
-    color: '#12382C',
+    color: '#E8F3EF',
     fontSize: 13,
     fontWeight: '900',
     textTransform: 'uppercase',
   },
   availableCarsValue: {
-    color: '#12382C',
+    color: '#FFFFFF',
     fontSize: 34,
     fontWeight: '900',
     lineHeight: 38,
+  },
+  callTaxiButton: {
+    alignItems: 'center',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    minHeight: 112,
+    padding: 14,
+  },
+  callTaxiCopy: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  callTaxiHint: {
+    color: '#E8F3EF',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  callTaxiIcon: {
+    alignItems: 'center',
+    backgroundColor: '#F4FAF6',
+    borderRadius: 8,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  callTaxiLabel: {
+    color: '#E8F3EF',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  callTaxiTitle: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '900',
+    lineHeight: 32,
   },
   badge: {
     backgroundColor: '#E8F3EF',
@@ -889,6 +995,73 @@ const styles = StyleSheet.create({
   driverStatsTitle: {
     color: '#12382C',
     fontSize: 16,
+    fontWeight: '900',
+  },
+  fleetInviteButton: {
+    alignItems: 'center',
+    backgroundColor: '#008D49',
+    borderRadius: 8,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 12,
+  },
+  fleetInviteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  fleetInviteCodeBox: {
+    backgroundColor: '#E8F3EF',
+    borderRadius: 8,
+    gap: 4,
+    padding: 10,
+  },
+  fleetInviteCodeLabel: {
+    color: '#557669',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  fleetInviteCodeValue: {
+    color: '#12382C',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  fleetInviteCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  fleetInviteHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  fleetInviteIcon: {
+    alignItems: 'center',
+    backgroundColor: '#E8F3EF',
+    borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  fleetInvitePanel: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  fleetInviteText: {
+    color: '#557669',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  fleetInviteTitle: {
+    color: '#12382C',
+    fontSize: 14,
     fontWeight: '900',
   },
   financePanel: {

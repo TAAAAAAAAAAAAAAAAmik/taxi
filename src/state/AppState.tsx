@@ -404,7 +404,7 @@ function createDriverAccessState(billingMode: DriverBillingMode, status: DriverS
   };
 }
 
-const initialDriverSubscription: DriverSubscription = createDriverAccessState('monthly', 'inactive');
+const initialDriverSubscription: DriverSubscription = createDriverAccessState('commission', 'inactive');
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<AppOrder[]>([]);
@@ -582,7 +582,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const payDriverSubscription = useCallback(
-    async (billingMode: DriverBillingMode = 'monthly') => {
+    async (billingMode: DriverBillingMode = 'commission') => {
       const nextSubscription = createDriverAccessState(billingMode, 'active');
 
       if (currentDriver && currentDriver.status !== 'approved') {
@@ -610,8 +610,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setServerStatus('connected');
         setServerMessage(
           pendingPayment
-            ? 'Платеж создан у провайдера. Завершите оплату и проверьте статус.'
-            : 'Оплата подписки проведена, чек сохранен на backend.',
+            ? 'Backend создал внешнюю операцию. Для пилота используйте ручную сверку.'
+            : 'Ручная модель расчетов сохранена на backend.',
         );
       } catch (error) {
         setDriverSubscription(nextSubscription);
@@ -623,7 +623,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setServerMessage(
           error instanceof Error
             ? error.message
-        : 'Backend не отвечает. Модель оплаты отмечена только локально.',
+            : 'Backend не отвечает. Ручная модель расчетов отмечена только локально.',
         );
       }
     },
@@ -637,17 +637,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
         applyBillingDashboard(dashboard);
         setServerStatus('connected');
-        setServerMessage('Статус платежа обновлен с провайдера.');
+        setServerMessage('Статус ручной операции обновлен.');
       } catch (error) {
         setServerStatus('offline');
-        setServerMessage(error instanceof Error ? error.message : 'Не удалось проверить платеж.');
+        setServerMessage(error instanceof Error ? error.message : 'Не удалось проверить ручную операцию.');
       }
     },
     [applyBillingDashboard],
   );
 
   const refundDriverSubscriptionPayment = useCallback(
-    async (paymentId: string, reason = 'Возврат подписки в MVP') => {
+    async (paymentId: string, reason = 'Отмена ручной операции в MVP') => {
       setDriverPayments((current) =>
         current.map((payment) =>
           payment.id === paymentId
@@ -666,7 +666,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const dashboard = await refundDriverSubscriptionPaymentApi(paymentId, reason);
         applyBillingDashboard(dashboard);
         setServerStatus('connected');
-        setServerMessage('Возврат подписки сохранен на backend.');
+        setServerMessage('Отмена ручной операции сохранена на backend.');
       } catch (error) {
         setServerStatus('offline');
         setServerMessage(error instanceof Error ? error.message : 'Не удалось оформить возврат.');
@@ -678,7 +678,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppStateValue>(
     () => ({
       adminReferralDashboard,
-      activateDriverSubscription: (billingMode = 'monthly') => {
+      activateDriverSubscription: (billingMode = 'commission') => {
         void payDriverSubscription(billingMode);
       },
       addOrder: async (order, role, clientName) => {
@@ -1460,7 +1460,7 @@ const defaultDriver: OrderParticipant = {
 const initialDrivers: DriverProfile[] = [
   {
     ...defaultDriver,
-    billingMode: 'monthly',
+    billingMode: 'commission',
     canReceiveOrders: true,
     contractStatus: 'signed',
     documentsStatus: 'approved',
@@ -1512,11 +1512,11 @@ function createLocalDriverPayment(
     driverName: driver?.name,
     id,
     paidAt: now,
-    paymentMethod: 'Локальная демо-карта',
+    paymentMethod: 'Ручная сверка',
     planName: plan.name,
     provider: {
-      mode: 'demo',
-      name: 'local-demo',
+      mode: 'manual',
+      name: 'manual-settlement',
     },
     receipt: {
       currency: 'RUB',
@@ -1713,7 +1713,7 @@ function updateLocalServiceShareStatus(
 }
 
 function normalizeBillingMode(value?: DriverBillingMode): DriverBillingMode {
-  return value === 'commission' ? 'commission' : 'monthly';
+  return value === 'monthly' ? 'monthly' : 'commission';
 }
 
 function getInitialPaymentStatus(paymentMethod: string, total: number): PaymentStatus {

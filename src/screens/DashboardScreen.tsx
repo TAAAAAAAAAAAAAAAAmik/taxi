@@ -34,6 +34,10 @@ export function DashboardScreen({ navigation, route }: Props) {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const isDriverRole = isDriverLikeRole(role);
   const isSelfEmployedDriver = isSelfEmployedDriverRole(role);
+  const fleetInviteCode =
+    role === 'park_admin'
+      ? createFleetInviteCode(currentUser?.id || currentUser?.email || firstName || 'salavat')
+      : undefined;
   const availableCarsCount = drivers.filter(
     (driver) =>
       driver.status === 'approved' &&
@@ -144,6 +148,7 @@ export function DashboardScreen({ navigation, route }: Props) {
             : undefined
         }
         firstName={firstName}
+        fleetInviteCode={fleetInviteCode}
         simpleMode={simpleMode}
         realtimeMessage={realtimeMessage}
         realtimeStatus={realtimeStatus}
@@ -159,6 +164,12 @@ export function DashboardScreen({ navigation, route }: Props) {
         }}
         onOpenOrderFlow={() => navigation.navigate('OrderFlow', { firstName, role })}
         onOpenDriverDocuments={() => navigation.navigate('DriverDocuments', { firstName, role })}
+        onOpenFleetDriverRegistration={() =>
+          navigation.navigate('Registration', {
+            referralCode: fleetInviteCode,
+            role: 'park_driver',
+          })
+        }
         onOpenOrderHistory={() => navigation.navigate('OrderHistory', { firstName, role })}
         onOpenReferral={() => navigation.navigate('Referral', { firstName, role })}
         onOpenSavedPlace={() => navigation.navigate('SavedPlace', { firstName, role })}
@@ -211,6 +222,15 @@ export function DashboardScreen({ navigation, route }: Props) {
       ) : null}
     </SafeAreaView>
   );
+}
+
+function createFleetInviteCode(seed: string) {
+  const normalized = seed
+    .toUpperCase()
+    .replace(/[^A-ZА-Я0-9]/g, '')
+    .slice(0, 10);
+
+  return `PARK-${normalized || 'SALAVAT'}`;
 }
 
 function formatDriverAccessStatus(driver?: DriverProfile) {

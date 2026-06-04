@@ -23,6 +23,7 @@ export type MenuItem = {
 
 export type MenuActionTarget =
   | 'deleteAccount'
+  | 'fleetDriverInvite'
   | 'history'
   | 'documents'
   | 'homeAddress'
@@ -62,7 +63,7 @@ export type RoleMenuConfig = {
 export const roleMenuConfig: Record<string, RoleMenuConfig> = {
   client: {
     title: 'Меню клиента',
-    subtitle: 'Заказы, адреса, оплата и поддержка в одном кабинете.',
+    subtitle: 'Главная, вызов такси, адреса и поддержка в одном кабинете.',
     statusTitle: 'Аккаунт почти готов',
     statusText: 'После подтверждения телефона и почты клиент сможет заказать первую поездку.',
     primaryAction: 'Заказать поездку',
@@ -82,9 +83,9 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
       },
       {
         id: 'payment',
-        title: 'Оплата',
-        subtitle: 'Карты, наличные, промокоды',
-        icon: 'credit-card',
+        title: 'Оплата водителю',
+        subtitle: 'Клиент платит водителю напрямую',
+        icon: 'wallet',
       },
       {
         id: 'referrals',
@@ -148,8 +149,8 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
       },
       {
         label: 'Оплата',
-        value: 'Не задана',
-        helper: 'Можно добавить карту',
+        value: 'Водителю',
+        helper: 'Без платежной системы',
       },
     ],
   },
@@ -259,10 +260,10 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
     ],
   },
   fleet: {
-    title: 'Меню автопарка',
-    subtitle: 'Управление водителями, автомобилями, документами и выплатами.',
+    title: 'Меню таксопарка',
+    subtitle: 'ИП, водители, автомобили, документы и ручная сверка.',
     statusTitle: 'Проверка партнера',
-    statusText: 'После проверки юрлица откроется подключение водителей и автомобилей.',
+    statusText: 'После проверки ИП откроется подключение водителей и автомобилей.',
     primaryAction: 'Добавить водителя',
     secondaryAction: 'Добавить автомобиль',
     menuItems: [
@@ -315,6 +316,7 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
         title: 'Пригласить водителя',
         subtitle: 'Отправка ссылки на регистрацию.',
         icon: 'users',
+        target: 'fleetDriverInvite',
       },
       {
         id: 'add-car',
@@ -343,7 +345,7 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
       {
         label: 'Статус',
         value: 'Модерация',
-        helper: 'Юрданные проверяются',
+        helper: 'ИП проверяется',
       },
     ],
   },
@@ -399,8 +401,8 @@ roleMenuConfig.park_driver = {
     },
   ],
   metrics: [
-    { label: 'Таксопарк', value: 'Привязан', helper: 'Оплата на стороне парка' },
+    { label: 'Таксопарк', value: 'Привязан', helper: 'Доступ через парк' },
     { label: 'Документы', value: 'Проверка', helper: 'Нужна валидация' },
-    { label: 'Комиссия', value: '0%', helper: 'По подписке парка' },
+    { label: 'Комиссия', value: '0%', helper: 'По договору парка' },
   ],
 };
