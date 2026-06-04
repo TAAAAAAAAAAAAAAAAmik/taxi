@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "12_codex_limit_saving.md",
+                "file": "16_release_runbook.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "12_codex_limit_saving"
+              "title": "16_release_runbook"
             }
           }
         ]
@@ -185,12 +185,15 @@
   },
   "active": "b103aa397e8de59f",
   "lastOpenFiles": [
+    "19_unique_product_identity.md",
+    "18_design_benchmark_yandex_uber.md",
+    "13_mvp_checklist.md",
+    "12_codex_limit_saving.md",
     "20_premium_local_identity.md",
     "17_codex_roles.md",
     "16_release_runbook.md",
     "15_api_contract.md",
     "14_design_rules.md",
-    "13_mvp_checklist.md",
     "11_task_template.md",
     "10_current_task.md",
     "09_last_state.md",
@@ -198,7 +201,6 @@
     "08_codex_prompts.md",
     "08_codex_prompts_en.md",
     "00_main.md",
-    "12_codex_limit_saving.md",
     "01_project_idea.md",
     "02_roles.md",
     "03_mvp_scenario.md",

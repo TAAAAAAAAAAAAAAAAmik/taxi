@@ -1,4 +1,4 @@
-﻿# MVP Checklist
+# MVP Checklist
 
 ## Главный сценарий
 
