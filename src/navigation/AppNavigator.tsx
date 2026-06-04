@@ -1,4 +1,4 @@
-import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
+import { NavigationContainer, type InitialState, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AdminPanelScreen } from '../screens/AdminPanelScreen';
@@ -77,9 +77,64 @@ function normalizeRoleParam(value: string) {
   return normalizeAccountRole(value);
 }
 
+function getInitialWebState(): InitialState | undefined {
+  if (typeof window === 'undefined' || !window.location?.pathname) {
+    return undefined;
+  }
+
+  let path = window.location.pathname;
+
+  if (webBasePath && (path === webBasePath || path.startsWith(`${webBasePath}/`))) {
+    path = path.slice(webBasePath.length);
+  }
+
+  const segments = path
+    .replace(/^\/+|\/+$/g, '')
+    .split('/')
+    .filter(Boolean);
+
+  const [screen, value] = segments;
+
+  if (screen === 'login') {
+    return { routes: [{ name: 'Login' }] };
+  }
+
+  if (screen === 'admin') {
+    return { routes: [{ name: 'AdminPanel' }] };
+  }
+
+  if (screen === 'password-reset') {
+    return { routes: [{ name: 'PasswordReset' }] };
+  }
+
+  if (screen === 'invite') {
+    return {
+      routes: [
+        {
+          name: 'Registration',
+          params: { referralCode: value ? normalizeReferralCodeParam(value) : undefined },
+        },
+      ],
+    };
+  }
+
+  if (screen === 'order') {
+    return {
+      routes: [
+        {
+          name: 'OrderFlow',
+          params: { role: normalizeRoleParam(value || 'client') },
+        },
+      ],
+    };
+  }
+
+  return undefined;
+}
+
 export function AppNavigator() {
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer initialState={getInitialWebState()} linking={linking}>
       <Stack.Navigator
         initialRouteName="Welcome"
         screenOptions={{
