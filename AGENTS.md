@@ -67,3 +67,48 @@
 5. сервер;
 6. APK;
 7. запуск.
+
+---
+
+## Language and communication rules
+
+- Always communicate with the user in Russian.
+- All explanations, plans, summaries, and questions must be in Russian.
+- If the prompt is written in English, still answer in Russian.
+- Keep technical names, file names, commands, code identifiers, and error messages in their original language.
+- Do not switch to English unless the user explicitly asks for it.
+
+---
+
+## равила экономии лимитов Codex
+
+- е читать всю папку project-brain без необходимости.
+- ля обычной задачи сначала читать:
+  - AGENTS.md
+  - TODO.md
+  - DEVELOPMENT_PLAN.md
+  - project-brain/09_last_state.md
+  - project-brain/10_current_task.md
+- стальные файлы project-brain читать только если они нужны для задачи.
+- сли задача про MVP, читать project-brain/03_mvp_scenario.md.
+- сли задача про монетизацию, читать project-brain/04_monetization.md.
+- сли задача про роли, читать project-brain/02_roles.md.
+- сли задача про баги, читать project-brain/07_bugs.md.
+- елать одну маленькую задачу за раз.
+- е анализировать весь проект повторно, если достаточно прочитать последнее состояние.
+- осле выполненной задачи предложить обновление project-brain/09_last_state.md.
+
+---
+
+## Премиальная локальность
+
+Проект должен иметь собственную изюминку, но она не должна быть колхозной.
+
+Codex должен делать приложение как современный локальный сервис, а не как дешевую копию такси-приложения.
+
+Если задача касается дизайна, интерфейса, текстов или позиционирования, учитывать:
+
+- project-brain/20_premium_local_identity.md
+
+Главное правило:
+локальность показывать через удобство, маршруты, доверие и честные условия, а не через деревенские клише.
