@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   submitButtonMuted: {
-    backgroundColor: '#5A544E',
+    backgroundColor: '#A9BBB3',
   },
   submitText: {
     color: '#FFFFFF',

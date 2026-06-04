@@ -440,7 +440,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
         <View style={[styles.clientPage, simpleMode && styles.clientPageSimple]}>
           <View style={styles.clientTopRow}>
             <View>
-              <Text style={styles.clientBrand}>Kinetix</Text>
+              <Text style={styles.clientBrand}>Такси Салават</Text>
               <Text style={styles.clientMeta}>Малояз · Эконом 120 ₽</Text>
             </View>
             <Pressable
@@ -1521,7 +1521,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   clientDestinationInput: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
@@ -1542,7 +1542,7 @@ const styles = StyleSheet.create({
   },
   clientEstimate: {
     alignItems: 'center',
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
@@ -1579,7 +1579,7 @@ const styles = StyleSheet.create({
   },
   clientModeButton: {
     alignItems: 'center',
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
@@ -1629,7 +1629,7 @@ const styles = StyleSheet.create({
   },
   clientShortcutButton: {
     alignItems: 'center',
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
@@ -1654,7 +1654,7 @@ const styles = StyleSheet.create({
     fontSize: 21,
   },
   clientSuggestion: {
-    backgroundColor: '#242426',
+    backgroundColor: '#E8F3EF',
     borderRadius: 8,
     gap: 3,
     padding: 10,
@@ -1669,7 +1669,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   clientSuggestions: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
@@ -1677,8 +1677,8 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   clientTariffCard: {
-    backgroundColor: '#1C1C1E',
-    borderColor: '#2E2E30',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D6E8DF',
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,

@@ -15,7 +15,7 @@ assertProductionConfig();
 
 module.exports = {
   expo: {
-    name: 'Kinetix',
+    name: 'Такси Салават',
     slug: 'taxi-partner-app',
     version: '1.0.0',
     orientation: 'portrait',

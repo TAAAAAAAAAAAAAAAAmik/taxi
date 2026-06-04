@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   primaryButtonMuted: {
-    backgroundColor: '#5A544E',
+    backgroundColor: '#A9BBB3',
   },
   primaryButtonText: {
     color: '#F4FAF6',

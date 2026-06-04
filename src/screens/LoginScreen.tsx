@@ -250,7 +250,7 @@ export function LoginScreen({ navigation }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <LogIn color="#12382C" size={19} strokeWidth={2.4} />
+            <LogIn color="#FFFFFF" size={19} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>{isSubmitting ? 'Проверяем...' : 'Войти'}</Text>
           </Pressable>
 
@@ -298,7 +298,7 @@ export function LoginScreen({ navigation }: Props) {
                 pressed && styles.pressed,
               ]}
             >
-              <ShieldCheck color="#12382C" size={19} strokeWidth={2.4} />
+              <ShieldCheck color="#FFFFFF" size={19} strokeWidth={2.4} />
               <Text style={styles.primaryButtonText}>
                 {isSubmitting ? 'Проверяем...' : 'Войти по SMS'}
               </Text>
@@ -455,7 +455,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   primaryButtonMuted: {
-    backgroundColor: '#5A544E',
+    backgroundColor: '#008D49',
+    opacity: 0.64,
   },
   primaryButtonText: {
     color: '#F4FAF6',

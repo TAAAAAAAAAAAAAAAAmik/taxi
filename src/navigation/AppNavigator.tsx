@@ -35,6 +35,12 @@ const linking: LinkingOptions<RootStackParamList> = {
     screens: {
       AdminPanel: 'admin',
       Login: 'login',
+      OrderFlow: {
+        parse: {
+          role: normalizeRoleParam,
+        },
+        path: 'order/:role',
+      },
       PasswordReset: 'password-reset',
       Registration: {
         parse: {

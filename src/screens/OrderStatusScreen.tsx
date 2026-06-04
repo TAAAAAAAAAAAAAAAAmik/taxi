@@ -408,7 +408,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                   <Car color="#F4FAF6" size={28} strokeWidth={2.6} />
                 </View>
                 <View style={styles.goodRoadCopy}>
-                  <Text style={styles.goodRoadTitle}>Спасибо, что вы с Kinetix</Text>
+                  <Text style={styles.goodRoadTitle}>Спасибо, что вы с Такси Салават</Text>
                   <Text numberOfLines={2} style={styles.goodRoadText}>Добрая дорога завершена. Поездку можно повторить или сохранить водителя.</Text>
                 </View>
                 <View style={styles.sparkRow}>
@@ -968,7 +968,7 @@ const styles = StyleSheet.create({
   },
   driverSheet: {
     alignItems: 'center',
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   goodRoadPanel: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
@@ -1291,7 +1291,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   primaryButtonMuted: {
-    backgroundColor: '#5A544E',
+    backgroundColor: '#008D49',
+    opacity: 0.64,
   },
   primaryButtonText: {
     color: '#F4FAF6',

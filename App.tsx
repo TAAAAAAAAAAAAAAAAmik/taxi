@@ -12,12 +12,12 @@ export default function App() {
   return (
     <AppStateProvider>
       <StatusBar style="dark" />
-      {splashVisible ? <KinetixSplash onDone={() => setSplashVisible(false)} /> : <AppNavigator />}
+      {splashVisible ? <SalavatSplash onDone={() => setSplashVisible(false)} /> : <AppNavigator />}
     </AppStateProvider>
   );
 }
 
-function KinetixSplash({ onDone }: { onDone: () => void }) {
+function SalavatSplash({ onDone }: { onDone: () => void }) {
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {

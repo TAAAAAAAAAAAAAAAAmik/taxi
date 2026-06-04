@@ -826,8 +826,8 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   driverLineButtonDisabled: {
-    backgroundColor: '#5A544E',
-    borderColor: '#5A544E',
+    backgroundColor: '#A9BBB3',
+    borderColor: '#A9BBB3',
   },
   driverLineButtonOnline: {
     backgroundColor: '#E8F3EF',
@@ -1319,7 +1319,7 @@ const styles = StyleSheet.create({
   },
   simpleModeButton: {
     alignItems: 'center',
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
@@ -1344,7 +1344,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4FAF6',
   },
   simpleModeSwitch: {
-    backgroundColor: '#242426',
+    backgroundColor: '#E8F3EF',
     borderColor: '#557669',
     borderRadius: 99,
     borderWidth: 1,
