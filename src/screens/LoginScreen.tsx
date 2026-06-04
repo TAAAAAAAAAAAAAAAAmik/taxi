@@ -5,8 +5,6 @@ import {
   Car,
   LockKeyhole,
   LogIn,
-  MessageSquareText,
-  ShieldCheck,
   UserRound,
 } from 'lucide-react-native';
 import {
@@ -57,18 +55,13 @@ const demoAccounts: Array<{
 ];
 
 export function LoginScreen({ navigation }: Props) {
-  const { confirmSmsLoginCode, loginAccount, requestSmsLoginCode, serverMessage, serverStatus } = useAppState();
+  const { loginAccount, serverMessage, serverStatus } = useAppState();
   const [role, setRole] = useState<AccountRole>('client');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [smsCode, setSmsCode] = useState('');
-  const [smsDemoCode, setSmsDemoCode] = useState('');
-  const [notice, setNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const canPasswordContinue = identifier.trim().length > 2 && password.length >= 4 && !isSubmitting;
-  const canRequestSms = identifier.trim().length >= 10 && !isSubmitting;
-  const canConfirmSms = identifier.trim().length >= 10 && smsCode.trim().length >= 4 && !isSubmitting;
   const showDemoLogin = isDemoModeEnabled();
 
   const submitLogin = async (
@@ -96,47 +89,6 @@ export function LoginScreen({ navigation }: Props) {
 
   const handleLogin = async () => {
     await submitLogin(identifier, password, role);
-  };
-
-  const handleRequestSmsCode = async () => {
-    setIsSubmitting(true);
-    setErrorText(null);
-    setNotice('');
-    setSmsDemoCode('');
-    const result = await requestSmsLoginCode(identifier, normalizeAccountRole(role), 'sms');
-    setIsSubmitting(false);
-
-    if (!result) {
-      setErrorText(serverMessage || 'Не удалось отправить SMS-код.');
-      return;
-    }
-
-    setSmsDemoCode(result.code ?? '');
-    setNotice(
-      result.deliveryMode === 'mvp-returned-code' && result.code
-        ? `MVP-код входа: ${result.code}`
-        : 'Если номер зарегистрирован, SMS-код отправлен.',
-    );
-  };
-
-  const handleSmsLogin = async () => {
-    setIsSubmitting(true);
-    setErrorText(null);
-    setNotice('');
-    const user = await confirmSmsLoginCode(identifier, smsCode, normalizeAccountRole(role));
-    setIsSubmitting(false);
-
-    if (!user) {
-      setErrorText(serverMessage || 'SMS-код не подошел.');
-      return;
-    }
-
-    const nextRole = normalizeAccountRole(user.role);
-
-    navigation.replace(nextRole === 'client' ? 'OrderFlow' : 'Dashboard', {
-      firstName: user.firstName || undefined,
-      role: nextRole,
-    });
   };
 
   const handleDemoLogin = async (account: (typeof demoAccounts)[number]) => {
@@ -253,57 +205,6 @@ export function LoginScreen({ navigation }: Props) {
             <LogIn color="#FFFFFF" size={19} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>{isSubmitting ? 'Проверяем...' : 'Войти'}</Text>
           </Pressable>
-
-          <View style={styles.smsPanel}>
-            <Text style={styles.sectionTitle}>Вход по SMS</Text>
-            <Pressable
-              accessibilityRole="button"
-              disabled={!canRequestSms}
-              onPress={handleRequestSmsCode}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                !canRequestSms && styles.secondaryButtonMuted,
-                pressed && styles.pressed,
-              ]}
-            >
-              <MessageSquareText color="#008D49" size={18} strokeWidth={2.4} />
-              <Text style={styles.secondaryButtonText}>
-                {isSubmitting ? 'Отправляем...' : 'Получить SMS-код'}
-              </Text>
-            </Pressable>
-
-            {smsDemoCode ? <Text style={styles.demoCode}>MVP-код: {smsDemoCode}</Text> : null}
-            {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-
-            <View style={styles.field}>
-              <Text style={styles.label}>SMS-код</Text>
-              <TextInput
-                keyboardType="number-pad"
-                maxLength={6}
-                onChangeText={setSmsCode}
-                placeholder="0000"
-                placeholderTextColor="#557669"
-                style={styles.input}
-                value={smsCode}
-              />
-            </View>
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={!canConfirmSms}
-              onPress={handleSmsLogin}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                !canConfirmSms && styles.primaryButtonMuted,
-                pressed && styles.pressed,
-              ]}
-            >
-              <ShieldCheck color="#FFFFFF" size={19} strokeWidth={2.4} />
-              <Text style={styles.primaryButtonText}>
-                {isSubmitting ? 'Проверяем...' : 'Войти по SMS'}
-              </Text>
-            </Pressable>
-          </View>
 
           {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
 
@@ -463,42 +364,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 50,
-    paddingHorizontal: 16,
-  },
-  secondaryButtonMuted: {
-    opacity: 0.56,
-  },
-  secondaryButtonText: {
-    color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  demoCode: {
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    color: '#008D49',
-    fontSize: 16,
-    fontWeight: '900',
-    overflow: 'hidden',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  notice: {
-    color: '#557669',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
   roleButton: {
     alignItems: 'center',
     backgroundColor: '#E8F3EF',
@@ -531,13 +396,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-  },
-  smsPanel: {
-    borderColor: '#3D3D3D',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 12,
-    padding: 12,
   },
   safeArea: {
     backgroundColor: '#F4FAF6',
