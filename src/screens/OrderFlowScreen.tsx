@@ -66,6 +66,8 @@ type RouteEstimate = {
   total: number;
 };
 
+const selectedTariffBenefits = ['Фиксированная цена', 'Быстрая подача', '4 места'];
+
 export function OrderFlowScreen({ navigation, route }: Props) {
   const { firstName, role } = route.params;
   const { width } = useWindowDimensions();
@@ -441,6 +443,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             ...serverAddressSuggestions,
           ]).slice(0, 4)
         : [];
+    const clientRealtimeLabel = formatClientRealtimeLabel(realtimeMessage, realtimeStatus);
 
     return (
       <SafeAreaView style={styles.clientSafeArea}>
@@ -452,7 +455,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               </View>
               <View style={styles.clientBrandCopy}>
                 <Text style={styles.clientBrand}>Такси Салават</Text>
-                <Text numberOfLines={1} style={styles.clientMeta}>Малояз · Эконом 120 ₽</Text>
+                <Text numberOfLines={1} style={styles.clientMeta}>Малояз · быстрые поездки по району</Text>
               </View>
             </View>
             <Pressable
@@ -521,74 +524,83 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
           {!simpleMode ? (
             <>
-              <ScrollView
-                contentContainerStyle={styles.clientTariffList}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-              >
-                {config.tariffs.map((tariff) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: tariff.id === selectedTariffId }}
-                    key={tariff.id}
-                    onPress={() => {
-                      setConfirmed(false);
-                      setSelectedTariffId(tariff.id);
-                    }}
-                    style={({ pressed }) => [
-                      styles.clientTariffCard,
-                      tariff.id === selectedTariffId && styles.clientTariffCardActive,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.clientTariffTitle,
-                        tariff.id === selectedTariffId && styles.clientTariffTitleActive,
-                      ]}
-                    >
-                      {tariff.title}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.clientTariffSubtitle,
-                        tariff.id === selectedTariffId && styles.clientTariffSubtitleActive,
-                      ]}
-                    >
-                      {tariff.id === 'economy' ? 'Фикс по Малоязу' : tariff.subtitle}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.clientTariffPrice,
-                        tariff.id === selectedTariffId && styles.clientTariffPriceActive,
-                      ]}
-                    >
-                      {tariff.id === selectedTariffId ? routeEstimate.total : tariff.price} ₽
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <View style={styles.clientTariffList}>
+                {config.tariffs.map((tariff) => {
+                  const active = tariff.id === selectedTariffId;
+                  const tariffPrice = active ? routeEstimate.total : tariff.price;
 
-              <View style={styles.clientEstimate}>
-                <View>
-                  <Text style={styles.clientEstimateLabel}>Итого</Text>
-                  <Text style={styles.clientEstimateValue}>{total} ₽</Text>
-                </View>
-                <View style={styles.clientEstimateRight}>
-                  <Text style={styles.clientEstimateText}>
-                    {selectedTariff.id === 'economy'
-                      ? 'Эконом не зависит от surge'
-                      : `Коэффициент ${formatSurge(routeEstimate)}`}
-                  </Text>
-                  <Text style={styles.clientEstimateText}>
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      key={tariff.id}
+                      onPress={() => {
+                        setConfirmed(false);
+                        setSelectedTariffId(tariff.id);
+                      }}
+                      style={({ pressed }) => [
+                        styles.clientTariffCard,
+                        active && styles.clientTariffCardActive,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      {active ? (
+                        <>
+                          <View style={styles.clientTariffHeader}>
+                            <View style={styles.clientTariffBadge}>
+                              <Text style={styles.clientTariffBadgeText}>✓ Выбрано</Text>
+                            </View>
+                            <View style={styles.clientTariffVisual}>
+                              <View style={styles.clientTariffRouteDot} />
+                              <View style={styles.clientTariffRouteLine} />
+                              <Car color="#12382C" size={18} strokeWidth={2.1} />
+                            </View>
+                          </View>
+                          <View style={styles.clientTariffMainRow}>
+                            <View style={styles.clientTariffCopy}>
+                              <Text style={styles.clientTariffTitle}>{tariff.title}</Text>
+                              <View style={styles.clientTariffBenefits}>
+                                {selectedTariffBenefits.map((benefit) => (
+                                  <View key={benefit} style={styles.clientTariffBenefit}>
+                                    <View style={styles.clientTariffBenefitDot} />
+                                    <Text numberOfLines={1} style={styles.clientTariffBenefitText}>
+                                      {benefit}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+                            <Text style={styles.clientTariffPrice}>{tariffPrice} ₽</Text>
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.clientTariffTitle}>{tariff.title}</Text>
+                          <Text style={styles.clientTariffSubtitle}>{tariff.subtitle}</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.clientCompactDetails}>
+                <View style={styles.clientDetailItem}>
+                  <Text style={styles.clientDetailLabel}>Маршрут</Text>
+                  <Text numberOfLines={1} style={styles.clientDetailValue}>
                     {formatDistance(routeEstimate.distanceKm)} · {routeEstimate.durationMin} мин
                   </Text>
                 </View>
-              </View>
-
-              <View style={styles.clientRealtime}>
-                <View style={[styles.clientRealtimeDot, realtimeStatus === 'live' && styles.clientRealtimeDotLive]} />
-            <Text numberOfLines={1} style={styles.clientRealtimeText}>{realtimeMessage}</Text>
+                <View style={styles.clientDetailItem}>
+                  <Text style={styles.clientDetailLabel}>Подача</Text>
+                  <Text numberOfLines={1} style={styles.clientDetailValue}>{selectedTariff.eta}</Text>
+                </View>
+                <View style={[styles.clientDetailItem, styles.clientDetailStatus]}>
+                  <View style={[styles.clientRealtimeDot, realtimeStatus === 'live' && styles.clientRealtimeDotLive]} />
+                  <Text numberOfLines={1} style={styles.clientDetailStatusText}>
+                    {clientRealtimeLabel}
+                  </Text>
+                </View>
               </View>
             </>
           ) : null}
@@ -1079,6 +1091,28 @@ function formatCarsWord(count: number) {
   return 'машин';
 }
 
+function formatClientRealtimeLabel(message: string, status: string) {
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network request failed') ||
+    normalized.includes('load failed')
+  ) {
+    return 'Связь восстановится автоматически';
+  }
+
+  if (status === 'live') {
+    return 'Сервис на связи';
+  }
+
+  if (status === 'polling') {
+    return 'Обновляем доступность';
+  }
+
+  return message || 'Готово к заказу';
+}
+
 function mapApiAddressSuggestion(suggestion: ApiAddressSuggestion): SalavatAddressSuggestion {
   return {
     aliases: suggestion.aliases ?? [],
@@ -1156,7 +1190,7 @@ function buildRouteEstimate({
       distanceKm,
       distancePrice: 120,
       durationMin,
-      note: 'фикс по Малоязу',
+      note: 'Фиксированная цена',
       total: 120 + optionsTotal,
     };
   }
@@ -1597,36 +1631,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-  clientEstimate: {
-    alignItems: 'center',
+  clientCompactDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  clientDetailItem: {
     backgroundColor: '#FFFFFF',
     borderColor: '#D6E8DF',
     borderRadius: 8,
     borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-    padding: 12,
+    flex: 1,
+    gap: 3,
+    justifyContent: 'center',
+    minHeight: 48,
+    minWidth: 112,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
   },
-  clientEstimateLabel: {
+  clientDetailLabel: {
     color: '#557669',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     textTransform: 'uppercase',
   },
-  clientEstimateRight: {
-    alignItems: 'flex-end',
-    gap: 4,
+  clientDetailStatus: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 7,
+    minWidth: 156,
   },
-  clientEstimateText: {
+  clientDetailStatusText: {
     color: '#557669',
+    flex: 1,
     fontSize: 13,
     fontWeight: '800',
   },
-  clientEstimateValue: {
+  clientDetailValue: {
     color: '#12382C',
-    fontSize: 24,
-    fontWeight: '900',
+    fontSize: 14,
+    fontWeight: '800',
   },
   clientMeta: {
     color: '#557669',
@@ -1749,31 +1793,106 @@ const styles = StyleSheet.create({
   },
   clientTariffCard: {
     backgroundColor: '#FFFFFF',
+    borderColor: '#C7DED3',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 16,
+    minHeight: 154,
+    padding: 15,
+    shadowColor: '#12382C',
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+  },
+  clientTariffCardActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
+    borderWidth: 1.5,
+    elevation: 3,
+  },
+  clientTariffList: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  clientTariffBadge: {
+    alignItems: 'center',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#BFDACE',
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 28,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+  },
+  clientTariffBadgeText: {
+    color: '#008D49',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  clientTariffBenefit: {
+    alignItems: 'center',
+    backgroundColor: '#F4FAF6',
     borderColor: '#D6E8DF',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 5,
-    minHeight: 104,
-    width: 138,
-    padding: 12,
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: 28,
+    paddingHorizontal: 9,
   },
-  clientTariffCardActive: {
+  clientTariffBenefitDot: {
     backgroundColor: '#008D49',
-    borderColor: '#008D49',
-    borderWidth: 1,
+    borderRadius: 3,
+    height: 6,
+    width: 6,
   },
-  clientTariffList: {
-    gap: 10,
-    paddingVertical: 2,
+  clientTariffBenefitText: {
+    color: '#31584A',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  clientTariffBenefits: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginTop: 10,
+  },
+  clientTariffCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  clientTariffHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  clientTariffMainRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
   },
   clientTariffPrice: {
-    color: '#008D49',
-    fontSize: 20,
-    fontWeight: '900',
-    marginTop: 'auto',
+    color: '#12382C',
+    fontSize: 25,
+    fontWeight: '800',
+    lineHeight: 31,
+    textAlign: 'right',
   },
   clientTariffPriceActive: {
-    color: '#FFFFFF',
+    color: '#12382C',
+  },
+  clientTariffRouteDot: {
+    backgroundColor: '#008D49',
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  clientTariffRouteLine: {
+    backgroundColor: '#BFDACE',
+    height: 2,
+    width: 34,
   },
   clientTariffSubtitle: {
     color: '#557669',
@@ -1781,15 +1900,27 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   clientTariffSubtitleActive: {
-    color: '#E8F3EF',
+    color: '#557669',
   },
   clientTariffTitle: {
     color: '#12382C',
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: '900',
+    lineHeight: 27,
   },
   clientTariffTitleActive: {
-    color: '#FFFFFF',
+    color: '#12382C',
+  },
+  clientTariffVisual: {
+    alignItems: 'center',
+    backgroundColor: '#F4FAF6',
+    borderColor: '#D6E8DF',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    minHeight: 30,
+    paddingHorizontal: 10,
   },
   clientTopRow: {
     alignItems: 'center',
