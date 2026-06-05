@@ -1,119 +1,482 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
-import { BashkortostanEmblem } from './src/components/BashkortostanEmblem';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { AppStateProvider } from './src/state/AppState';
+import { kinetixColors } from './src/theme/kinetixTokens';
 
 export default function App() {
   const [splashVisible, setSplashVisible] = useState(true);
+  const handleSplashDone = useCallback(() => setSplashVisible(false), []);
 
   return (
     <AppStateProvider>
       <StatusBar style="dark" />
-      {splashVisible ? <SalavatSplash onDone={() => setSplashVisible(false)} /> : <AppNavigator />}
+      {splashVisible ? <SalavatSplash onDone={handleSplashDone} /> : <AppNavigator />}
     </AppStateProvider>
   );
 }
 
 function SalavatSplash({ onDone }: { onDone: () => void }) {
-  const progress = useRef(new Animated.Value(0)).current;
+  const backgroundProgress = useRef(new Animated.Value(0)).current;
+  const routeStartProgress = useRef(new Animated.Value(0)).current;
+  const routeTurnProgress = useRef(new Animated.Value(0)).current;
+  const routeEndProgress = useRef(new Animated.Value(0)).current;
+  const markerProgress = useRef(new Animated.Value(0)).current;
+  const pulseProgress = useRef(new Animated.Value(0)).current;
+  const brandProgress = useRef(new Animated.Value(0)).current;
+  const sloganProgress = useRef(new Animated.Value(0)).current;
+  const exitProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(progress, {
-      duration: 2500,
-      easing: Easing.out(Easing.cubic),
-      toValue: 1,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseProgress, {
+          duration: 1180,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseProgress, {
+          duration: 0,
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    const intro = Animated.sequence([
+      Animated.timing(backgroundProgress, {
+        duration: 360,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(routeStartProgress, {
+            duration: 520,
+            easing: Easing.bezier(0.2, 0, 0, 1),
+            toValue: 1,
+            useNativeDriver: true,
+          }),
+          Animated.timing(routeTurnProgress, {
+            duration: 360,
+            easing: Easing.inOut(Easing.cubic),
+            toValue: 1,
+            useNativeDriver: true,
+          }),
+          Animated.timing(routeEndProgress, {
+            duration: 520,
+            easing: Easing.bezier(0.16, 1, 0.3, 1),
+            toValue: 1,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.delay(820),
+          Animated.timing(markerProgress, {
+            duration: 460,
+            easing: Easing.out(Easing.back(1.35)),
+            toValue: 1,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+      Animated.stagger(140, [
+        Animated.timing(brandProgress, {
+          duration: 560,
+          easing: Easing.bezier(0.16, 1, 0.3, 1),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sloganProgress, {
+          duration: 520,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.delay(720),
+      Animated.timing(exitProgress, {
+        duration: 420,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    pulseLoop.start();
+    intro.start(({ finished }) => {
+      pulseLoop.stop();
+
       if (finished) {
         onDone();
       }
     });
-  }, [onDone, progress]);
 
-  const cardOpacity = progress.interpolate({
-    inputRange: [0, 0.25, 1],
+    return () => {
+      intro.stop();
+      pulseLoop.stop();
+    };
+  }, [
+    backgroundProgress,
+    brandProgress,
+    exitProgress,
+    markerProgress,
+    onDone,
+    pulseProgress,
+    routeEndProgress,
+    routeStartProgress,
+    routeTurnProgress,
+    sloganProgress,
+  ]);
+
+  const splashOpacity = exitProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+  const splashTranslate = exitProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -10],
+  });
+  const backdropOpacity = backgroundProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+  const backdropTranslate = backgroundProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 0],
+  });
+  const routeStartScale = routeStartProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.02, 1],
+  });
+  const routeTurnScale = routeTurnProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.02, 1],
+  });
+  const routeEndScale = routeEndProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.02, 1],
+  });
+  const markerOpacity = markerProgress.interpolate({
+    inputRange: [0, 0.4, 1],
     outputRange: [0, 1, 1],
   });
-  const cardTranslate = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [12, 0],
+  const markerScale = markerProgress.interpolate({
+    inputRange: [0, 0.72, 1],
+    outputRange: [0.42, 1.12, 1],
   });
-  const barScale = progress.interpolate({
+  const pulseOpacity = pulseProgress.interpolate({
+    inputRange: [0, 0.7, 1],
+    outputRange: [0.28, 0.08, 0],
+  });
+  const pulseScale = pulseProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.18, 1],
+    outputRange: [1, 2.55],
+  });
+  const brandOpacity = brandProgress.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 0.85, 1],
+  });
+  const brandTranslate = brandProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 0],
+  });
+  const sloganOpacity = sloganProgress.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 0.75, 1],
+  });
+  const sloganTranslate = sloganProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [8, 0],
   });
 
   return (
-    <View style={styles.splash}>
-      <Animated.View
-        style={[
-          styles.splashCard,
-          {
-            opacity: cardOpacity,
-            transform: [{ translateY: cardTranslate }],
-          },
-        ]}
-      >
-        <BashkortostanEmblem size={132} />
-        <Text style={styles.logo}>Такси Салават</Text>
-        <Text style={styles.splashText}>Салаватский район · Республика Башкортостан</Text>
-        <View style={styles.progressTrack}>
-          <Animated.View style={[styles.progressFill, { transform: [{ scaleX: barScale }] }]} />
-        </View>
+    <Animated.View
+      style={[
+        styles.splash,
+        {
+          opacity: splashOpacity,
+          transform: [{ translateY: splashTranslate }],
+        },
+      ]}
+    >
+      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+        <Animated.View
+          style={[
+            styles.backdropPanel,
+            styles.backdropPanelTop,
+            { transform: [{ translateY: backdropTranslate }] },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.backdropPanel,
+            styles.backdropPanelBottom,
+            { transform: [{ translateY: backdropTranslate }] },
+          ]}
+        />
+        <View style={[styles.gridLine, styles.gridLineOne]} />
+        <View style={[styles.gridLine, styles.gridLineTwo]} />
+        <View style={[styles.gridLine, styles.gridLineThree]} />
       </Animated.View>
-    </View>
+
+      <View style={styles.introStage}>
+        <View style={styles.routeScene}>
+          <View style={[styles.routeAnchor, styles.routeAnchorStart]} />
+          <Animated.View
+            style={[
+              styles.routeSegment,
+              styles.routeSegmentStart,
+              { transform: [{ scaleX: routeStartScale }] },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.routeSegment,
+              styles.routeSegmentTurn,
+              { transform: [{ scaleY: routeTurnScale }] },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.routeSegment,
+              styles.routeSegmentEnd,
+              { transform: [{ scaleX: routeEndScale }] },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.markerCluster,
+              {
+                opacity: markerOpacity,
+                transform: [{ scale: markerScale }],
+              },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.markerPulse,
+                {
+                  opacity: pulseOpacity,
+                  transform: [{ scale: pulseScale }],
+                },
+              ]}
+            />
+            <View style={styles.markerPin}>
+              <View style={styles.markerCore} />
+            </View>
+            <View style={styles.markerStem} />
+          </Animated.View>
+        </View>
+
+        <Animated.View
+          style={[
+            styles.brandBlock,
+            {
+              opacity: brandOpacity,
+              transform: [{ translateY: brandTranslate }],
+            },
+          ]}
+        >
+          <Text style={styles.logoKinetix}>Kinetix</Text>
+          <Text style={styles.logoPartner}>Такси Партнер</Text>
+        </Animated.View>
+
+        <Animated.Text
+          style={[
+            styles.splashText,
+            {
+              opacity: sloganOpacity,
+              transform: [{ translateY: sloganTranslate }],
+            },
+          ]}
+        >
+          Такси и доставка для Салаватского района
+        </Animated.Text>
+      </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  logo: {
-    color: '#12382C',
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 0,
-    marginTop: 12,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
   },
-  progressFill: {
-    backgroundColor: '#008D49',
-    borderRadius: 999,
-    height: 6,
-    transformOrigin: 'left',
+  backdropPanel: {
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    borderColor: kinetixColors.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 178,
+    position: 'absolute',
+    width: 280,
+  },
+  backdropPanelBottom: {
+    bottom: 82,
+    right: -110,
+    transform: [{ rotate: '-10deg' }],
+  },
+  backdropPanelTop: {
+    left: -104,
+    top: 72,
+    transform: [{ rotate: '-10deg' }],
+  },
+  brandBlock: {
+    alignItems: 'center',
+    marginTop: 28,
+  },
+  gridLine: {
+    backgroundColor: 'rgba(0, 141, 73, 0.1)',
+    height: 1,
+    position: 'absolute',
+    width: '120%',
+  },
+  gridLineOne: {
+    top: '30%',
+    transform: [{ rotate: '-10deg' }],
+  },
+  gridLineThree: {
+    top: '70%',
+    transform: [{ rotate: '-10deg' }],
+  },
+  gridLineTwo: {
+    top: '50%',
+    transform: [{ rotate: '-10deg' }],
+  },
+  introStage: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    maxWidth: 380,
     width: '100%',
   },
-  progressTrack: {
-    backgroundColor: '#DCECE5',
+  logoKinetix: {
+    color: kinetixColors.textPrimary,
+    fontSize: 38,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 44,
+  },
+  logoPartner: {
+    color: kinetixColors.textSecondary,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0,
+    lineHeight: 22,
+    marginTop: 2,
+  },
+  markerCluster: {
+    alignItems: 'center',
+    height: 62,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 30,
+    top: 50,
+    width: 62,
+  },
+  markerCore: {
+    backgroundColor: kinetixColors.surface,
     borderRadius: 999,
-    height: 6,
-    marginTop: 20,
-    overflow: 'hidden',
-    width: 190,
+    height: 8,
+    width: 8,
+  },
+  markerPin: {
+    alignItems: 'center',
+    backgroundColor: kinetixColors.amber,
+    borderColor: kinetixColors.surface,
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 26,
+    justifyContent: 'center',
+    shadowColor: kinetixColors.amber,
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0.34,
+    shadowRadius: 16,
+    width: 26,
+  },
+  markerPulse: {
+    backgroundColor: kinetixColors.amberSoft,
+    borderColor: kinetixColors.line,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 38,
+    position: 'absolute',
+    width: 38,
+  },
+  markerStem: {
+    backgroundColor: kinetixColors.amber,
+    borderRadius: 999,
+    height: 10,
+    marginTop: -2,
+    width: 3,
+  },
+  routeAnchor: {
+    backgroundColor: kinetixColors.surface,
+    borderColor: kinetixColors.amber,
+    borderRadius: 999,
+    borderWidth: 3,
+    height: 18,
+    position: 'absolute',
+    width: 18,
+  },
+  routeAnchorStart: {
+    left: 28,
+    top: 136,
+  },
+  routeScene: {
+    height: 230,
+    maxWidth: 340,
+    position: 'relative',
+    width: '100%',
+  },
+  routeSegment: {
+    backgroundColor: kinetixColors.amber,
+    borderRadius: 999,
+    position: 'absolute',
+    shadowColor: kinetixColors.amber,
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+  },
+  routeSegmentEnd: {
+    height: 4,
+    right: 58,
+    top: 76,
+    transformOrigin: 'left',
+    width: 124,
+  },
+  routeSegmentStart: {
+    height: 4,
+    left: 42,
+    top: 144,
+    transformOrigin: 'left',
+    width: 132,
+  },
+  routeSegmentTurn: {
+    height: 72,
+    left: 172,
+    top: 76,
+    transformOrigin: 'top',
+    width: 4,
   },
   splash: {
     alignItems: 'center',
-    backgroundColor: '#F4FAF6',
+    backgroundColor: kinetixColors.graphite,
     flex: 1,
     justifyContent: 'center',
     padding: 24,
   },
-  splashCard: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(0, 141, 73, 0.16)',
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-    width: '100%',
-    maxWidth: 360,
-  },
   splashText: {
-    color: '#557669',
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 6,
+    color: kinetixColors.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+    marginTop: 14,
+    maxWidth: 280,
     textAlign: 'center',
   },
 });
