@@ -588,14 +588,22 @@ export function getApiBaseUrl() {
 
   if (value && !isReleaseUnsafePublicValue(value)) {
     if (isProductionApp() && !/^https:\/\//i.test(value)) {
-      throw new Error('EXPO_PUBLIC_API_URL must use HTTPS in production.');
+      return getBrowserFallbackApiUrl();
     }
 
     return value;
   }
 
   if (isProductionApp()) {
-    throw new Error('EXPO_PUBLIC_API_URL must point to the production API domain.');
+    return getBrowserFallbackApiUrl();
+  }
+
+  return developmentApiUrl;
+}
+
+function getBrowserFallbackApiUrl() {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
   }
 
   return developmentApiUrl;

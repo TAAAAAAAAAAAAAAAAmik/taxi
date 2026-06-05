@@ -26,7 +26,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const webOrigin =
   typeof window === 'undefined' || !window.location?.origin ? undefined : window.location.origin;
-const webBasePath = normalizeWebBasePath(getPublicEnv('EXPO_PUBLIC_WEB_BASE_PATH'));
+const webBasePath = normalizeWebBasePath(getPublicEnv('EXPO_PUBLIC_WEB_BASE_PATH') || inferHostedBasePath());
 const webBaseOrigin = webOrigin && webBasePath ? `${webOrigin}${webBasePath}` : undefined;
 const linksOrigin = normalizePublicOrigin(getPublicEnv('EXPO_PUBLIC_LINKS_DOMAIN'));
 
@@ -64,6 +64,21 @@ function normalizeWebBasePath(value: string | undefined) {
   const rawPath = String(value || '').trim().replace(/^\/+|\/+$/g, '');
 
   return rawPath ? `/${rawPath}` : '';
+}
+
+function inferHostedBasePath() {
+  if (typeof window === 'undefined' || !window.location?.hostname || !window.location?.pathname) {
+    return '';
+  }
+
+  if (!window.location.hostname.toLowerCase().endsWith('.github.io')) {
+    return '';
+  }
+
+  return window.location.pathname
+    .replace(/^\/+|\/+$/g, '')
+    .split('/')
+    .filter(Boolean)[0] ?? '';
 }
 
 function normalizeReferralCodeParam(value: string) {
