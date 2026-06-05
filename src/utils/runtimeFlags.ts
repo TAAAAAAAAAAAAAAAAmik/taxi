@@ -56,11 +56,23 @@ export function isProductionApp() {
 export function isDemoModeEnabled() {
   const value = String(getPublicEnv('EXPO_PUBLIC_ENABLE_DEMO') || '').trim().toLowerCase();
 
-  return !isProductionApp() && value !== 'false' && value !== '0';
+  if (value === 'false' || value === '0') {
+    return false;
+  }
+
+  return !isProductionApp() || isHostedDemoPage();
 }
 
 export function isPhoneVerificationSkipped() {
   const value = String(getPublicEnv('EXPO_PUBLIC_SKIP_PHONE_VERIFICATION') || '').trim().toLowerCase();
 
   return !isProductionApp() && ['1', 'true', 'yes'].includes(value);
+}
+
+function isHostedDemoPage() {
+  if (typeof window === 'undefined' || !window.location?.hostname) {
+    return false;
+  }
+
+  return window.location.hostname.toLowerCase().endsWith('.github.io');
 }
