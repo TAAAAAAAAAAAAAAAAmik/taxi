@@ -120,6 +120,7 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
         title: 'Избранные адреса',
         subtitle: 'Дом, работа и частые маршруты.',
         icon: 'star',
+        target: 'homeAddress',
       },
       {
         id: 'support-ticket',
