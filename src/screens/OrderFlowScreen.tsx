@@ -494,18 +494,41 @@ export function OrderFlowScreen({ navigation, route }: Props) {
         ]).slice(0, 4)
       : [];
     const clientRealtimeLabel = formatClientRealtimeLabel(realtimeMessage, realtimeStatus);
-    const clientSteps = ['Маршрут', 'Детали', 'Подтверждение'];
+    const clientStepMeta = [
+      {
+        title: 'Куда едем?',
+        text: 'Укажите адрес подачи и точку назначения. Потом выберем тариф.',
+      },
+      {
+        title: 'Выберите тариф',
+        text: 'Проверьте цену, время подачи и доступность машины.',
+      },
+      {
+        title: 'Проверьте заказ',
+        text: 'Последняя проверка маршрута перед отправкой заказа водителям.',
+      },
+    ] as const;
+    const currentClientStep = clientStepMeta[clientStep] ?? clientStepMeta[0];
+    const lastClientStep = clientStepMeta.length - 1;
     const clientPrimaryLabel =
-      clientStep < clientSteps.length - 1 ? 'Дальше' : isSubmitting ? 'Ищем машину' : 'Вызвать';
+      clientStep === 0
+        ? canConfirm
+          ? 'Выбрать тариф'
+          : 'Указать маршрут'
+        : clientStep === 1
+        ? 'Продолжить'
+        : isSubmitting
+        ? 'Ищем машину'
+        : 'Вызвать';
     const handleClientStepAction = async () => {
       if (clientStep === 0 && !canConfirm) {
         setConfirmed(true);
         return;
       }
 
-      if (clientStep < clientSteps.length - 1) {
+      if (clientStep < lastClientStep) {
         setConfirmed(false);
-        setClientStep((current) => Math.min(current + 1, clientSteps.length - 1));
+        setClientStep((current) => Math.min(current + 1, lastClientStep));
         return;
       }
 
@@ -536,33 +559,16 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             </Pressable>
           </View>
 
-          <View style={styles.clientStepRail}>
-            {clientSteps.map((step, index) => {
-              const active = index === clientStep;
-              const done = index < clientStep;
-
-              return (
-                <View
-                  key={step}
-                  style={[
-                    styles.clientStepPill,
-                    active && styles.clientStepPillActive,
-                    done && styles.clientStepPillDone,
-                  ]}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.clientStepText,
-                      active && styles.clientStepTextActive,
-                      done && styles.clientStepTextDone,
-                    ]}
-                  >
-                    {index + 1}. {step}
-                  </Text>
-                </View>
-              );
-            })}
+          <View style={styles.clientFlowPanel}>
+            <View style={styles.clientFlowIcon}>
+              <Route color="#008D49" size={22} strokeWidth={2.4} />
+            </View>
+            <View style={styles.clientFlowCopy}>
+              <Text style={styles.clientFlowTitle}>{currentClientStep.title}</Text>
+              <Text numberOfLines={2} style={styles.clientFlowText}>
+                {currentClientStep.text}
+              </Text>
+            </View>
           </View>
 
           {clientStep === 0 ? (
@@ -1882,6 +1888,39 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 14,
     fontWeight: '800',
+  },
+  clientFlowCopy: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  clientFlowIcon: {
+    alignItems: 'center',
+    backgroundColor: '#DDF1E7',
+    borderRadius: 8,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  clientFlowPanel: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D6E8DF',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 12,
+  },
+  clientFlowText: {
+    color: '#557669',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  clientFlowTitle: {
+    color: '#12382C',
+    fontSize: 18,
+    fontWeight: '900',
   },
   clientStepPill: {
     alignItems: 'center',

@@ -354,14 +354,14 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
 roleMenuConfig.client = {
   ...roleMenuConfig.client,
   title: 'Клиент',
-  subtitle: 'Главная, заказы и профиль без лишних водительских и админских разделов.',
+  subtitle: 'Заказ всегда под рукой, а история, оплата, рефералы, поддержка и профиль остаются в отдельных разделах.',
   primaryAction: 'Заказать поездку',
-  secondaryAction: 'Профиль',
+  secondaryAction: 'История',
   menuItems: [
     {
       id: 'home',
       title: 'Главная',
-      subtitle: 'Приветствие, активный заказ и быстрые действия',
+      subtitle: 'Куда едем, активный заказ и быстрые действия',
       icon: 'home',
     },
     {
@@ -371,9 +371,28 @@ roleMenuConfig.client = {
       icon: 'route',
     },
     {
+      id: 'payment',
+      title: 'Оплата',
+      subtitle: 'Оплата водителю напрямую и правила поездки',
+      icon: 'wallet',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Код, ссылка и бонусы',
+      icon: 'users',
+      badge: 'Бонусы',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Вопросы по поездкам и профилю',
+      icon: 'headphones',
+    },
+    {
       id: 'profile',
       title: 'Профиль',
-      subtitle: 'Данные клиента, поддержка и сохраненные адреса',
+      subtitle: 'Данные клиента и сохраненные адреса',
       icon: 'shield',
     },
   ],
@@ -382,9 +401,9 @@ roleMenuConfig.client = {
 roleMenuConfig.driver = {
   ...roleMenuConfig.driver,
   title: 'Водитель',
-  subtitle: 'Заказы, доход, тариф, рефералы и профиль вынесены в отдельные разделы.',
+  subtitle: 'Главное как в водительском приложении: линия, заказы, доход, тариф, документы и поддержка в отдельных разделах.',
   primaryAction: 'Смотреть заказы',
-  secondaryAction: 'Доход и расчеты',
+  secondaryAction: 'Доход',
   menuItems: [
     {
       id: 'orders',
@@ -406,15 +425,39 @@ roleMenuConfig.driver = {
       icon: 'credit-card',
     },
     {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Паспорт, ВУ, СТС, ОСАГО и проверка',
+      icon: 'file',
+    },
+    {
+      id: 'vehicle',
+      title: 'Авто',
+      subtitle: 'Данные машины и статус допуска',
+      icon: 'car',
+    },
+    {
       id: 'referrals',
       title: 'Рефералы',
       subtitle: 'Приглашенные водители и бонус 200 ₽',
       icon: 'users',
     },
     {
+      id: 'rating',
+      title: 'Рейтинг',
+      subtitle: 'Оценки, качество и рекомендации',
+      icon: 'star',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Помощь водителю и спорные поездки',
+      icon: 'headphones',
+    },
+    {
       id: 'profile',
       title: 'Профиль',
-      subtitle: 'Данные аккаунта и документы',
+      subtitle: 'Данные аккаунта и настройки',
       icon: 'shield',
     },
   ],
