@@ -64,6 +64,7 @@ export type RootStackParamList = {
   Subscription: {
     role: AccountRole;
     firstName?: string;
+    context?: 'trial-ended';
   };
   DriverDocuments: {
     role: AccountRole;

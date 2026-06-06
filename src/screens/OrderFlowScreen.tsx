@@ -52,7 +52,7 @@ import {
   searchAddressSuggestions,
 } from '../services/apiClient';
 import { requestUserLocation, reverseGeocodePoint } from '../services/locationService';
-import { useAppState } from '../state/AppState';
+import { type AppOrder, useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OrderFlow'>;
 
@@ -77,6 +77,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     addOrder,
     assignOrderToDriver,
     currentUser,
+    declineOrderOffer,
     driverSubscription,
     drivers,
     notifications,
@@ -100,11 +101,13 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const [safetyPinRequired, setSafetyPinRequired] = useState(true);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(false);
+  const [clientStep, setClientStep] = useState(0);
   const [activeAddressFieldId, setActiveAddressFieldId] = useState<string | null>(null);
   const [locationPoint, setLocationPoint] = useState<GeoPoint | undefined>();
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFeedOrderId, setSelectedFeedOrderId] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [serverAddressSuggestions, setServerAddressSuggestions] = useState<SalavatAddressSuggestion[]>([]);
   const [serverRouteEstimate, setServerRouteEstimate] = useState<RouteEstimate | null>(null);
   const [routeEstimateStatus, setRouteEstimateStatus] = useState<'local' | 'loading' | 'server'>('local');
@@ -153,13 +156,31 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             (order) =>
               order.role === 'client' &&
               !order.driver &&
-              ['created', 'searching'].includes(order.status),
+              ['created', 'searching'].includes(order.status) &&
+              isOrderVisibleToDriver(order, currentDriver?.id, nowMs),
           )
+          .sort((left, right) => {
+            const leftExclusive = isOrderExclusiveForDriver(left, currentDriver?.id, nowMs);
+            const rightExclusive = isOrderExclusiveForDriver(right, currentDriver?.id, nowMs);
+
+            if (leftExclusive !== rightExclusive) {
+              return rightExclusive ? 1 : -1;
+            }
+
+            return Date.parse(right.createdAt || '') - Date.parse(left.createdAt || '');
+          })
         : [],
-    [driverCannotReceiveOrders, isDriverRole, orders],
+    [currentDriver?.id, driverCannotReceiveOrders, isDriverRole, nowMs, orders],
   );
   const selectedFeedOrder =
     availableDriverOrders.find((order) => order.id === selectedFeedOrderId) ?? availableDriverOrders[0];
+  const selectedFeedOrderExclusiveSeconds = selectedFeedOrder
+    ? getExclusiveOfferRemainingSeconds(selectedFeedOrder, currentDriver?.id, nowMs)
+    : 0;
+  const selectedFeedOrderIsExclusive = selectedFeedOrderExclusiveSeconds > 0;
+  const exclusiveDriverOrdersCount = availableDriverOrders.filter((order) =>
+    isOrderExclusiveForDriver(order, currentDriver?.id, nowMs),
+  ).length;
   const localRouteEstimate = useMemo(
     () =>
       buildRouteEstimate({
@@ -173,6 +194,16 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   );
   const routeEstimate = serverRouteEstimate ?? localRouteEstimate;
   const total = isDriverRole && selectedFeedOrder ? selectedFeedOrder.total : routeEstimate.total;
+
+  useEffect(() => {
+    if (!isDriverRole) {
+      return;
+    }
+
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+
+    return () => clearInterval(timer);
+  }, [isDriverRole]);
 
   useEffect(() => {
     if (
@@ -275,7 +306,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       clientComment: selectedFeedOrder.options.join(', ') || 'Комментарий не указан',
       destination: selectedFeedOrder.destination,
       pickup: selectedFeedOrder.pickup,
-      pickupDistance: 'Открытый заказ из backend',
+      pickupDistance: 'Открытый заказ из ленты',
     }));
     setSelectedTariffId(config.tariffs[0].id);
     setPaymentMethod(selectedFeedOrder.paymentMethod);
@@ -318,6 +349,21 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     setSelectedFeedOrderId(orderId);
   };
 
+  const handleDeclineExclusiveOffer = async () => {
+    if (!currentDriver || !selectedFeedOrder || !selectedFeedOrderIsExclusive) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await declineOrderOffer(selectedFeedOrder.id, currentDriver.id);
+      setSelectedFeedOrderId(null);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const requestLocationRoutes = async () => {
     setLocationMessage('Запрашиваем геолокацию...');
     const result = await requestUserLocation();
@@ -356,7 +402,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       driverSubscription.status !== 'active' &&
       currentDriver?.subscriptionStatus !== 'active'
     ) {
-      navigation.navigate('Subscription', { firstName, role });
+      navigation.navigate('Subscription', { context: 'trial-ended', firstName, role });
       return;
     }
 
@@ -406,6 +452,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       tariff: selectedTariff.title,
       tariffId: selectedTariff.id,
       total,
+      ...(locationPoint ? { pickupPoint: locationPoint } : {}),
     };
 
     setIsSubmitting(true);
@@ -436,14 +483,34 @@ export function OrderFlowScreen({ navigation, route }: Props) {
         address: 'Малояз, администрация',
       },
     ];
-    const clientAddressSuggestions =
-      activeAddressFieldId === 'destination'
-        ? mergeAddressSuggestions([
-            ...findSalavatAddressSuggestions(values.destination ?? '', 6),
-            ...serverAddressSuggestions,
-          ]).slice(0, 4)
-        : [];
+    const clientAddressFieldId =
+      activeAddressFieldId === 'pickup' || activeAddressFieldId === 'destination'
+        ? activeAddressFieldId
+        : null;
+    const clientAddressSuggestions = clientAddressFieldId
+      ? mergeAddressSuggestions([
+          ...findSalavatAddressSuggestions(values[clientAddressFieldId] ?? '', 6),
+          ...serverAddressSuggestions,
+        ]).slice(0, 4)
+      : [];
     const clientRealtimeLabel = formatClientRealtimeLabel(realtimeMessage, realtimeStatus);
+    const clientSteps = ['Маршрут', 'Детали', 'Подтверждение'];
+    const clientPrimaryLabel =
+      clientStep < clientSteps.length - 1 ? 'Дальше' : isSubmitting ? 'Ищем машину' : 'Вызвать';
+    const handleClientStepAction = async () => {
+      if (clientStep === 0 && !canConfirm) {
+        setConfirmed(true);
+        return;
+      }
+
+      if (clientStep < clientSteps.length - 1) {
+        setConfirmed(false);
+        setClientStep((current) => Math.min(current + 1, clientSteps.length - 1));
+        return;
+      }
+
+      await handlePrimaryAction();
+    };
 
     return (
       <SafeAreaView style={styles.clientSafeArea}>
@@ -469,10 +536,50 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             </Pressable>
           </View>
 
+          <View style={styles.clientStepRail}>
+            {clientSteps.map((step, index) => {
+              const active = index === clientStep;
+              const done = index < clientStep;
+
+              return (
+                <View
+                  key={step}
+                  style={[
+                    styles.clientStepPill,
+                    active && styles.clientStepPillActive,
+                    done && styles.clientStepPillDone,
+                  ]}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.clientStepText,
+                      active && styles.clientStepTextActive,
+                      done && styles.clientStepTextDone,
+                    ]}
+                  >
+                    {index + 1}. {step}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {clientStep === 0 ? (
           <View style={styles.clientDestinationBlock}>
             <TextInput
               autoCorrect={false}
               autoFocus
+              onChangeText={(value) => updateValue('pickup', value)}
+              onFocus={() => setActiveAddressFieldId('pickup')}
+              placeholder="Откуда"
+              placeholderTextColor="#557669"
+              returnKeyType="next"
+              style={[styles.clientDestinationInput, simpleMode && styles.clientDestinationInputSimple]}
+              value={values.pickup ?? ''}
+            />
+            <TextInput
+              autoCorrect={false}
               onChangeText={(value) => updateValue('destination', value)}
               onFocus={() => setActiveAddressFieldId('destination')}
               placeholder="Куда едем?"
@@ -487,7 +594,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   <Pressable
                     accessibilityRole="button"
                     key={suggestion.id}
-                    onPress={() => selectAddressSuggestion('destination', suggestion)}
+                    onPress={() =>
+                      selectAddressSuggestion(clientAddressFieldId ?? 'destination', suggestion)
+                    }
                     style={({ pressed }) => [styles.clientSuggestion, pressed && styles.pressed]}
                   >
                     <Text numberOfLines={1} style={styles.clientSuggestionTitle}>
@@ -501,7 +610,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               </View>
             ) : null}
           </View>
+          ) : null}
 
+          {clientStep === 0 ? (
           <View style={styles.clientShortcutRow}>
             {favoriteRoutes.map((item) => (
               <Pressable
@@ -521,8 +632,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               </Pressable>
             ))}
           </View>
+          ) : null}
 
-          {!simpleMode ? (
+          {clientStep === 1 ? (
             <>
               <View style={styles.clientTariffList}>
                 {config.tariffs.map((tariff) => {
@@ -605,15 +717,67 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             </>
           ) : null}
 
+          {clientStep === 2 ? (
+            <View style={styles.clientSummaryCard}>
+              <Text style={styles.clientSummaryTitle}>Подтверждение заказа</Text>
+              <View style={styles.clientSummaryRow}>
+                <Text style={styles.clientSummaryLabel}>Откуда</Text>
+                <Text numberOfLines={2} style={styles.clientSummaryValue}>
+                  {values.pickup || 'Не указано'}
+                </Text>
+              </View>
+              <View style={styles.clientSummaryRow}>
+                <Text style={styles.clientSummaryLabel}>Куда</Text>
+                <Text numberOfLines={2} style={styles.clientSummaryValue}>
+                  {values.destination || 'Не указано'}
+                </Text>
+              </View>
+              <View style={styles.clientSummaryRow}>
+                <Text style={styles.clientSummaryLabel}>Тариф</Text>
+                <Text numberOfLines={1} style={styles.clientSummaryValue}>
+                  {selectedTariff.title}
+                </Text>
+              </View>
+              <View style={styles.clientSummaryRow}>
+                <Text style={styles.clientSummaryLabel}>Маршрут</Text>
+                <Text numberOfLines={1} style={styles.clientSummaryValue}>
+                  {formatDistance(routeEstimate.distanceKm)} · {routeEstimate.durationMin} мин
+                </Text>
+              </View>
+              <View style={[styles.clientSummaryRow, styles.clientSummaryTotalRow]}>
+                <Text style={styles.clientSummaryTotalLabel}>Итого</Text>
+                <Text style={styles.clientSummaryTotalValue}>{total} ₽</Text>
+              </View>
+            </View>
+          ) : null}
+
           {confirmed && !canConfirm ? (
             <Text style={styles.clientError}>Укажите, куда едем.</Text>
           ) : null}
 
           <View style={styles.clientBottom}>
+            {clientStep > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSubmitting}
+                onPress={() => {
+                  setConfirmed(false);
+                  setClientStep((current) => Math.max(current - 1, 0));
+                }}
+                style={({ pressed }) => [
+                  styles.clientBackStepButton,
+                  isSubmitting && styles.clientCallButtonDisabled,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
+                <Text style={styles.clientBackStepText}>Назад</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               disabled={isSubmitting}
-              onPress={handlePrimaryAction}
+              onPress={handleClientStepAction}
               style={({ pressed }) => [
                 styles.clientCallButton,
                 simpleMode && styles.clientCallButtonSimple,
@@ -623,6 +787,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             >
               <Navigation color="#F4FAF6" size={21} strokeWidth={2.6} />
               <Text style={[styles.clientCallButtonText, simpleMode && styles.clientCallButtonTextSimple]}>
+                {clientPrimaryLabel}
+              </Text>
+              <Text style={styles.hiddenClientButtonLabel}>
                 {isSubmitting ? 'Ищем машину' : 'Вызвать'}
               </Text>
             </Pressable>
@@ -778,9 +945,11 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                         ? 'Заявка водителя создана. Администратор должен проверить автомобиль и открыть доступ.'
                         : driverCannotReceiveOrders
                         ? 'Доступ к заказам закрыт. Нужны документы, договор, разрешение авто, реестр и налоговый профиль.'
+                        : exclusiveDriverOrdersCount > 0
+                        ? `Заказ рядом сначала предложен вам на ${selectedFeedOrderExclusiveSeconds} сек. Примите или пропустите.`
                         : availableDriverOrders.length > 0
                         ? `Доступно заявок: ${availableDriverOrders.length}. Выберите заказ и нажмите принятие.`
-                        : 'Открытых заявок нет. Обновите backend или примите заказ вручную для демо.'}
+                        : 'Открытых заявок нет. Обновите ленту.'}
                     </Text>
                     {currentDriver ? (
                       <Text style={styles.regionMeta}>Статус допуска: {currentDriver.status}</Text>
@@ -806,13 +975,42 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                         ]}
                       >
                         <Text style={styles.homeAddressTitle}>
-                          {order.id} · {order.total} ₽ · {order.tariff}
+                          {isOrderExclusiveForDriver(order, currentDriver?.id, nowMs)
+                            ? `Сначала вам · ${getExclusiveOfferRemainingSeconds(order, currentDriver?.id, nowMs)} сек`
+                            : 'Общая лента'}{' '}
+                          · {order.total} ₽
                         </Text>
                         <Text style={styles.homeAddressText}>
                           {order.pickup} → {order.destination}
                         </Text>
+                        <Text style={styles.homeAddressText}>
+                          {order.exclusiveDistanceKm
+                            ? `${order.exclusiveDistanceKm} км до подачи · ${order.tariff}`
+                            : order.tariff}
+                        </Text>
                       </Pressable>
                     ))}
+                    {selectedFeedOrderIsExclusive ? (
+                      <View style={styles.offerNotice}>
+                        <Text style={styles.offerNoticeTitle}>Заказ закреплен за вами</Text>
+                        <Text style={styles.offerNoticeText}>
+                          Осталось {selectedFeedOrderExclusiveSeconds} сек. Если не можете принять, пропустите -
+                          заказ уйдет в общую ленту.
+                        </Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={isSubmitting}
+                          onPress={handleDeclineExclusiveOffer}
+                          style={({ pressed }) => [
+                            styles.skipOfferButton,
+                            isSubmitting && styles.disabledButton,
+                            pressed && styles.pressed,
+                          ]}
+                        >
+                          <Text style={styles.skipOfferButtonText}>Пропустить</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
                   </View>
                   <View style={styles.suggestions}>
                     {config.suggestions.map((suggestion) => (
@@ -1015,7 +1213,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 ]}
               >
                 <Text style={styles.resultTitle}>
-                  {serverStatus === 'connected' ? 'Backend подключен' : 'Локальный режим'}
+                  {serverStatus === 'connected' ? 'Сервер подключен' : 'Нет связи с сервером'}
                 </Text>
                 <Text style={styles.resultText}>{serverMessage}</Text>
               </View>
@@ -1023,13 +1221,13 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               {confirmed ? (
                 <View style={[styles.resultBox, canConfirm && styles.resultBoxSuccess]}>
                   <Text style={styles.resultTitle}>
-                    {driverNeedsApproval ? 'Нужен допуск' : canConfirm ? 'Готово к отправке' : 'Нужен маршрут'}
+                    {driverNeedsApproval ? 'Нужен допуск' : canConfirm ? 'Заказ создан' : 'Нужен маршрут'}
                   </Text>
                   <Text style={styles.resultText}>
                     {driverNeedsApproval
                       ? 'Реальные заказы откроются после ручного одобрения администратора.'
                       : canConfirm
-                      ? 'Следующий шаг - отправка на сервер и создание заказа.'
+                      ? 'Проверьте маршрут и статус заказа.'
                       : 'Заполните точку подачи и назначение, чтобы вызвать автомобиль.'}
                   </Text>
                 </View>
@@ -1151,6 +1349,38 @@ function mergeAddressSuggestions(suggestions: SalavatAddressSuggestion[]) {
     seen.add(key);
     return true;
   });
+}
+
+function getExclusiveOfferRemainingSeconds(order: AppOrder, driverId?: string, nowMs = Date.now()) {
+  if (!driverId || order.exclusiveOfferStatus !== 'pending' || order.exclusiveDriverId !== driverId) {
+    return 0;
+  }
+
+  const expiresAt = Date.parse(order.exclusiveOfferExpiresAt || '');
+
+  if (!Number.isFinite(expiresAt)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.ceil((expiresAt - nowMs) / 1000));
+}
+
+function isOrderExclusiveForDriver(order: AppOrder, driverId?: string, nowMs = Date.now()) {
+  return getExclusiveOfferRemainingSeconds(order, driverId, nowMs) > 0;
+}
+
+function isOrderVisibleToDriver(order: AppOrder, driverId?: string, nowMs = Date.now()) {
+  if (!order.exclusiveDriverId || order.exclusiveOfferStatus !== 'pending') {
+    return true;
+  }
+
+  const expiresAt = Date.parse(order.exclusiveOfferExpiresAt || '');
+
+  if (!Number.isFinite(expiresAt) || expiresAt <= nowMs) {
+    return true;
+  }
+
+  return order.exclusiveDriverId === driverId;
 }
 
 function buildRouteEstimate({
@@ -1550,6 +1780,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   clientBottom: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
     marginTop: 'auto',
     paddingTop: 18,
   },
@@ -1583,6 +1816,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#008D49',
     borderRadius: 8,
     elevation: 3,
+    flex: 1,
     flexDirection: 'row',
     gap: 9,
     justifyContent: 'center',
@@ -1607,6 +1841,24 @@ const styles = StyleSheet.create({
   clientCallButtonTextSimple: {
     fontSize: 25,
   },
+  clientBackStepButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0, 141, 73, 0.24)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    justifyContent: 'center',
+    minHeight: 56,
+    minWidth: 108,
+    paddingHorizontal: 14,
+  },
+  clientBackStepText: {
+    color: '#008D49',
+    fontSize: 15,
+    fontWeight: '900',
+  },
   clientDestinationBlock: {
     gap: 8,
     marginTop: 16,
@@ -1630,6 +1882,90 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 14,
     fontWeight: '800',
+  },
+  clientStepPill: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D6E8DF',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 34,
+    minWidth: 92,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  clientStepPillActive: {
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
+  },
+  clientStepPillDone: {
+    backgroundColor: '#E8F3EF',
+    borderColor: '#BFDACE',
+  },
+  clientStepRail: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  clientStepText: {
+    color: '#557669',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  clientStepTextActive: {
+    color: '#FFFFFF',
+  },
+  clientStepTextDone: {
+    color: '#008D49',
+  },
+  clientSummaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D6E8DF',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+  },
+  clientSummaryLabel: {
+    color: '#557669',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  clientSummaryRow: {
+    borderBottomColor: '#E2EFE8',
+    borderBottomWidth: 1,
+    gap: 4,
+    paddingBottom: 10,
+  },
+  clientSummaryTitle: {
+    color: '#12382C',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  clientSummaryTotalLabel: {
+    color: '#12382C',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  clientSummaryTotalRow: {
+    alignItems: 'center',
+    borderBottomWidth: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 0,
+  },
+  clientSummaryTotalValue: {
+    color: '#008D49',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  clientSummaryValue: {
+    color: '#12382C',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 20,
   },
   clientCompactDetails: {
     flexDirection: 'row',
@@ -1988,6 +2324,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
+  disabledButton: {
+    opacity: 0.55,
+  },
   field: {
     gap: 8,
   },
@@ -2003,6 +2342,9 @@ const styles = StyleSheet.create({
     color: '#557669',
     fontSize: 12,
     lineHeight: 17,
+  },
+  hiddenClientButtonLabel: {
+    display: 'none',
   },
   hero: {
     alignItems: 'flex-start',
@@ -2139,6 +2481,24 @@ const styles = StyleSheet.create({
     color: '#557669',
     fontSize: 12,
     lineHeight: 16,
+  },
+  offerNotice: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#008D49',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  offerNoticeText: {
+    color: '#557669',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  offerNoticeTitle: {
+    color: '#12382C',
+    fontSize: 14,
+    fontWeight: '900',
   },
   page: {
     backgroundColor: '#F4FAF6',
@@ -2430,6 +2790,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
+    color: '#12382C',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  skipOfferButton: {
+    alignItems: 'center',
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 12,
+  },
+  skipOfferButtonText: {
     color: '#12382C',
     fontSize: 14,
     fontWeight: '900',

@@ -370,20 +370,20 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
   },
   driver: {
     subscription: {
-      title: 'Расчеты',
-      subtitle: 'Главная модель сервиса: клиент платит водителю напрямую, а водитель переводит долю сервиса в конце дня.',
+      title: 'Тариф и расчеты',
+      subtitle: 'PRO без комиссии или обычный режим с дневной шкалой 7% / 5% / 3%.',
       icon: 'wallet',
       statusTitle: 'Доступ к заказам открывается после допуска',
       statusText:
-        `После проверки документов водитель работает по модели ${driverAccessPlans.commission.commissionPercent}% к переводу с каждой завершенной поездки.`,
-      primaryAction: 'Открыть расчеты',
+        'После тестового периода водитель выбирает: работать по комиссии или подключить Партнёр PRO.',
+      primaryAction: 'Подключить тариф',
       primaryTarget: 'subscription',
       secondaryAction: 'Посмотреть ленту',
       secondaryTarget: 'order',
       metrics: [
-        { label: 'Доля сервиса', value: `${driverAccessPlans.commission.commissionPercent}%`, helper: 'К переводу за день' },
-        { label: 'Оплата клиента', value: 'Водителю', helper: 'Деньги сначала получает водитель' },
-        { label: 'Фокус сервиса', value: 'Трафик', helper: 'Привести клиентов водителю' },
+        { label: 'Партнёр PRO', value: '3 990 ₽', helper: '0% комиссии' },
+        { label: 'Без подписки', value: '7/5/3%', helper: 'Комиссия снижается за день' },
+        { label: 'Тест', value: '7 дней', helper: 'Или первые 20 заказов' },
       ],
       quickActions: [
         {
@@ -1071,6 +1071,58 @@ sectionPages.driver.profile = {
   subtitle: 'Личные данные, безопасность аккаунта и удаление профиля водителя.',
   statusText: 'Водитель может управлять профилем и удалить аккаунт через backend-сценарий.',
 };
+sectionPages.driver.referrals = {
+  ...sectionPages.client.referrals,
+  title: 'Рефералы',
+  subtitle: 'Приглашенные водители, прогресс до 10 поездок и бонус 200 ₽.',
+  icon: 'users',
+  statusTitle: 'Бонус после 10 поездок',
+  statusText: 'Реферальная логика не меняется: водитель получает 200 ₽ после 10 завершенных поездок приглашенного водителя.',
+  primaryAction: 'Открыть рефералы',
+  primaryTarget: 'referral',
+  secondaryAction: 'К заказам',
+  secondaryTarget: 'order',
+  metrics: [
+    { label: 'Бонус', value: '200 ₽', helper: 'После 10 поездок приглашенного водителя' },
+    { label: 'Порог', value: '10', helper: 'Завершенных поездок приглашенного' },
+    { label: 'Статус', value: 'Ожидает', helper: 'Подтверждает администратор' },
+  ],
+  quickActions: [
+    {
+      id: 'open-referrals',
+      title: 'Мои рефералы',
+      subtitle: 'Список приглашенных водителей и прогресс до бонуса.',
+      icon: 'users',
+      target: 'referral',
+    },
+    {
+      id: 'orders',
+      title: 'Заказы',
+      subtitle: 'Вернуться к доступным и активным заказам.',
+      icon: 'briefcase',
+      target: 'order',
+    },
+  ],
+  listTitle: 'Статусы бонусов',
+  rows: [
+    {
+      id: 'threshold',
+      title: 'До бонуса',
+      subtitle: 'Показываем, сколько поездок осталось до выплаты 200 ₽.',
+      value: '10',
+      status: 'Порог',
+    },
+    {
+      id: 'admin-confirm',
+      title: 'Подтверждение',
+      subtitle: 'Готовые бонусы подтверждаются или отклоняются в админ-панели.',
+      value: 'Админ',
+      status: 'Контроль',
+    },
+  ],
+  note: 'Сумма бонуса, порог в 10 завершенных поездок и админское подтверждение сохранены без изменений.',
+};
+
 sectionPages.fleet.profile = {
   ...sectionPages.client.profile,
   subtitle: 'Данные владельца таксопарка, безопасность аккаунта и управление данными.',

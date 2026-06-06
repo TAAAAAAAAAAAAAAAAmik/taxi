@@ -18,12 +18,13 @@ import {
   driverAccessPlans,
 } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
+import { DriverPaymentSettings, fetchDriverPaymentSettings } from '../services/apiClient';
 import { useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 
 export function SubscriptionScreen({ navigation, route }: Props) {
-  const { firstName, role } = route.params;
+  const { context, firstName, role } = route.params;
   const {
     driverPayments,
     driverSubscription,
@@ -32,8 +33,10 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     serverMessage,
     syncDriverSubscriptionPayment,
   } = useAppState();
-  const [selectedMode, setSelectedMode] = useState<DriverBillingMode>('commission');
+  const [selectedMode, setSelectedMode] = useState<DriverBillingMode>('monthly');
   const [busy, setBusy] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState<DriverPaymentSettings | undefined>();
+  const [paymentNotice, setPaymentNotice] = useState('');
   const [refundBusyId, setRefundBusyId] = useState<string | undefined>();
   const [syncBusyId, setSyncBusyId] = useState<string | undefined>();
   const selectedPlan = driverAccessPlans[selectedMode];
@@ -48,10 +51,30 @@ export function SubscriptionScreen({ navigation, route }: Props) {
   const lastRefundablePayment = paidPayments.find((payment) => payment.amount > 0);
   const hasActiveDriverAccess = isActive && ['monthly', 'commission'].includes(driverSubscription.billingMode);
   const isSelectedCurrentMode = hasActiveDriverAccess && selectedMode === driverSubscription.billingMode;
+  const isTrialChoice = context === 'trial-ended' || driverSubscription.status === 'expired';
+  const primaryButtonLabel = isTrialChoice
+    ? selectedMode === 'monthly'
+      ? 'Подключить PRO'
+      : 'Работать по комиссии'
+    : busy
+    ? 'Проводим операцию'
+    : isSelectedCurrentMode
+    ? 'Перейти к заказам'
+    : hasActiveDriverAccess
+    ? selectedMode === 'monthly'
+      ? 'Подключить за 3 990 ₽'
+      : 'Работать по комиссии'
+    : selectedPlan.primaryAction;
 
   useEffect(() => {
-    setSelectedMode('commission');
+    setSelectedMode(driverSubscription.status === 'active' ? driverSubscription.billingMode : 'monthly');
   }, [driverSubscription.billingMode]);
+
+  useEffect(() => {
+    fetchDriverPaymentSettings()
+      .then(setPaymentSettings)
+      .catch(() => setPaymentSettings(undefined));
+  }, []);
 
   const confirmPlan = async () => {
     if (isSelectedCurrentMode) {
@@ -62,6 +85,16 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     setBusy(true);
     await payDriverSubscription(selectedMode);
     setBusy(false);
+    if (selectedMode === 'commission') {
+      navigation.navigate('Dashboard', { firstName, role });
+      return;
+    }
+
+    if (selectedMode === 'monthly') {
+      setPaymentNotice(
+        'Заявка на подключение тарифа отправлена. Администратор свяжется с вами для оплаты и активации.',
+      );
+    }
   };
 
   const refundPayment = async (paymentId: string) => {
@@ -93,14 +126,20 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             <WalletCards color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>Расчеты водителя</Text>
-            <Text style={styles.subtitle}>
-              Клиентская оплата поступает водителю напрямую. Приложение считает долю сервиса с
-              завершенных поездок, а водитель переводит ее в конце рабочего дня. Онлайн-оплаты в пилоте нет.
-            </Text>
+            <Text style={styles.title}>Тариф и расчеты</Text>
+            <Text style={styles.subtitle}>PRO убирает комиссию. Без подписки действует дневная шкала 7% / 5% / 3%.</Text>
             <Text style={styles.metaLine}>{firstName?.trim() || 'Водитель-партнер'}</Text>
           </View>
         </View>
+
+        {isTrialChoice ? (
+          <View style={styles.trialChoiceCard}>
+            <Text style={styles.trialChoiceTitle}>Тестовый период завершен. Выберите формат работы.</Text>
+            <Text style={styles.trialChoiceText}>
+              Вы можете продолжить работу по комиссии 7% / 5% / 3% или отправить заявку на Партнер PRO за 3 990 ₽ в месяц.
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.statusGrid}>
           <StatusCard
@@ -112,13 +151,26 @@ export function SubscriptionScreen({ navigation, route }: Props) {
                 : `Доля сервиса с поездок: ${driverSubscription.ordersCommission}%`
             }
           />
-          <StatusCard label="Модель" value={driverAccessPlans.commission.name} helper={formatPlanCost('commission')} />
+          <StatusCard
+            label="Тариф"
+            value={driverAccessPlans[driverSubscription.billingMode].name}
+            helper={formatPlanCost(driverSubscription.billingMode)}
+          />
           <StatusCard label="Сверки" value={String(driverPayments.length)} helper="Ручные операции" />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Модель расчетов</Text>
+          <Text style={styles.sectionTitle}>Выберите формат работы</Text>
           <View style={styles.planGrid}>
+            <PlanChoice
+              active={selectedMode === 'monthly'}
+              icon="card"
+              onPress={() => setSelectedMode('monthly')}
+              title={driverAccessPlans.monthly.name}
+              headline={driverAccessPlans.monthly.headline}
+              text={driverAccessPlans.monthly.description}
+              benefits={driverAccessPlans.monthly.benefits}
+            />
             <PlanChoice
               active={selectedMode === 'commission'}
               icon="commission"
@@ -126,6 +178,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
               title={driverAccessPlans.commission.name}
               headline={driverAccessPlans.commission.headline}
               text={driverAccessPlans.commission.description}
+              benefits={driverAccessPlans.commission.benefits}
             />
           </View>
 
@@ -133,8 +186,14 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             <Text style={styles.summaryTitle}>Выбрано: {selectedPlan.shortName}</Text>
             <Text style={styles.summaryText}>{selectedPlan.description}</Text>
             <Text style={styles.summaryText}>
-              Администратор сверяет дневную сумму и подтверждает перевод доли сервиса вручную.
+              {selectedMode === 'monthly'
+                ? 'Для подключения тарифа “Партнёр PRO” переведите 3 990 ₽ на карту владельца проекта. После оплаты отправьте чек администратору. Подписка будет активирована после проверки.'
+                : 'В конце дня водитель переводит комиссию владельцу проекта, администратор отмечает расчет как оплаченный.'}
             </Text>
+            {selectedMode === 'monthly' && paymentSettings?.cardMask ? (
+              <Text style={styles.summaryText}>Карта: {paymentSettings.cardMask}</Text>
+            ) : null}
+            {paymentNotice ? <Text style={styles.noticeText}>{paymentNotice}</Text> : null}
             <Text style={styles.summaryText}>{serverMessage}</Text>
           </View>
 
@@ -149,13 +208,16 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             ]}
           >
             <CreditCard color="#12382C" size={18} strokeWidth={2.4} />
-            <Text style={styles.primaryButtonText}>
+            <Text style={styles.primaryButtonText}>{primaryButtonLabel}</Text>
+            <Text style={styles.hiddenButtonLabel}>
               {busy
                 ? 'Проводим операцию'
                 : isSelectedCurrentMode
                 ? 'Перейти к заказам'
                 : hasActiveDriverAccess
-                ? 'Сменить модель'
+                ? selectedMode === 'monthly'
+                  ? 'Подключить за 3 990 ₽'
+                  : 'Работать по комиссии'
                 : selectedPlan.primaryAction}
             </Text>
           </Pressable>
@@ -223,6 +285,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
 
 type PlanChoiceProps = {
   active: boolean;
+  benefits: string[];
   icon: 'card' | 'commission';
   title: string;
   headline: string;
@@ -230,7 +293,7 @@ type PlanChoiceProps = {
   onPress: () => void;
 };
 
-function PlanChoice({ active, headline, icon, onPress, text, title }: PlanChoiceProps) {
+function PlanChoice({ active, benefits, headline, icon, onPress, text, title }: PlanChoiceProps) {
   const Icon = icon === 'commission' ? ReceiptText : CreditCard;
 
   return (
@@ -246,6 +309,13 @@ function PlanChoice({ active, headline, icon, onPress, text, title }: PlanChoice
       </View>
       <Text style={[styles.planHeadline, active && styles.planTextActive]}>{headline}</Text>
       <Text style={[styles.planText, active && styles.planTextActive]}>{text}</Text>
+      <View style={styles.benefitList}>
+        {benefits.map((benefit) => (
+          <Text key={benefit} style={[styles.planText, active && styles.planTextActive]}>
+            — {benefit}
+          </Text>
+        ))}
+      </View>
     </Pressable>
   );
 }
@@ -331,7 +401,7 @@ function formatPlanCost(mode: DriverBillingMode) {
     return `${plan.monthlyPrice.toLocaleString('ru-RU')} ₽/мес, ${plan.commissionPercent}% к переводу`;
   }
 
-  return `0 ₽/мес, ${plan.commissionPercent}% к переводу`;
+  return '0 ₽/мес, комиссия 7% / 5% / 3%';
 }
 
 function formatMoney(value: number) {
@@ -365,6 +435,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: { color: '#008D49', fontSize: 14, fontWeight: '900' },
+  benefitList: { gap: 3, marginTop: 2 },
   card: {
     backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
@@ -394,7 +465,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 58,
   },
+  hiddenButtonLabel: { display: 'none' },
   metaLine: { color: '#008D49', fontSize: 13, fontWeight: '900' },
+  noticeText: { color: '#008D49', fontSize: 13, fontWeight: '900', lineHeight: 19 },
   page: { backgroundColor: '#F4FAF6', gap: 16, minHeight: '100%', padding: 16 },
   paymentCopy: { flex: 1, gap: 4, minWidth: 0 },
   paymentIcon: {
@@ -493,4 +566,23 @@ const styles = StyleSheet.create({
   summaryText: { color: '#557669', fontSize: 13, lineHeight: 19 },
   summaryTitle: { color: '#008D49', fontSize: 15, fontWeight: '900' },
   title: { color: '#12382C', fontSize: 30, fontWeight: '900', lineHeight: 36 },
+  trialChoiceCard: {
+    backgroundColor: '#E8F3EF',
+    borderColor: '#008D49',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 16,
+  },
+  trialChoiceText: {
+    color: '#557669',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  trialChoiceTitle: {
+    color: '#12382C',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 25,
+  },
 });

@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowRight, Car, LockKeyhole, LogIn, MapPin, UserPlus } from 'lucide-react-native';
+import { ArrowRight, Car, LogIn, MapPin, UserPlus, UserRound } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BashkortostanEmblem } from '../components/BashkortostanEmblem';
@@ -9,7 +9,7 @@ import { RootStackParamList } from '../navigation/types';
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
 export function WelcomeScreen({ navigation }: Props) {
-  const driverCommissionPercent = driverAccessPlans.commission.commissionPercent;
+  const proPrice = driverAccessPlans.monthly.monthlyPrice.toLocaleString('ru-RU');
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -20,18 +20,25 @@ export function WelcomeScreen({ navigation }: Props) {
               <Car color="#FFFFFF" size={24} strokeWidth={2.5} />
             </View>
             <View style={styles.brandCopy}>
-              <Text style={styles.appName}>Такси Салават</Text>
+              <Text style={styles.appName}>Kinetix</Text>
               <Text numberOfLines={1} style={styles.appMeta}>
                 Салаватский район · Башкортостан
               </Text>
             </View>
           </View>
-          <BashkortostanEmblem size={72} />
+          <Pressable
+            accessibilityLabel="Скрытый вход администратора"
+            accessibilityRole="button"
+            onLongPress={() => navigation.navigate('AdminPanel')}
+            style={({ pressed }) => [styles.hiddenAdminTrigger, pressed && styles.pressed]}
+          >
+            <BashkortostanEmblem size={72} />
+          </Pressable>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => navigation.navigate('Registration')}
+          onPress={() => navigation.navigate('Registration', { role: 'client' })}
           style={({ pressed }) => [styles.destinationCard, pressed && styles.pressed]}
         >
           <View style={styles.pinWrap}>
@@ -40,16 +47,55 @@ export function WelcomeScreen({ navigation }: Props) {
           <View style={styles.destinationCopy}>
             <Text style={styles.destinationLabel}>Куда едем?</Text>
             <Text numberOfLines={1} style={styles.destinationHint}>
-              Быстрый старт для пассажира или водителя
+              Поездка или работа водителем
             </Text>
           </View>
           <ArrowRight color="#12382C" size={22} strokeWidth={2.4} />
         </Pressable>
 
+        <View style={styles.roleChoice}>
+          <Text style={styles.sectionTitle}>Выберите роль</Text>
+          <View style={styles.roleGrid}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('Registration', { role: 'client' })}
+              style={({ pressed }) => [styles.roleCard, pressed && styles.pressed]}
+            >
+              <View style={styles.roleIcon}>
+                <UserRound color="#008D49" size={22} strokeWidth={2.5} />
+              </View>
+              <View style={styles.roleCopy}>
+                <Text style={styles.roleTitle}>Клиент</Text>
+                <Text numberOfLines={2} style={styles.roleText}>
+                  Заказать поездку, смотреть активный заказ и историю.
+                </Text>
+              </View>
+              <ArrowRight color="#12382C" size={20} strokeWidth={2.4} />
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('Registration', { role: 'self_employed_driver' })}
+              style={({ pressed }) => [styles.roleCard, pressed && styles.pressed]}
+            >
+              <View style={styles.roleIcon}>
+                <Car color="#008D49" size={22} strokeWidth={2.5} />
+              </View>
+              <View style={styles.roleCopy}>
+                <Text style={styles.roleTitle}>Водитель</Text>
+                <Text numberOfLines={2} style={styles.roleText}>
+                  Принимать заказы, видеть доход, тариф и рефералов.
+                </Text>
+              </View>
+              <ArrowRight color="#12382C" size={20} strokeWidth={2.4} />
+            </Pressable>
+          </View>
+        </View>
+
         <View style={styles.actions}>
           <Pressable
             accessibilityRole="button"
-            onPress={() => navigation.navigate('Registration')}
+            onPress={() => navigation.navigate('Registration', { role: 'client' })}
             style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
           >
             <UserPlus color="#FFFFFF" size={20} strokeWidth={2.5} />
@@ -68,17 +114,17 @@ export function WelcomeScreen({ navigation }: Props) {
           <Pressable
             accessibilityRole="button"
             onPress={() => navigation.navigate('AdminPanel')}
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            style={styles.hiddenButton}
           >
-            <LockKeyhole color="#006BB6" size={20} strokeWidth={2.4} />
+            <LogIn color="#006BB6" size={20} strokeWidth={2.4} />
             <Text style={styles.secondaryButtonText}>Админ</Text>
           </Pressable>
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.title}>Своя служба для района</Text>
+          <Text style={styles.title}>Такси для Малояза и района</Text>
           <Text numberOfLines={3} style={styles.subtitle}>
-            Пассажиры вызывают поездку, водитель получает оплату напрямую и закрывает дневную долю сервиса {driverCommissionPercent}%.
+            Пассажир заказывает поездку. Водитель получает оплату напрямую и выбирает комиссию или PRO за {proPrice} ₽.
           </Text>
         </View>
 
@@ -92,13 +138,13 @@ export function WelcomeScreen({ navigation }: Props) {
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>Водителю</Text>
             <Text numberOfLines={2} style={styles.infoText}>
-              Документы, рейтинг, заказы и ручная сверка доли сервиса.
+              7 дней без комиссии, затем комиссия 7/5/3% или Партнёр PRO.
             </Text>
           </View>
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>Району</Text>
             <Text numberOfLines={2} style={styles.infoText}>
-              Локальный сервис с башкирским визуальным стилем.
+              Малояз и ближайшие населенные пункты.
             </Text>
           </View>
         </View>
@@ -174,6 +220,12 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 16,
   },
+  hiddenAdminTrigger: {
+    borderRadius: 8,
+  },
+  hiddenButton: {
+    display: 'none',
+  },
   infoCard: {
     backgroundColor: '#FFFFFF',
     borderColor: 'rgba(0, 107, 182, 0.16)',
@@ -235,6 +287,50 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
+  roleCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0, 141, 73, 0.18)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flex: 1,
+    gap: 12,
+    minHeight: 92,
+    minWidth: 220,
+    padding: 14,
+  },
+  roleChoice: {
+    gap: 10,
+  },
+  roleCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  roleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  roleIcon: {
+    alignItems: 'center',
+    backgroundColor: '#DDF1E7',
+    borderRadius: 8,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  roleText: {
+    color: '#557669',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  roleTitle: {
+    color: '#12382C',
+    fontSize: 17,
+    fontWeight: '900',
+  },
   safeArea: {
     backgroundColor: '#F4FAF6',
     flex: 1,
@@ -256,6 +352,11 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#12382C',
     fontSize: 15,
+    fontWeight: '900',
+  },
+  sectionTitle: {
+    color: '#12382C',
+    fontSize: 17,
     fontWeight: '900',
   },
   subtitle: {

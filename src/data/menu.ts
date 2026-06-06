@@ -351,6 +351,85 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
   },
 };
 
+roleMenuConfig.client = {
+  ...roleMenuConfig.client,
+  title: 'Клиент',
+  subtitle: 'Главная, заказы и профиль без лишних водительских и админских разделов.',
+  primaryAction: 'Заказать поездку',
+  secondaryAction: 'Профиль',
+  menuItems: [
+    {
+      id: 'home',
+      title: 'Главная',
+      subtitle: 'Приветствие, активный заказ и быстрые действия',
+      icon: 'home',
+    },
+    {
+      id: 'rides',
+      title: 'Заказы',
+      subtitle: 'Заказать поездку, активный заказ и история',
+      icon: 'route',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные клиента, поддержка и сохраненные адреса',
+      icon: 'shield',
+    },
+  ],
+};
+
+roleMenuConfig.driver = {
+  ...roleMenuConfig.driver,
+  title: 'Водитель',
+  subtitle: 'Заказы, доход, тариф, рефералы и профиль вынесены в отдельные разделы.',
+  primaryAction: 'Смотреть заказы',
+  secondaryAction: 'Доход и расчеты',
+  menuItems: [
+    {
+      id: 'orders',
+      title: 'Заказы',
+      subtitle: 'Доступные, активные и история',
+      icon: 'briefcase',
+      badge: 'Работа',
+    },
+    {
+      id: 'payouts',
+      title: 'Доход',
+      subtitle: 'Дневной заработок и комиссия к оплате',
+      icon: 'wallet',
+    },
+    {
+      id: 'subscription',
+      title: 'Тариф',
+      subtitle: 'Trial, комиссия 7/5/3% и Партнер PRO',
+      icon: 'credit-card',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Приглашенные водители и бонус 200 ₽',
+      icon: 'users',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные аккаунта и документы',
+      icon: 'shield',
+    },
+  ],
+  quickActions: [
+    ...roleMenuConfig.driver.quickActions,
+    {
+      id: 'driver-referrals',
+      title: 'Рефералы',
+      subtitle: 'Бонус 200 ₽ после 10 завершенных поездок приглашенного водителя.',
+      icon: 'users',
+      target: 'referral',
+    },
+  ],
+};
+
 roleMenuConfig.self_employed_driver = roleMenuConfig.driver;
 roleMenuConfig.park_admin = roleMenuConfig.fleet;
 roleMenuConfig.park_driver = {

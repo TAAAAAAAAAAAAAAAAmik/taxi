@@ -18,15 +18,18 @@ import {
 } from '../data/salavatDistrict';
 import { salavatDistrictHouseSourceSummary, salavatDistrictHouses } from '../data/salavatDistrictHouses';
 import { isSelfEmployedDriverRole } from '../data/registration';
-import { driverAccessPlans } from '../data/subscription';
+import { driverAccessPlans, DriverSubscriptionPayment } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
 import {
   AdminAddressPoint,
   createAdminAddress,
   deleteAdminAddress,
   fetchAdminAddresses,
+  fetchAdminDriverPayments,
   fetchDriverDocumentFile,
+  ReferralStatus,
   updateAdminAddress,
+  updateAdminReferralStatus,
 } from '../services/apiClient';
 import {
   AppOrder,
@@ -41,12 +44,28 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AdminPanel'>;
 
 const demoAdminPassword = 'admin-demo-5000';
 
+type AdminSectionId = 'overview' | 'orders' | 'drivers' | 'settlements' | 'pro' | 'referrals' | 'settings';
+
+const adminSections: Array<{ id: AdminSectionId; title: string }> = [
+  { id: 'overview', title: 'Обзор' },
+  { id: 'orders', title: 'Заказы' },
+  { id: 'drivers', title: 'Водители' },
+  { id: 'settlements', title: 'Расчеты' },
+  { id: 'pro', title: 'PRO-заявки' },
+  { id: 'referrals', title: 'Рефералы' },
+  { id: 'settings', title: 'Настройки' },
+];
+
 export function AdminPanelScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [documentAccessNotices, setDocumentAccessNotices] = useState<Record<string, string>>({});
   const [documentReviewReasons, setDocumentReviewReasons] = useState<Record<string, string>>({});
   const [addressNotice, setAddressNotice] = useState('');
   const [adminAddresses, setAdminAddresses] = useState<AdminAddressPoint[]>([]);
+  const [adminDriverPayments, setAdminDriverPayments] = useState<DriverSubscriptionPayment[]>([]);
+  const [serviceShareDate, setServiceShareDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [referralBusyId, setReferralBusyId] = useState<string | undefined>();
+  const [activeSection, setActiveSection] = useState<AdminSectionId>('overview');
   const [addressForm, setAddressForm] = useState({
     category: 'address',
     latitude: '',
@@ -89,9 +108,16 @@ export function AdminPanelScreen({ navigation }: Props) {
       .filter(({ upload }) => isExpiringPolicy(upload)),
   );
   const showDemoAdmin = isDemoModeEnabled();
+  const activePartnerProDrivers = drivers.filter((driver) => isPartnerProActive(driver));
+  const pendingPartnerProPayments = adminDriverPayments.filter(
+    (payment) => payment.billingMode === 'monthly' && payment.status === 'pending',
+  );
+  const activeAdminOrders = orders.filter((order) => !['completed', 'cancelled', 'canceled'].includes(order.status));
+  const completedAdminOrders = orders.filter((order) => order.status === 'completed');
+  const cancelledAdminOrders = orders.filter((order) => ['cancelled', 'canceled'].includes(order.status));
   const dailyServiceShare = useMemo(
-    () => serviceShareSummary ?? buildLocalServiceShareSummary(orders),
-    [orders, serviceShareSummary],
+    () => serviceShareSummary ?? buildLocalServiceShareSummary(orders, serviceShareDate),
+    [orders, serviceShareDate, serviceShareSummary],
   );
 
   const loadAdminAddresses = useCallback(async () => {
@@ -104,12 +130,22 @@ export function AdminPanelScreen({ navigation }: Props) {
     }
   }, []);
 
+  const loadAdminDriverPayments = useCallback(async () => {
+    try {
+      const payments = await fetchAdminDriverPayments();
+      setAdminDriverPayments(payments);
+    } catch {
+      setAdminDriverPayments([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (unlocked) {
       void loadAdminAddresses();
-      void refreshServiceShareSummary();
+      void refreshServiceShareSummary(serviceShareDate);
+      void loadAdminDriverPayments();
     }
-  }, [loadAdminAddresses, refreshServiceShareSummary, unlocked]);
+  }, [loadAdminAddresses, loadAdminDriverPayments, refreshServiceShareSummary, serviceShareDate, unlocked]);
 
   const updateAddressForm = (field: keyof typeof addressForm, value: string) => {
     setAddressForm((current) => ({
@@ -322,6 +358,29 @@ export function AdminPanelScreen({ navigation }: Props) {
     await handleSubmit(demoAdminPassword);
   };
 
+  const markDriverDailySettlementPaid = async (driverId: string) => {
+    const driverOrders = dailyServiceShare.orders.filter(
+      (order) => order.driverId === driverId && order.serviceShareAmount > 0 && order.status !== 'confirmed',
+    );
+
+    await Promise.all(
+      driverOrders.map((order) =>
+        updateOrderServiceShareStatus(order.id, 'confirmed', 'Admin marked daily driver settlement as paid'),
+      ),
+    );
+    await refreshServiceShareSummary(serviceShareDate);
+  };
+
+  const updateReferralStatus = async (referralId: string, status: ReferralStatus) => {
+    setReferralBusyId(referralId);
+    try {
+      await updateAdminReferralStatus(referralId, status, 'Ручное решение администратора');
+      await refreshAdminReferralDashboard();
+    } finally {
+      setReferralBusyId(undefined);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
@@ -403,7 +462,31 @@ export function AdminPanelScreen({ navigation }: Props) {
               </Text>
             </View>
 
-            <View style={styles.sectionCard}>
+            <View style={styles.adminTabs}>
+              {adminSections.map((section) => {
+                const active = section.id === activeSection;
+
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    key={section.id}
+                    onPress={() => setActiveSection(section.id)}
+                    style={({ pressed }) => [
+                      styles.adminTab,
+                      active && styles.adminTabActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={[styles.adminTabText, active && styles.adminTabTextActive]}>
+                      {section.title}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={[styles.sectionCard, activeSection !== 'overview' && styles.hiddenSection]}>
               <View style={styles.sectionHeader}>
                 <ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Backend</Text>
@@ -432,7 +515,7 @@ export function AdminPanelScreen({ navigation }: Props) {
               </Pressable>
             </View>
 
-            <View style={styles.statsGrid}>
+            <View style={[styles.statsGrid, activeSection !== 'overview' && styles.hiddenSection]}>
               {stats.map((item) => (
                 <View key={item.label} style={styles.statCard}>
                   <Text numberOfLines={1} style={styles.statLabel}>{item.label}</Text>
@@ -442,13 +525,29 @@ export function AdminPanelScreen({ navigation }: Props) {
               ))}
             </View>
 
-            <View style={styles.sectionCard}>
+            <View style={[styles.sectionCard, activeSection !== 'settlements' && styles.hiddenSection]}>
               <View style={styles.sectionHeader}>
                 <Wallet color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Расчеты с водителем</Text>
               </View>
               <PlanRow title={driverAccessPlans.monthly.name} value={driverAccessPlans.monthly.headline} />
               <PlanRow title={driverAccessPlans.commission.name} value={driverAccessPlans.commission.headline} />
+              <View style={styles.inlineForm}>
+                <TextInput
+                  onChangeText={setServiceShareDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#557669"
+                  style={[styles.input, styles.inlineInput]}
+                  value={serviceShareDate}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => refreshServiceShareSummary(serviceShareDate)}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.secondaryButtonText}>Показать дату</Text>
+                </Pressable>
+              </View>
               <Text style={styles.sectionText}>
                 Сегодня: собрано {dailyServiceShare.summary.totalCollectedAmount} ₽, доля сервиса{' '}
                 {dailyServiceShare.summary.totalServiceShareAmount} ₽, ожидает перевода{' '}
@@ -458,11 +557,43 @@ export function AdminPanelScreen({ navigation }: Props) {
               </Text>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => refreshServiceShareSummary()}
+                onPress={() => refreshServiceShareSummary(serviceShareDate)}
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
               >
                 <Text style={styles.secondaryButtonText}>Обновить сверку</Text>
               </Pressable>
+              {activePartnerProDrivers.length ? (
+                <View style={styles.reviewBox}>
+                  <Text style={styles.orderTitle}>Партнёр PRO активен</Text>
+                  {activePartnerProDrivers.map((driver) => (
+                    <Text key={driver.id} style={styles.orderText}>
+                      {driver.name} · до {formatDate(driver.subscriptionExpiresAt ?? driver.accessExpiresAt)}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+              {pendingPartnerProPayments.length ? (
+                <View style={styles.reviewBox}>
+                  <Text style={styles.orderTitle}>Заявки на PRO</Text>
+                  {pendingPartnerProPayments.slice(0, 8).map((payment) => (
+                    <View key={payment.id} style={styles.orderRow}>
+                      <Text style={styles.orderText}>
+                        {payment.driverName || payment.driverId} · {payment.amount} ₽ · ожидает оплаты/проверки
+                      </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={async () => {
+                          await updateDriverAccess(payment.driverId, 'monthly', 'active');
+                          await loadAdminDriverPayments();
+                        }}
+                        style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                      >
+                        <Text style={styles.smallButtonText}>Активировать на 30 дней</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
               {dailyServiceShare.drivers.length ? (
                 dailyServiceShare.drivers.slice(0, 6).map((driver) => (
                   <View key={driver.driverId} style={styles.orderRow}>
@@ -470,13 +601,21 @@ export function AdminPanelScreen({ navigation }: Props) {
                       {driver.driverName} · {driver.ordersCount} заказов
                     </Text>
                     <Text style={styles.orderText}>
-                      Собрано {driver.totalCollectedAmount} ₽ · доля сервиса{' '}
-                      {driver.totalServiceShareAmount} ₽
+                      Оборот {driver.totalCollectedAmount} ₽ · комиссия {driver.totalServiceShareAmount} ₽ ·{' '}
+                      {driver.currentCommissionPercent ?? 0}%
                     </Text>
                     <Text style={styles.orderText}>
-                      Ожидает {driver.pendingTransferAmount} ₽ · отмечено водителем{' '}
-                      {driver.reportedTransferAmount} ₽ · подтверждено {driver.confirmedAmount} ₽
+                      Статус: {formatServiceShareStatus(driver.settlementStatus)} · ожидает {driver.pendingTransferAmount} ₽ · оплачено {driver.confirmedAmount} ₽
                     </Text>
+                    {driver.totalServiceShareAmount > 0 && driver.settlementStatus !== 'confirmed' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => markDriverDailySettlementPaid(driver.driverId)}
+                        style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                      >
+                        <Text style={styles.smallButtonText}>Отметить как оплачено</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
                 ))
               ) : (
@@ -488,7 +627,52 @@ export function AdminPanelScreen({ navigation }: Props) {
               </Text>
             </View>
 
-            <View style={styles.sectionCard}>
+            <View style={[styles.sectionCard, activeSection !== 'pro' && styles.hiddenSection]}>
+              <View style={styles.sectionHeader}>
+                <Wallet color="#008D49" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>PRO-заявки</Text>
+              </View>
+              <PlanRow title={driverAccessPlans.monthly.name} value={driverAccessPlans.monthly.headline} />
+              <Text numberOfLines={2} style={styles.sectionTextMuted}>
+                Ручная оплата и активация на 30 дней остаются через админ-панель.
+              </Text>
+              {pendingPartnerProPayments.length ? (
+                pendingPartnerProPayments.slice(0, 12).map((payment) => (
+                  <View key={payment.id} style={styles.orderRow}>
+                    <Text numberOfLines={1} style={styles.orderTitle}>
+                      {payment.driverName || payment.driverId} · {payment.amount} ₽
+                    </Text>
+                    <Text numberOfLines={1} style={styles.orderText}>
+                      Статус оплаты: {payment.status} · создано {formatDate(payment.createdAt)}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={async () => {
+                        await updateDriverAccess(payment.driverId, 'monthly', 'active');
+                        await loadAdminDriverPayments();
+                      }}
+                      style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.smallButtonText}>Активировать на 30 дней</Text>
+                    </Pressable>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.sectionTextMuted}>Новых заявок на PRO пока нет.</Text>
+              )}
+              {activePartnerProDrivers.length ? (
+                <View style={styles.reviewBox}>
+                  <Text style={styles.orderTitle}>Активные PRO-водители</Text>
+                  {activePartnerProDrivers.map((driver) => (
+                    <Text key={driver.id} style={styles.orderText}>
+                      {driver.name} · до {formatDate(driver.subscriptionExpiresAt ?? driver.accessExpiresAt)}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+
+            <View style={[styles.sectionCard, activeSection !== 'referrals' && styles.hiddenSection]}>
               <View style={styles.sectionHeader}>
                 <Gift color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Рефералы</Text>
@@ -524,6 +708,35 @@ export function AdminPanelScreen({ navigation }: Props) {
                       Прогресс: {referral.progress?.completedOrders ?? 0}/
                       {referral.progress?.requiredOrders ?? 0} поездок · код {referral.code}
                     </Text>
+                    {isSelfEmployedDriverRole(referral.inviteeRole) && referral.status === 'qualified' ? (
+                      <View style={styles.rowActions}>
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={referralBusyId === referral.id}
+                          onPress={() => updateReferralStatus(referral.id, 'rewarded')}
+                          style={({ pressed }) => [
+                            styles.smallButton,
+                            referralBusyId === referral.id && styles.mutedButton,
+                            pressed && styles.pressed,
+                          ]}
+                        >
+                          <Text style={styles.smallButtonText}>Начислить 200 ₽</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={referralBusyId === referral.id}
+                          onPress={() => updateReferralStatus(referral.id, 'blocked')}
+                          style={({ pressed }) => [
+                            styles.smallButton,
+                            styles.dangerButton,
+                            referralBusyId === referral.id && styles.mutedButton,
+                            pressed && styles.pressed,
+                          ]}
+                        >
+                          <Text style={styles.dangerButtonText}>Отклонить бонус</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
                   </View>
                 ))
               ) : (
@@ -531,7 +744,7 @@ export function AdminPanelScreen({ navigation }: Props) {
               )}
             </View>
 
-            <View style={styles.sectionCard}>
+            <View style={[styles.sectionCard, activeSection !== 'drivers' && styles.hiddenSection]}>
               <View style={styles.sectionHeader}>
                 <ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Водители</Text>
@@ -566,8 +779,16 @@ export function AdminPanelScreen({ navigation }: Props) {
                     Допуск к заказам: {driver.canReceiveOrders ? 'открыт' : 'закрыт'}.
                   </Text>
                   <Text numberOfLines={1} style={styles.orderText}>
-                    Пилотный доступ: {driver.subscriptionStatus}
-                    {driver.accessExpiresAt ? ` до ${formatDate(driver.accessExpiresAt)}` : ''}.
+                    Тариф: {driver.subscriptionPlan === 'partner_pro' ? 'Партнёр PRO' : 'Комиссия 7% / 5% / 3%'} · статус:{' '}
+                    {driver.subscriptionStatus}
+                    {driver.subscriptionExpiresAt || driver.accessExpiresAt
+                      ? ` до ${formatDate(driver.subscriptionExpiresAt ?? driver.accessExpiresAt)}`
+                      : ''}.
+                  </Text>
+                  <Text numberOfLines={1} style={styles.orderText}>
+                    Тест: {driver.commissionTrialStartedAt ? formatDate(driver.commissionTrialStartedAt) : 'не начат'} →{' '}
+                    {driver.commissionTrialEndsAt ? formatDate(driver.commissionTrialEndsAt) : 'нет даты'} · режим:{' '}
+                    {driver.workMode || (driver.subscriptionPlan === 'partner_pro' ? 'partner_pro' : 'commission')}
                   </Text>
                   <View style={styles.complianceGrid}>
                     <CompliancePill label="Документы" value={driver.documentsStatus} readyValue="approved" />
@@ -662,7 +883,14 @@ export function AdminPanelScreen({ navigation }: Props) {
                       onPress={() => updateDriverAccess(driver.id, 'monthly', 'active')}
                       style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
                     >
-                      <Text style={styles.smallButtonText}>Активировать доступ</Text>
+                      <Text style={styles.smallButtonText}>Активировать PRO</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => updateDriverAccess(driver.id, 'commission', 'active')}
+                      style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.smallButtonText}>Режим комиссии</Text>
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
@@ -673,7 +901,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                         pressed && styles.pressed,
                       ]}
                     >
-                      <Text style={styles.dangerButtonText}>Отключить доступ</Text>
+                      <Text style={styles.dangerButtonText}>Отключить PRO</Text>
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
@@ -692,7 +920,7 @@ export function AdminPanelScreen({ navigation }: Props) {
               })}
             </View>
 
-            <View style={styles.sectionCard}>
+            <View style={[styles.sectionCard, activeSection !== 'settings' && styles.hiddenSection]}>
               <View style={styles.sectionHeader}>
                 <MapPinned color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Адресный слой</Text>
@@ -812,10 +1040,15 @@ export function AdminPanelScreen({ navigation }: Props) {
               ))}
             </View>
 
-            <View style={styles.sectionCard}>
+            <View style={[styles.sectionCard, activeSection !== 'orders' && styles.hiddenSection]}>
               <View style={styles.sectionHeader}>
                 <ReceiptText color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Последние заказы</Text>
+              </View>
+              <View style={styles.statsGridCompact}>
+                <PlanRow title="Активные" value={String(activeAdminOrders.length)} />
+                <PlanRow title="Завершенные" value={String(completedAdminOrders.length)} />
+                <PlanRow title="Отмененные" value={String(cancelledAdminOrders.length)} />
               </View>
               {orders.length > 0 ? (
                 orders.slice(0, 5).map((order) => (
@@ -947,28 +1180,49 @@ function formatRealtimeStatus(status: 'connecting' | 'live' | 'offline' | 'polli
   return 'подключается';
 }
 
-function buildLocalServiceShareSummary(orders: AppOrder[]) {
-  const today = new Date().toISOString().slice(0, 10);
+function isPartnerProActive(driver: {
+  accessExpiresAt?: string;
+  billingMode?: string;
+  subscriptionExpiresAt?: string;
+  subscriptionPlan?: string;
+  subscriptionStatus?: string;
+}) {
+  const expiresAt = Date.parse(driver.subscriptionExpiresAt || driver.accessExpiresAt || '');
+
+  return (
+    driver.billingMode === 'monthly' &&
+    driver.subscriptionPlan === 'partner_pro' &&
+    driver.subscriptionStatus === 'active' &&
+    Number.isFinite(expiresAt) &&
+    expiresAt > Date.now()
+  );
+}
+
+function buildLocalServiceShareSummary(orders: AppOrder[], targetDate = new Date().toISOString().slice(0, 10)) {
   const completedOrders = orders.filter((order) => {
-    const serviceShareAmount = order.serviceShareAmount ?? order.driverCommission ?? 0;
     const batchDate = order.serviceShareBatchDate ?? order.completedAt?.slice(0, 10);
 
     return (
       ['closed', 'completed'].includes(order.status) &&
-      batchDate === today &&
-      serviceShareAmount > 0
+      batchDate === targetDate
     );
   });
   const byDriver = new Map<
     string,
     {
       confirmedAmount: number;
+      billingMode?: AppOrder['driverBillingMode'];
+      currentCommissionPercent?: number;
       driverId: string;
       driverName: string;
       ordersCount: number;
       pendingTransferAmount: number;
       reportedTransferAmount: number;
+      settlementStatus?: AppOrder['serviceShareStatus'];
+      subscriptionExpiresAt?: string;
+      subscriptionPlan?: string;
       totalCollectedAmount: number;
+      totalDriverNetAmount?: number;
       totalServiceShareAmount: number;
     }
   >();
@@ -991,12 +1245,18 @@ function buildLocalServiceShareSummary(orders: AppOrder[]) {
     if (!byDriver.has(driverId)) {
       byDriver.set(driverId, {
         confirmedAmount: 0,
+        billingMode: order.driverBillingMode ?? order.driver?.billingMode,
+        currentCommissionPercent: order.serviceShareRate ?? order.driverCommissionRate ?? 0,
         driverId,
         driverName,
         ordersCount: 0,
         pendingTransferAmount: 0,
         reportedTransferAmount: 0,
+        settlementStatus: 'not_applicable',
+        subscriptionExpiresAt: order.driver?.subscriptionExpiresAt,
+        subscriptionPlan: order.driver?.subscriptionPlan,
         totalCollectedAmount: 0,
+        totalDriverNetAmount: 0,
         totalServiceShareAmount: 0,
       });
     }
@@ -1008,7 +1268,13 @@ function buildLocalServiceShareSummary(orders: AppOrder[]) {
     }
 
     driverSummary.ordersCount += 1;
+    driverSummary.billingMode = order.driverBillingMode ?? order.driver?.billingMode;
+    driverSummary.currentCommissionPercent = order.serviceShareRate ?? order.driverCommissionRate ?? 0;
+    driverSummary.subscriptionExpiresAt = order.driver?.subscriptionExpiresAt;
+    driverSummary.subscriptionPlan = order.driver?.subscriptionPlan;
     driverSummary.totalCollectedAmount += collectedAmount;
+    driverSummary.totalDriverNetAmount =
+      (driverSummary.totalDriverNetAmount ?? 0) + (order.driverNetAmount ?? Math.max(0, collectedAmount - serviceShareAmount));
     driverSummary.totalServiceShareAmount += serviceShareAmount;
     summary.totalCollectedAmount += collectedAmount;
     summary.totalServiceShareAmount += serviceShareAmount;
@@ -1025,12 +1291,26 @@ function buildLocalServiceShareSummary(orders: AppOrder[]) {
     }
   });
 
+  byDriver.forEach((driverSummary) => {
+    if (driverSummary.totalServiceShareAmount <= 0) {
+      driverSummary.settlementStatus = 'not_applicable';
+    } else if (driverSummary.confirmedAmount >= driverSummary.totalServiceShareAmount) {
+      driverSummary.settlementStatus = 'confirmed';
+    } else if (driverSummary.reportedTransferAmount > 0) {
+      driverSummary.settlementStatus = 'reported_transferred';
+    } else {
+      driverSummary.settlementStatus = 'pending_transfer';
+    }
+  });
+
   return {
-    date: today,
+    date: targetDate,
     drivers: Array.from(byDriver.values()).sort((left, right) =>
       right.totalServiceShareAmount - left.totalServiceShareAmount,
     ),
     orders: completedOrders.map((order) => ({
+      commissionPercent: order.serviceShareRate ?? order.driverCommissionRate ?? 0,
+      dailyOrderNumber: order.driverDailyOrderNumber ?? 0,
       driverId: order.driver?.id,
       driverName: order.driver?.name,
       id: order.id,
@@ -1269,6 +1549,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
+  adminTab: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0, 141, 73, 0.22)',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: 12,
+  },
+  adminTabActive: {
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
+  },
+  adminTabs: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  adminTabText: {
+    color: '#12382C',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  adminTabTextActive: {
+    color: '#FFFFFF',
+  },
   errorText: {
     color: '#C17A70',
     fontSize: 13,
@@ -1289,6 +1596,9 @@ const styles = StyleSheet.create({
     color: '#557669',
     fontSize: 12,
     lineHeight: 18,
+  },
+  hiddenSection: {
+    display: 'none',
   },
   iconWrap: {
     alignItems: 'center',
@@ -1512,6 +1822,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statsGridCompact: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
