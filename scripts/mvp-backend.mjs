@@ -643,6 +643,29 @@ async function persistDb(db) {
   }
 }
 
+// Сериализованная критическая секция read-modify-write. mutator получает СВЕЖЕЕ
+// состояние, меняет его и сразу персистится — всё как одна неделимая операция.
+// Это убирает гонку, когда два запроса читают каждый свою копию состояния и затирают
+// изменения друг друга (например, два водителя одновременно принимают один заказ).
+let dbMutationChain = Promise.resolve();
+
+async function mutateDb(mutator) {
+  const run = dbMutationChain.then(async () => {
+    const db = await readDb();
+    const result = await mutator(db);
+    await writeDb(db);
+
+    return result;
+  });
+  // Сбой одной мутации не должен рвать очередь для последующих.
+  dbMutationChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return run;
+}
+
 function normalizeDb(parsed) {
   const source = parsed && typeof parsed === 'object' ? parsed : {};
   const defaultDb = createDefaultDb();
@@ -8485,36 +8508,40 @@ async function handleRequest(request, response) {
 
     if (request.method === 'PATCH' && pathParts[0] === 'orders' && pathParts[2] === 'payment') {
       const payload = await readBody(request);
-      const order = db.orders.find((item) => item.id === pathParts[1]);
-      const paymentStatus = normalizePaymentStatus(payload.paymentStatus || payload.status, '');
+      // Обновление оплаты — через сериализованную критическую секцию, чтобы оплата и
+      // смена статуса того же заказа не затирали друг друга при одновременных запросах.
+      const outcome = await mutateDb(async (db) => {
+        const order = db.orders.find((item) => item.id === pathParts[1]);
+        const paymentStatus = normalizePaymentStatus(payload.paymentStatus || payload.status, '');
 
-      if (!order) {
-        sendJson(response, 404, { error: 'Order not found' });
-        return;
-      }
+        if (!order) {
+          return { status: 404, body: { error: 'Order not found' } };
+        }
 
-      if (!paymentStatus) {
-        sendJson(response, 400, { error: 'Invalid payment status' });
-        return;
-      }
+        if (!paymentStatus) {
+          return { status: 400, body: { error: 'Invalid payment status' } };
+        }
 
-      updateOrderPayment(
-        order,
-        paymentStatus,
-        payload.actor || 'payment-patch',
-        payload.note || 'Payment status updated manually in MVP',
-      );
+        updateOrderPayment(
+          order,
+          paymentStatus,
+          payload.actor || 'payment-patch',
+          payload.note || 'Payment status updated manually in MVP',
+        );
 
-      const notification = notifyOrderChange(
-        db,
-        order,
-        'Оплата заказа обновлена',
-        `${order.id}: ${order.paymentStatus}.`,
-        'order_payment',
-      );
-      await writeDb(db);
-      broadcastRealtime('order_payment', { notification, order }, db);
-      sendJson(response, 200, { order });
+        const notification = notifyOrderChange(
+          db,
+          order,
+          'Оплата заказа обновлена',
+          `${order.id}: ${order.paymentStatus}.`,
+          'order_payment',
+        );
+        broadcastRealtime('order_payment', { notification, order }, db);
+
+        return { status: 200, body: { order } };
+      });
+
+      sendJson(response, outcome.status, outcome.body);
       return;
     }
 
@@ -8848,114 +8875,115 @@ async function handleRequest(request, response) {
 
     if (request.method === 'PATCH' && pathParts[0] === 'orders' && pathParts[2] === 'assign') {
       const payload = await readBody(request);
-      const order = db.orders.find((item) => item.id === pathParts[1]);
-      const driver = db.drivers.find((item) => item.id === payload.driverId);
+      // Назначение заказа идёт через сериализованную критическую секцию: проверка
+      // доступности и присвоение водителя выполняются на свежем состоянии под замком,
+      // поэтому два водителя не могут одновременно «принять» один и тот же заказ.
+      const outcome = await mutateDb(async (db) => {
+        const order = db.orders.find((item) => item.id === pathParts[1]);
+        const driver = db.drivers.find((item) => item.id === payload.driverId);
 
-      if (!order) {
-        sendJson(response, 404, { error: 'Order not found' });
-        return;
-      }
+        if (!order) {
+          return { status: 404, body: { error: 'Order not found' } };
+        }
 
-      if (!driver) {
-        sendJson(response, 404, { error: 'Driver not found' });
-        return;
-      }
+        if (!driver) {
+          return { status: 404, body: { error: 'Driver not found' } };
+        }
 
-      applyDriverAccessState(driver);
+        applyDriverAccessState(driver);
 
-      if (!driver.canReceiveOrders) {
-        sendJson(response, 403, {
-          driver,
-          error: 'Driver is not allowed to receive orders yet',
-        });
-        return;
-      }
+        if (!driver.canReceiveOrders) {
+          return {
+            status: 403,
+            body: { driver, error: 'Driver is not allowed to receive orders yet' },
+          };
+        }
 
-      if (order.driver?.id) {
-        sendJson(response, 409, {
-          error: 'Order is already accepted by another driver',
+        if (order.driver?.id) {
+          return {
+            status: 409,
+            body: { error: 'Order is already accepted by another driver', order },
+          };
+        }
+
+        if (isExclusiveOfferActive(order) && String(order.exclusiveDriverId) !== String(driver.id)) {
+          return {
+            status: 409,
+            body: { error: 'Order is temporarily offered to another driver', order },
+          };
+        }
+
+        if (order.exclusiveDriverId && order.exclusiveOfferStatus === 'pending' && !isExclusiveOfferActive(order)) {
+          releaseExclusiveOffer(order, 'expired');
+        }
+
+        if (!['created', 'searching'].includes(order.status)) {
+          return {
+            status: 409,
+            body: { error: 'Order is not open for dispatch', order },
+          };
+        }
+
+        const now = new Date().toISOString();
+        order.driver = {
+          billingMode: driver.billingMode,
+          commissionTrialEndsAt: driver.commissionTrialEndsAt,
+          commissionTrialOrderLimit: driver.commissionTrialOrderLimit,
+          commissionTrialStartedAt: driver.commissionTrialStartedAt,
+          driverTariff: getDriverAccessPlan(driver.billingMode).name,
+          id: driver.id,
+          name: driver.name,
+          phone: driver.phone,
+          rating: driver.rating,
+          subscriptionExpiresAt: driver.subscriptionExpiresAt || driver.accessExpiresAt,
+          subscriptionPlan: driver.subscriptionPlan || (driver.billingMode === 'monthly' ? 'partner_pro' : 'commission'),
+          subscriptionStatus: driver.subscriptionStatus,
+          vehicle: driver.vehicle,
+          plate: driver.plate,
+        };
+        order.fulfilledByRole = normalizeFulfilledByRole(payload.fulfilledByRole, driver.employmentType === 'park_driver' ? 'park_driver' : 'self_employed_driver');
+        order.parkId = payload.parkId ? String(payload.parkId) : driver.parkId || order.parkId;
+        order.batchId = payload.batchId ? String(payload.batchId) : order.batchId;
+        if (order.safetyPinRequired && !order.tripPin) {
+          order.tripPin = createTripPin();
+        }
+        order.acceptedAt = now;
+        order.status = 'accepted';
+        if (String(order.exclusiveDriverId || '') === String(driver.id)) {
+          order.exclusiveOfferStatus = 'accepted';
+          order.dispatchStatus = 'accepted_from_exclusive';
+        } else {
+          order.dispatchStatus = 'accepted_from_feed';
+        }
+        order.updatedAt = now;
+        addOrderStatusHistory(order, order.status, driver.id);
+        const notification = notifyOrderChange(
+          db,
           order,
-        });
-        return;
-      }
-
-      if (isExclusiveOfferActive(order) && String(order.exclusiveDriverId) !== String(driver.id)) {
-        sendJson(response, 409, {
-          error: 'Order is temporarily offered to another driver',
-          order,
-        });
-        return;
-      }
-
-      if (order.exclusiveDriverId && order.exclusiveOfferStatus === 'pending' && !isExclusiveOfferActive(order)) {
-        releaseExclusiveOffer(order, 'expired');
-      }
-
-      if (!['created', 'searching'].includes(order.status)) {
-        sendJson(response, 409, {
-          error: 'Order is not open for dispatch',
-          order,
-        });
-        return;
-      }
-
-      const now = new Date().toISOString();
-      order.driver = {
-        billingMode: driver.billingMode,
-        commissionTrialEndsAt: driver.commissionTrialEndsAt,
-        commissionTrialOrderLimit: driver.commissionTrialOrderLimit,
-        commissionTrialStartedAt: driver.commissionTrialStartedAt,
-        driverTariff: getDriverAccessPlan(driver.billingMode).name,
-        id: driver.id,
-        name: driver.name,
-        phone: driver.phone,
-        rating: driver.rating,
-        subscriptionExpiresAt: driver.subscriptionExpiresAt || driver.accessExpiresAt,
-        subscriptionPlan: driver.subscriptionPlan || (driver.billingMode === 'monthly' ? 'partner_pro' : 'commission'),
-        subscriptionStatus: driver.subscriptionStatus,
-        vehicle: driver.vehicle,
-        plate: driver.plate,
-      };
-      order.fulfilledByRole = normalizeFulfilledByRole(payload.fulfilledByRole, driver.employmentType === 'park_driver' ? 'park_driver' : 'self_employed_driver');
-      order.parkId = payload.parkId ? String(payload.parkId) : driver.parkId || order.parkId;
-      order.batchId = payload.batchId ? String(payload.batchId) : order.batchId;
-      if (order.safetyPinRequired && !order.tripPin) {
-        order.tripPin = createTripPin();
-      }
-      order.acceptedAt = now;
-      order.status = 'accepted';
-      if (String(order.exclusiveDriverId || '') === String(driver.id)) {
-        order.exclusiveOfferStatus = 'accepted';
-        order.dispatchStatus = 'accepted_from_exclusive';
-      } else {
-        order.dispatchStatus = 'accepted_from_feed';
-      }
-      order.updatedAt = now;
-      addOrderStatusHistory(order, order.status, driver.id);
-      const notification = notifyOrderChange(
-        db,
-        order,
-        'Водитель назначен',
-        `${driver.name} принял ${order.id}: ${formatOrderRoute(order)}.`,
-        'order_assigned',
-      );
-      await sendPushToUser(db, order.userId, notification, {
-        orderId: order.id,
-        status: order.status,
-      }, ['client']);
-      if (order.parkId) {
-        await sendPushToPark(db, order.parkId, notification, {
+          'Водитель назначен',
+          `${driver.name} принял ${order.id}: ${formatOrderRoute(order)}.`,
+          'order_assigned',
+        );
+        await sendPushToUser(db, order.userId, notification, {
+          orderId: order.id,
+          status: order.status,
+        }, ['client']);
+        if (order.parkId) {
+          await sendPushToPark(db, order.parkId, notification, {
+            orderId: order.id,
+            status: order.status,
+          });
+        }
+        await sendPushToAdmins(db, notification, {
           orderId: order.id,
           status: order.status,
         });
-      }
-      await sendPushToAdmins(db, notification, {
-        orderId: order.id,
-        status: order.status,
+        broadcastRealtime('order_assigned', { notification, order }, db);
+
+        return { status: 200, body: { order } };
       });
-      await writeDb(db);
-      broadcastRealtime('order_assigned', { notification, order }, db);
-      sendJson(response, 200, { order });
+
+      sendJson(response, outcome.status, outcome.body);
       return;
     }
 
