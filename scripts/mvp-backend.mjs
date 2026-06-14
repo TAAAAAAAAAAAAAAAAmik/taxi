@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
-import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { URL } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -605,7 +605,24 @@ async function readJsonDb() {
   }
 }
 
-async function writeDb(db) {
+// Записи состояния сериализуются через эту цепочку промисов: одновременные запросы
+// не должны переписывать хранилище внахлёст. Запись на диск делается атомарно
+// (temp-файл + rename), чтобы падение процесса посреди записи не оставляло
+// наполовину записанный db-файл.
+let dbWriteChain = Promise.resolve();
+
+function writeDb(db) {
+  const run = dbWriteChain.then(() => persistDb(db));
+  // Ошибка одной записи не должна рвать очередь для последующих.
+  dbWriteChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return run;
+}
+
+async function persistDb(db) {
   pruneTransientAuthRecords(db);
 
   if (storageDriver === 'postgres') {
@@ -614,7 +631,16 @@ async function writeDb(db) {
   }
 
   await mkdir(dirname(dbPath), { recursive: true });
-  await writeFile(dbPath, `${JSON.stringify(db, null, 2)}\n`, 'utf8');
+
+  const tempPath = `${dbPath}.${process.pid}.${randomUUID()}.tmp`;
+
+  try {
+    await writeFile(tempPath, `${JSON.stringify(db, null, 2)}\n`, 'utf8');
+    await rename(tempPath, dbPath);
+  } catch (error) {
+    await rm(tempPath, { force: true });
+    throw error;
+  }
 }
 
 function normalizeDb(parsed) {
