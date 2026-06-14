@@ -1,4 +1,4 @@
-﻿# Design Rules
+# Design Rules
 
 ## Главная цель дизайна
 

@@ -18,12 +18,12 @@ const toneColors = {
     icon: kx.color.amber,
   },
   warning: {
-    background: kx.surface.raised,
+    background: '#FFF9E8',
     border: kx.color.warning,
     icon: kx.color.warning,
   },
   success: {
-    background: kx.surface.raised,
+    background: '#F1F8F3',
     border: kx.color.success,
     icon: kx.color.success,
   },
@@ -63,13 +63,19 @@ const styles = StyleSheet.create({
   panel: {
     borderRadius: kx.radius.card,
     borderWidth: 1,
+    elevation: 1,
     gap: 10,
     padding: 14,
+    shadowColor: kx.color.shadow,
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
   },
   title: {
     color: kx.text.primary,
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '900',
+    lineHeight: 20,
   },
 });

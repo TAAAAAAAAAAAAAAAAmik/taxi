@@ -209,7 +209,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
       secondaryTarget: 'order',
       metrics: [
         { label: 'За клиента', value: '60 ₽', helper: 'После 5 поездок' },
-        { label: 'За водителя', value: '300 ₽', helper: 'После 10 заказов' },
+        { label: 'За водителя', value: '200 ₽', helper: 'После 10 заказов' },
       ],
       quickActions: [
         {
@@ -222,7 +222,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
         {
           id: 'client-rule',
           title: 'Пригласить клиента',
-          subtitle: 'Массовый трафик через бонус на первую поездку.',
+          subtitle: 'Пригласивший получает бонус после активных поездок клиента.',
           icon: 'route',
           target: 'referral',
         },
@@ -239,15 +239,15 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
         {
           id: 'client',
           title: 'Приглашенный клиент',
-          subtitle: 'Получает бонус на первую поездку, пригласивший получает бонус после 5 завершенных поездок.',
-          value: '300/60 ₽',
+          subtitle: 'Пригласивший получает бонус после 5 завершенных поездок клиента.',
+          value: '60 ₽',
           status: 'Массово',
         },
         {
           id: 'driver',
           title: 'Приглашенный водитель',
           subtitle: 'Получает пробный доступ после проверки; пригласивший получает бонус после 10 заказов.',
-          value: '300 ₽',
+          value: '200 ₽',
           status: 'Ценно',
         },
       ],
@@ -369,6 +369,48 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
     },
   },
   driver: {
+    home: {
+      title: 'Главная',
+      subtitle: 'Короткая рабочая панель водителя: выйти на линию, открыть ленту, рассчитаться и посмотреть статистику.',
+      icon: 'home',
+      statusTitle: 'Рабочий экран водителя',
+      statusText: 'Основные действия собраны в одном месте, а тариф, документы, рефералы и правила доступны через меню.',
+      primaryAction: 'Выйти на линию',
+      secondaryAction: 'Лента заказов',
+      secondaryTarget: 'order',
+      metrics: [
+        { label: 'Смена', value: 'Готово', helper: 'Включается кнопкой' },
+        { label: 'Лента', value: 'Рядом', helper: 'Короткие карточки' },
+        { label: 'Сверка', value: 'День', helper: 'Оплата сервиса' },
+      ],
+      quickActions: [
+        {
+          id: 'orders',
+          title: 'Лента заказов',
+          subtitle: 'Расстояние, адрес, цена и принятие.',
+          icon: 'briefcase',
+          target: 'order',
+        },
+        {
+          id: 'settlement',
+          title: 'Расчитаться',
+          subtitle: 'Сумма к оплате и статус сверки.',
+          icon: 'wallet',
+          target: 'subscription',
+        },
+      ],
+      listTitle: 'Сегодня',
+      rows: [
+        {
+          id: 'line',
+          title: 'Линия',
+          subtitle: 'Водитель сам включает смену, когда готов принимать заказы.',
+          value: 'Кнопка',
+          status: 'Главное',
+        },
+      ],
+      note: 'Дополнительные функции не удалены: они вынесены из главной в меню с тремя линиями.',
+    },
     subscription: {
       title: 'Тариф и расчеты',
       subtitle: 'PRO без комиссии или обычный режим с дневной шкалой 7% / 5% / 3%.',
@@ -1128,6 +1170,321 @@ sectionPages.fleet.profile = {
   subtitle: 'Данные владельца таксопарка, безопасность аккаунта и управление данными.',
   statusText: 'Таксопарк может управлять профилем владельца и удалить аккаунт через backend-сценарий.',
 };
+
+sectionPages.client.settings = {
+  ...sectionPages.client.profile,
+  title: 'Настройки',
+  subtitle: 'Сохраненные адреса, простой режим, безопасность аккаунта и быстрый доступ к поддержке.',
+  icon: 'shield',
+  statusTitle: 'Настройки собраны отдельно',
+  statusText: 'Профиль, адреса и удаление аккаунта остались доступны без смешивания с заказом поездки.',
+  primaryAction: 'Сохраненные адреса',
+  primaryTarget: 'homeAddress',
+  secondaryAction: 'Поддержка',
+  secondaryTarget: 'supportChat',
+  metrics: [
+    { label: 'Адреса', value: '0', helper: 'Дом и работа доступны отдельно' },
+    { label: 'Режим', value: 'Простой', helper: 'Можно включить на главной' },
+    { label: 'Аккаунт', value: 'Защищен', helper: 'Удаление через код' },
+  ],
+  quickActions: [
+    {
+      id: 'saved-addresses',
+      title: 'Адреса',
+      subtitle: 'Дом, работа и частые маршруты.',
+      icon: 'star',
+      target: 'homeAddress',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Вопросы по профилю и поездкам.',
+      icon: 'headphones',
+      target: 'supportChat',
+    },
+    {
+      id: 'delete',
+      title: 'Удаление аккаунта',
+      subtitle: 'Подтверждение кодом через backend.',
+      icon: 'shield',
+      target: 'deleteAccount',
+    },
+  ],
+};
+
+sectionPages.client.about = {
+  ...sectionPages.client.payment,
+  title: 'О приложении',
+  subtitle: 'Kinetix для локальных поездок: заказ, статусы, поддержка и прозрачные правила пилота.',
+  icon: 'star',
+  statusTitle: 'Функции сохранены',
+  statusText: 'Основные действия находятся снизу, дополнительные разделы открываются через меню с тремя линиями.',
+  primaryAction: 'Заказать поездку',
+  primaryTarget: 'order',
+  secondaryAction: 'Поддержка',
+  secondaryTarget: 'supportChat',
+  listTitle: 'Что доступно клиенту',
+  rows: [
+    {
+      id: 'order',
+      title: 'Заказ поездки',
+      subtitle: 'Главная кнопка ведет к выбору маршрута и тарифа.',
+      value: 'Снизу',
+      status: 'Главное',
+    },
+    {
+      id: 'history',
+      title: 'История и статусы',
+      subtitle: 'Активные и завершенные заказы доступны через вкладку Заказы и меню.',
+      value: 'Заказы',
+      status: 'Доступно',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Чат поддержки вынесен в профиль и боковое меню.',
+      value: 'Меню',
+      status: 'Доступно',
+    },
+  ],
+  note: 'Этот раздел только объясняет структуру приложения и не отключает клиентскую логику.',
+};
+
+sectionPages.driver.settings = {
+  ...sectionPages.driver.profile,
+  title: 'Настройки',
+  subtitle: 'Профиль, уведомления, безопасность аккаунта и служебные действия водителя.',
+  icon: 'shield',
+  statusTitle: 'Настройки вне рабочего стола',
+  statusText: 'Рабочий экран не перегружен, но профиль, документы, поддержка и удаление аккаунта доступны.',
+  primaryAction: 'Открыть документы',
+  primaryTarget: 'documents',
+  secondaryAction: 'Поддержка',
+  secondaryTarget: 'supportChat',
+  metrics: [
+    { label: 'Профиль', value: 'Доступен', helper: 'Личные данные и безопасность' },
+    { label: 'Документы', value: 'Отдельно', helper: 'Через защищенный экран' },
+    { label: 'Сессия', value: 'В меню', helper: 'Смена роли и выход' },
+  ],
+  quickActions: [
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Паспорт, ВУ, СТС и ОСАГО.',
+      icon: 'file',
+      target: 'documents',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Спорные поездки и вопросы по доступу.',
+      icon: 'headphones',
+      target: 'supportChat',
+    },
+    {
+      id: 'delete',
+      title: 'Удаление аккаунта',
+      subtitle: 'Подтверждение кодом через backend.',
+      icon: 'shield',
+      target: 'deleteAccount',
+    },
+  ],
+};
+
+sectionPages.driver.settlementHistory = {
+  ...sectionPages.driver.payouts,
+  title: 'История расчетов',
+  subtitle: 'Дневные сверки, статусы оплаты, суммы к переводу и подтверждения администратора.',
+  icon: 'wallet',
+  statusTitle: 'История появится после поездок',
+  statusText: 'Расчеты 7% / 5% / 3%, trial и Партнер PRO не меняются, меняется только путь в меню.',
+  primaryAction: 'Открыть тариф',
+  primaryTarget: 'subscription',
+  secondaryAction: 'История заказов',
+  secondaryTarget: 'history',
+  metrics: [
+    { label: 'Сегодня', value: '0 ₽', helper: 'Нет начислений' },
+    { label: 'Статус', value: 'Открыто', helper: 'Дневная сверка' },
+    { label: 'Комиссия', value: '7/5/3%', helper: 'По числу заказов за день' },
+  ],
+  listTitle: 'Сверки и оплаты',
+  rows: [
+    {
+      id: 'pending',
+      title: 'Ожидает перевода',
+      subtitle: 'После завершенных заказов здесь будет сумма к оплате сервису.',
+      value: '0 ₽',
+      status: 'Нет',
+    },
+    {
+      id: 'reported',
+      title: 'Водитель отметил перевод',
+      subtitle: 'Администратор проверяет и подтверждает оплату.',
+      value: '0 ₽',
+      status: 'Нет',
+    },
+    {
+      id: 'confirmed',
+      title: 'Оплачено',
+      subtitle: 'Подтвержденные дневные расчеты остаются в истории.',
+      value: '0 ₽',
+      status: 'История',
+    },
+  ],
+  note: 'Раздел дополняет экран дохода и сохраняет всю финансовую логику без урезаний.',
+};
+
+sectionPages.fleet.finance = {
+  ...sectionPages.fleet.finance,
+  title: 'Расчеты',
+  subtitle: 'Дневные расчеты, суммы к оплате, история оплат, комиссии и отчеты таксопарка.',
+  listTitle: 'История оплат',
+};
+
+sectionPages.fleet.orders = {
+  ...sectionPages.client.rides,
+  title: 'Заказы',
+  subtitle: 'Активные, завершенные и отмененные заказы таксопарка.',
+  icon: 'route',
+  statusTitle: 'Заказы таксопарка',
+  statusText: 'Таксопарк видит статусы заказов своих водителей без доступа к клиентским функциям.',
+  primaryAction: 'Обновить заказы',
+  secondaryAction: 'Отчеты',
+  metrics: [
+    { label: 'Активные', value: '0', helper: 'Сейчас нет заказов' },
+    { label: 'Завершенные', value: '0', helper: 'История появится после поездок' },
+    { label: 'Отмененные', value: '0', helper: 'Для контроля качества' },
+  ],
+  quickActions: [
+    {
+      id: 'active',
+      title: 'Активные',
+      subtitle: 'Заказы на линии и назначенные водители.',
+      icon: 'route',
+    },
+    {
+      id: 'completed',
+      title: 'Завершенные',
+      subtitle: 'История выполненных поездок.',
+      icon: 'file',
+    },
+    {
+      id: 'cancelled',
+      title: 'Отмененные',
+      subtitle: 'Причины отмен и спорные случаи.',
+      icon: 'headphones',
+    },
+  ],
+  listTitle: 'Последние заказы',
+  rows: [
+    {
+      id: 'empty',
+      title: 'Заказов пока нет',
+      subtitle: 'После выхода водителей на линию здесь появится список заказов парка.',
+      value: '0',
+      status: 'Пусто',
+    },
+  ],
+  note: 'Раздел не заменяет водительскую ленту, а дает таксопарку обзор по своим водителям.',
+};
+
+sectionPages.fleet.settings = {
+  ...sectionPages.fleet.documents,
+  title: 'Настройки таксопарка',
+  subtitle: 'Данные ИП, реквизиты, договоры, автомобили и параметры работы парка.',
+  icon: 'briefcase',
+  statusTitle: 'Настройки вынесены в меню',
+  statusText: 'Основной обзор стал короче, а документы, автомобили и реквизиты остались доступны.',
+  primaryAction: 'Пригласить водителя',
+  primaryTarget: 'fleetDriverInvite',
+  secondaryAction: 'Профиль',
+  metrics: [
+    { label: 'ИП', value: 'Проверка', helper: 'Данные из анкеты' },
+    { label: 'Реквизиты', value: 'Черновик', helper: 'Для актов и выплат' },
+    { label: 'Авто', value: '0', helper: 'Добавляются отдельно' },
+  ],
+};
+
+sectionPages.fleet.referrals = {
+  ...sectionPages.client.referrals,
+  title: 'Рефералы',
+  subtitle: 'Приглашения водителей и клиентов, коды, бонусы и статусы начисления.',
+  statusTitle: 'Реферальная система доступна',
+  statusText: 'Бонусная логика не меняется: раздел вынесен из нижнего меню в дополнительные функции.',
+  primaryAction: 'Открыть рефералы',
+  primaryTarget: 'referral',
+  secondaryAction: 'Пригласить водителя',
+  secondaryTarget: 'fleetDriverInvite',
+};
+
+sectionPages.fleet.reports = {
+  ...sectionPages.fleet.finance,
+  title: 'Отчеты',
+  subtitle: 'Операционные и финансовые сводки по водителям, заказам, оплатам и комиссиям.',
+  icon: 'file',
+  statusTitle: 'Отчеты собраны отдельно',
+  statusText: 'Финансы остаются основной вкладкой, а расширенные выгрузки находятся в меню.',
+  primaryAction: 'Скачать отчет',
+  secondaryAction: 'Расчеты',
+  listTitle: 'Доступные отчеты',
+  rows: [
+    {
+      id: 'finance',
+      title: 'Финансовый отчет',
+      subtitle: 'Сводка выплат, удержаний и дневных сверок.',
+      value: '0 ₽',
+      status: 'Готовится',
+    },
+    {
+      id: 'drivers',
+      title: 'Активность водителей',
+      subtitle: 'Заказы, статусы и допуск к линии.',
+      value: '0',
+      status: 'Готовится',
+    },
+  ],
+};
+
+sectionPages.fleet.support = {
+  ...sectionPages.client.support,
+  title: 'Поддержка',
+  subtitle: 'Вопросы по таксопарку, водителям, расчетам и документам.',
+  statusTitle: 'Поддержка таксопарка',
+  statusText: 'Связь с сервисом остается доступной через меню и не занимает нижнюю навигацию.',
+  primaryAction: 'Написать поддержке',
+  primaryTarget: 'supportChat',
+  secondaryAction: 'Правила работы',
+};
+
+sectionPages.fleet.rules = {
+  ...sectionPages.fleet.documents,
+  title: 'Правила работы',
+  subtitle: 'Требования к таксопарку, водителям, документам, расчетам и качеству поездок.',
+  icon: 'shield',
+  statusTitle: 'Правила доступны из меню',
+  statusText: 'Юридические и операционные требования не скрыты, а вынесены из главной навигации.',
+  primaryAction: 'Профиль парка',
+  secondaryAction: 'Поддержка',
+  secondaryTarget: 'supportChat',
+  listTitle: 'Основные требования',
+  rows: [
+    {
+      id: 'drivers',
+      title: 'Водители',
+      subtitle: 'Допуск, документы и активность должны контролироваться таксопарком.',
+      value: 'Контроль',
+      status: 'Важно',
+    },
+    {
+      id: 'payments',
+      title: 'Расчеты',
+      subtitle: 'Дневные суммы и история оплат доступны в разделе Расчеты.',
+      value: 'Ежедневно',
+      status: 'Важно',
+    },
+  ],
+};
+
 sectionPages.self_employed_driver = sectionPages.driver;
 sectionPages.park_admin = sectionPages.fleet;
 sectionPages.park_driver = {

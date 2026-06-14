@@ -1,9 +1,9 @@
+import { loadHouseRecords } from './houseLoader';
 import {
-  salavatDistrictHouses,
   salavatDistrictHouseSourceSummary,
   type SalavatHouseRecord,
   type SalavatHouseSource,
-} from './salavatDistrictHouses';
+} from './salavatDistrictHouseSourceSummary';
 import {
   salavatDistrictSettlements,
   salavatDistrictStreetSourceSummary,
@@ -13,7 +13,6 @@ import {
 } from './salavatDistrictStreets';
 
 export {
-  salavatDistrictHouses,
   salavatDistrictHouseSourceSummary,
   salavatDistrictSettlements,
   salavatDistrictStreetSourceSummary,
@@ -227,16 +226,57 @@ const fixedDistrictPoints: SalavatAddressSuggestion[] = [
   },
 ];
 
-const generatedHouseSuggestions = salavatDistrictHouses.map(houseRecordToSuggestion);
 const generatedStreetSuggestions = salavatDistrictStreets.map(streetRecordToSuggestion);
+
+// Дома Салаватского района (~14 тыс. записей, ~8.7 МБ) грузятся лениво: иначе тяжёлый
+// map выполнялся бы синхронно при импорте модуля и блокировал старт приложения.
+// До загрузки поиск работает по улицам и POI, затем дома «дозагружаются» в кэш.
+let loadedHouseRecords: SalavatHouseRecord[] = [];
+let cachedAddressSuggestions: SalavatAddressSuggestion[] = [
+  ...fixedDistrictPoints,
+  ...generatedStreetSuggestions,
+];
+let houseRecordsPromise: Promise<SalavatHouseRecord[]> | null = null;
+
+export function ensureSalavatHousesLoaded(): Promise<SalavatHouseRecord[]> {
+  if (!houseRecordsPromise) {
+    houseRecordsPromise = loadHouseRecords()
+      .then((records) => {
+        loadedHouseRecords = records;
+        cachedAddressSuggestions = [
+          ...fixedDistrictPoints,
+          ...records.map(houseRecordToSuggestion),
+          ...generatedStreetSuggestions,
+        ];
+
+        return records;
+      })
+      .catch((error) => {
+        houseRecordsPromise = null;
+        throw error;
+      });
+  }
+
+  return houseRecordsPromise;
+}
+
+// Предзагрузка вне критического пути старта: дома начинают грузиться, как только
+// модуль адресов впервые используется экраном, но не задерживают первый рендер.
+void ensureSalavatHousesLoaded().catch(() => undefined);
+
+// Полное число подсказок берём из метаданных, чтобы статистика не зависела от того,
+// успели ли дома догрузиться к моменту чтения.
+export const salavatAddressSuggestionCount =
+  fixedDistrictPoints.length +
+  salavatDistrictHouseSourceSummary.houses +
+  generatedStreetSuggestions.length;
 
 export const salavatDistrictCoverageSummary = {
   settlements: salavatDistrictSettlements.length,
   streets: salavatDistrictStreetSourceSummary.streets,
   houses: salavatDistrictHouseSourceSummary.houses,
   poi: fixedDistrictPoints.length,
-  suggestions:
-    fixedDistrictPoints.length + generatedHouseSuggestions.length + generatedStreetSuggestions.length,
+  suggestions: salavatAddressSuggestionCount,
   sources: {
     gar: salavatDistrictHouseSourceSummary.garHouses + salavatDistrictStreetSourceSummary.garStreets,
     osm: salavatDistrictHouseSourceSummary.osmHouses + salavatDistrictStreetSourceSummary.osmStreets,
@@ -247,12 +287,6 @@ export const salavatDistrictCoverageSummary = {
     streets: salavatDistrictStreetSourceSummary.generatedAt,
   },
 } as const;
-
-export const salavatAddressSuggestions: SalavatAddressSuggestion[] = [
-  ...fixedDistrictPoints,
-  ...generatedHouseSuggestions,
-  ...generatedStreetSuggestions,
-];
 
 export const salavatPopularRoutes: SalavatRoutePreset[] = [
   {
@@ -339,10 +373,10 @@ export function findSalavatAddressSuggestions(query: string, limit = 8) {
   const baseSuggestions = exactHouseSuggestion ? [exactHouseSuggestion] : [];
 
   if (!normalizedQuery) {
-    return [...baseSuggestions, ...salavatAddressSuggestions].slice(0, limit);
+    return [...baseSuggestions, ...cachedAddressSuggestions].slice(0, limit);
   }
 
-  const found = salavatAddressSuggestions
+  const found = cachedAddressSuggestions
     .map((address) => ({
       address,
       score: getAddressScore(address, normalizedQuery),
@@ -432,7 +466,7 @@ function createExactHouseSuggestion(query: string): SalavatAddressSuggestion | n
     return null;
   }
 
-  const exactHouse = salavatDistrictHouses
+  const exactHouse = loadedHouseRecords
     .map((record) => ({
       record,
       score: getHouseRecordScore(record, streetQuery, house),

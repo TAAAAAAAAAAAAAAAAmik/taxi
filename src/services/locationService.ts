@@ -1,3 +1,6 @@
+import { Platform } from 'react-native';
+import * as Location from 'expo-location';
+
 import type { GeoPoint } from '../data/salavatDistrict';
 import {
   getPublicEnv,
@@ -63,15 +66,45 @@ export type ReverseGeocodeResult =
       point: GeoPoint;
     };
 
-export function requestUserLocation(): Promise<UserLocationResult> {
+export async function requestUserLocation(): Promise<UserLocationResult> {
+  if (Platform.OS !== 'web') {
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== 'granted') {
+        return {
+          message: 'Доступ к геолокации отклонен. Можно продолжить без точного ближайшего заказа.',
+          status: 'denied',
+        };
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      return {
+        accuracy: position.coords.accuracy ?? undefined,
+        point: {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        },
+        status: 'granted',
+      };
+    } catch {
+      return {
+        message: 'Не удалось получить геолокацию. Можно продолжить без точного ближайшего заказа.',
+        status: 'unavailable',
+      };
+    }
+  }
+
   const maybeNavigator = globalThis as typeof globalThis & { navigator?: BrowserNavigator };
 
   if (!maybeNavigator.navigator?.geolocation) {
-    return Promise.resolve({
-      message:
-        'Геолокация недоступна в этой среде. На телефоне нужно подключить нативный модуль Expo Location.',
+    return {
+      message: 'Геолокация недоступна в этой среде. Можно ввести адрес вручную.',
       status: 'unavailable',
-    });
+    };
   }
 
   return new Promise((resolve) => {

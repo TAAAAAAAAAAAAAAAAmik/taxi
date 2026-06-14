@@ -19,6 +19,7 @@ export type MenuItem = {
   subtitle: string;
   icon: MenuIconName;
   badge?: string;
+  target?: MenuActionTarget;
 };
 
 export type MenuActionTarget =
@@ -31,6 +32,7 @@ export type MenuActionTarget =
   | 'order'
   | 'referral'
   | 'registration'
+  | 'logout'
   | 'subscription'
   | 'supportChat';
 
@@ -56,6 +58,7 @@ export type RoleMenuConfig = {
   primaryAction: string;
   secondaryAction: string;
   menuItems: MenuItem[];
+  drawerItems?: MenuItem[];
   quickActions: QuickAction[];
   metrics: DashboardMetric[];
 };
@@ -462,16 +465,7 @@ roleMenuConfig.driver = {
       icon: 'shield',
     },
   ],
-  quickActions: [
-    ...roleMenuConfig.driver.quickActions,
-    {
-      id: 'driver-referrals',
-      title: 'Рефералы',
-      subtitle: 'Бонус 200 ₽ после 10 завершенных поездок приглашенного водителя.',
-      icon: 'users',
-      target: 'referral',
-    },
-  ],
+  quickActions: roleMenuConfig.driver.quickActions,
 };
 
 roleMenuConfig.self_employed_driver = roleMenuConfig.driver;
@@ -527,5 +521,420 @@ roleMenuConfig.park_driver = {
     { label: 'Таксопарк', value: 'Привязан', helper: 'Доступ через парк' },
     { label: 'Документы', value: 'Проверка', helper: 'Нужна валидация' },
     { label: 'Комиссия', value: '0%', helper: 'По договору парка' },
+  ],
+};
+
+roleMenuConfig.client = {
+  ...roleMenuConfig.client,
+  menuItems: [
+    {
+      id: 'home',
+      title: 'Главная',
+      subtitle: 'Заказ поездки и активный статус',
+      icon: 'home',
+    },
+    {
+      id: 'rides',
+      title: 'Заказы',
+      subtitle: 'Активный заказ, история и статусы',
+      icon: 'route',
+    },
+    {
+      id: 'profile',
+      title: 'Аккаунт',
+      subtitle: 'Данные, настройки и поддержка',
+      icon: 'shield',
+    },
+  ],
+  drawerItems: [
+    {
+      id: 'history',
+      title: 'История поездок',
+      subtitle: 'Все поездки, чеки и статусы',
+      icon: 'route',
+      target: 'history',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Код, ссылка и бонусы',
+      icon: 'users',
+      target: 'referral',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Чат и вопросы по поездкам',
+      icon: 'headphones',
+      target: 'supportChat',
+    },
+    {
+      id: 'settings',
+      title: 'Настройки',
+      subtitle: 'Адреса, простой режим и безопасность',
+      icon: 'shield',
+    },
+    {
+      id: 'about',
+      title: 'О приложении',
+      subtitle: 'Kinetix, район работы и правила пилота',
+      icon: 'star',
+    },
+    {
+      id: 'registration',
+      title: 'Сменить роль',
+      subtitle: 'Вернуться к выбору анкеты',
+      icon: 'users',
+      target: 'registration',
+    },
+    {
+      id: 'logout',
+      title: 'Выйти',
+      subtitle: 'Завершить текущую сессию',
+      icon: 'shield',
+      target: 'logout',
+    },
+  ],
+  quickActions: [
+    {
+      id: 'order',
+      title: 'Заказать такси',
+      subtitle: 'По адресу или домой.',
+      icon: 'map',
+      target: 'order',
+    },
+    {
+      id: 'home',
+      title: 'Домой',
+      subtitle: 'Добавить или выбрать домашний адрес.',
+      icon: 'home',
+      target: 'homeAddress',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Открыть чат с оператором.',
+      icon: 'headphones',
+      target: 'supportChat',
+    },
+  ],
+};
+
+roleMenuConfig.driver = {
+  ...roleMenuConfig.driver,
+  menuItems: [
+    {
+      id: 'home',
+      title: 'Главная',
+      subtitle: 'Линия, лента, расчет и статистика',
+      icon: 'home',
+    },
+    {
+      id: 'orders',
+      title: 'Лента',
+      subtitle: 'Доступные заказы рядом',
+      icon: 'briefcase',
+      badge: 'Работа',
+    },
+    {
+      id: 'payouts',
+      title: 'Доход',
+      subtitle: 'День, комиссия и сумма к оплате',
+      icon: 'wallet',
+    },
+    {
+      id: 'profile',
+      title: 'Аккаунт',
+      subtitle: 'Данные, проверка и документы',
+      icon: 'shield',
+    },
+  ],
+  drawerItems: [
+    {
+      id: 'subscription',
+      title: 'Тариф',
+      subtitle: 'Trial, 7/5/3% и Партнер PRO',
+      icon: 'credit-card',
+      target: 'subscription',
+    },
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Паспорт, ВУ, СТС и ОСАГО',
+      icon: 'file',
+      target: 'documents',
+    },
+    {
+      id: 'vehicle',
+      title: 'Автомобиль',
+      subtitle: 'Данные машины и допуск',
+      icon: 'car',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Дополнительная программа бонусов',
+      icon: 'users',
+      target: 'referral',
+    },
+    {
+      id: 'history',
+      title: 'История заказов',
+      subtitle: 'Выполненные поездки и суммы',
+      icon: 'route',
+      target: 'history',
+    },
+    {
+      id: 'settlementHistory',
+      title: 'История расчетов',
+      subtitle: 'Дневные сверки и оплаты',
+      icon: 'wallet',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Помощь водителю и спорные поездки',
+      icon: 'headphones',
+    },
+    {
+      id: 'settings',
+      title: 'Настройки',
+      subtitle: 'Профиль, уведомления и безопасность',
+      icon: 'shield',
+    },
+    {
+      id: 'rating',
+      title: 'Правила работы',
+      subtitle: 'Качество, рейтинг и требования сервиса',
+      icon: 'star',
+    },
+    {
+      id: 'registration',
+      title: 'Сменить роль',
+      subtitle: 'Вернуться к выбору анкеты',
+      icon: 'users',
+      target: 'registration',
+    },
+    {
+      id: 'logout',
+      title: 'Выйти',
+      subtitle: 'Завершить текущую сессию',
+      icon: 'shield',
+      target: 'logout',
+    },
+  ],
+  quickActions: [
+    {
+      id: 'orders',
+      title: 'Лента заказов',
+      subtitle: 'Короткие карточки и принятие заказа.',
+      icon: 'briefcase',
+      target: 'order',
+    },
+    {
+      id: 'payouts',
+      title: 'Расчитаться',
+      subtitle: 'Сумма к оплате и дневная сверка.',
+      icon: 'wallet',
+      target: 'subscription',
+    },
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Проверка допуска к линии.',
+      icon: 'file',
+      target: 'documents',
+    },
+  ],
+};
+
+roleMenuConfig.self_employed_driver = roleMenuConfig.driver;
+
+roleMenuConfig.fleet = {
+  ...roleMenuConfig.fleet,
+  menuItems: [
+    {
+      id: 'overview',
+      title: 'Обзор',
+      subtitle: 'Статистика, водители и уведомления',
+      icon: 'home',
+    },
+    {
+      id: 'drivers',
+      title: 'Водители',
+      subtitle: 'Список, статусы и активность',
+      icon: 'users',
+    },
+    {
+      id: 'orders',
+      title: 'Заказы',
+      subtitle: 'Активные, завершенные и отмененные',
+      icon: 'route',
+    },
+    {
+      id: 'finance',
+      title: 'Расчеты',
+      subtitle: 'Дневные суммы и история оплат',
+      icon: 'wallet',
+    },
+  ],
+  drawerItems: [
+    {
+      id: 'settings',
+      title: 'Настройки таксопарка',
+      subtitle: 'Данные ИП, договоры и реквизиты',
+      icon: 'briefcase',
+    },
+    {
+      id: 'cars',
+      title: 'Автомобили',
+      subtitle: 'СТС, ОСАГО и допуск к линии',
+      icon: 'car',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Приглашения и бонусы',
+      icon: 'users',
+      target: 'referral',
+    },
+    {
+      id: 'reports',
+      title: 'Отчеты',
+      subtitle: 'Финансовые и операционные сводки',
+      icon: 'file',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Связь с сервисом',
+      icon: 'headphones',
+    },
+    {
+      id: 'rules',
+      title: 'Правила работы',
+      subtitle: 'Требования к парку и водителям',
+      icon: 'shield',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные аккаунта и безопасность',
+      icon: 'shield',
+    },
+    {
+      id: 'registration',
+      title: 'Сменить роль',
+      subtitle: 'Вернуться к выбору анкеты',
+      icon: 'users',
+      target: 'registration',
+    },
+    {
+      id: 'logout',
+      title: 'Выйти',
+      subtitle: 'Завершить текущую сессию',
+      icon: 'shield',
+      target: 'logout',
+    },
+  ],
+};
+
+roleMenuConfig.park_admin = roleMenuConfig.fleet;
+
+roleMenuConfig.park_driver = {
+  ...roleMenuConfig.park_driver,
+  menuItems: [
+    {
+      id: 'orders',
+      title: 'Заказы',
+      subtitle: 'Лента и активная поездка',
+      icon: 'briefcase',
+      badge: 'Работа',
+    },
+    {
+      id: 'payouts',
+      title: 'Выплаты',
+      subtitle: 'Баланс и история',
+      icon: 'wallet',
+    },
+    {
+      id: 'subscription',
+      title: 'Парк',
+      subtitle: 'Статус доступа через таксопарк',
+      icon: 'credit-card',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные, проверка и документы',
+      icon: 'shield',
+    },
+  ],
+  drawerItems: [
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Паспорт, ВУ, СТС и ОСАГО',
+      icon: 'file',
+      target: 'documents',
+    },
+    {
+      id: 'vehicle',
+      title: 'Автомобиль',
+      subtitle: 'Данные машины и проверка',
+      icon: 'car',
+    },
+    {
+      id: 'history',
+      title: 'История заказов',
+      subtitle: 'Выполненные поездки и суммы',
+      icon: 'route',
+      target: 'history',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Код, ссылка и бонусы',
+      icon: 'users',
+      target: 'referral',
+    },
+    {
+      id: 'settlementHistory',
+      title: 'История выплат',
+      subtitle: 'Баланс, реквизиты и статусы',
+      icon: 'wallet',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Связь с парком и сервисом',
+      icon: 'headphones',
+    },
+    {
+      id: 'settings',
+      title: 'Настройки',
+      subtitle: 'Профиль и безопасность',
+      icon: 'shield',
+    },
+    {
+      id: 'rating',
+      title: 'Правила работы',
+      subtitle: 'Качество и требования сервиса',
+      icon: 'star',
+    },
+    {
+      id: 'registration',
+      title: 'Сменить роль',
+      subtitle: 'Вернуться к выбору анкеты',
+      icon: 'users',
+      target: 'registration',
+    },
+    {
+      id: 'logout',
+      title: 'Выйти',
+      subtitle: 'Завершить текущую сессию',
+      icon: 'shield',
+      target: 'logout',
+    },
   ],
 };

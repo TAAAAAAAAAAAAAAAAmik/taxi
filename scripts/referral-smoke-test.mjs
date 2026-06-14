@@ -75,8 +75,8 @@ try {
   });
 
   assert(
-    invitedClientDashboard.bonusBalance === 300,
-    `Invited client should receive 300 bonus, got ${invitedClientDashboard.bonusBalance}`,
+    invitedClientDashboard.bonusBalance === 0,
+    `Invited client should not receive an upfront bonus, got ${invitedClientDashboard.bonusBalance}`,
   );
 
   for (let index = 0; index < 5; index += 1) {
@@ -187,17 +187,39 @@ try {
     await completeDriverOrder(driver.id, index);
   }
 
-  const finalDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
+  const qualifiedDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
     token: inviter.session.token,
   });
-  const driverReferral = finalDashboard.referrals.find(
+  const driverReferral = qualifiedDashboard.referrals.find(
     (referral) => referral.inviteeUserId === invitedDriver.user.id,
   );
 
-  assert(driverReferral?.status === 'rewarded', 'Driver referral should be rewarded after 10 orders');
+  assert(driverReferral?.status === 'qualified', 'Driver referral should be ready for admin payout after 10 orders');
   assert(
-    finalDashboard.bonusBalance >= 360,
-    `Inviter total reward should be at least 360, got ${finalDashboard.bonusBalance}`,
+    qualifiedDashboard.bonusBalance >= 60 && qualifiedDashboard.bonusBalance < 260,
+    `Driver bonus should not be credited before admin confirmation, got ${qualifiedDashboard.bonusBalance}`,
+  );
+
+  await api(`/admin/referrals/${encodeURIComponent(driverReferral.id)}/status`, {
+    body: {
+      note: 'Smoke admin confirmed driver referral payout',
+      status: 'rewarded',
+    },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+
+  const finalDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
+    token: inviter.session.token,
+  });
+  const rewardedDriverReferral = finalDashboard.referrals.find(
+    (referral) => referral.inviteeUserId === invitedDriver.user.id,
+  );
+
+  assert(rewardedDriverReferral?.status === 'rewarded', 'Admin should confirm driver referral payout');
+  assert(
+    finalDashboard.bonusBalance >= 260,
+    `Inviter total reward should be at least 260, got ${finalDashboard.bonusBalance}`,
   );
 
   console.log('Referral smoke test passed');

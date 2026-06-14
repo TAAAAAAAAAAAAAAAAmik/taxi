@@ -1,4 +1,4 @@
-﻿# Release Runbook
+# Release Runbook
 
 ## Назначение
 

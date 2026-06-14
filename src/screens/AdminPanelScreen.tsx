@@ -1,7 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, Eye, Gift, LockKeyhole, ShieldCheck, MapPinned, ReceiptText, Wallet } from 'lucide-react-native';
 import {
+  ArrowLeft,
+  BriefcaseBusiness,
+  Eye,
+  Gift,
+  Headphones,
+  LockKeyhole,
+  Menu as MenuIcon,
+  ShieldCheck,
+  MapPinned,
+  ReceiptText,
+  UsersRound,
+  Wallet,
+  X,
+} from 'lucide-react-native';
+import {
+  Animated,
+  Easing,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -12,11 +29,12 @@ import {
 } from 'react-native';
 
 import {
-  salavatAddressSuggestions,
+  salavatAddressSuggestionCount,
   salavatDistrictSettlements,
   salavatDistrictStreetSourceSummary,
 } from '../data/salavatDistrict';
-import { salavatDistrictHouseSourceSummary, salavatDistrictHouses } from '../data/salavatDistrictHouses';
+import { KinetixCard, KinetixStatus } from '../components/KinetixUI';
+import { salavatDistrictHouseSourceSummary } from '../data/salavatDistrictHouseSourceSummary';
 import { isSelfEmployedDriverRole } from '../data/registration';
 import { driverAccessPlans, DriverSubscriptionPayment } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
@@ -38,22 +56,62 @@ import {
   DriverDocumentUpload,
   useAppState,
 } from '../state/AppState';
+import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
 import { isDemoModeEnabled } from '../utils/runtimeFlags';
+import { styles } from './AdminPanelScreen.styles';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminPanel'>;
 
 const demoAdminPassword = 'admin-demo-5000';
 
-type AdminSectionId = 'overview' | 'orders' | 'drivers' | 'settlements' | 'pro' | 'referrals' | 'settings';
+type AdminSectionId =
+  | 'stats'
+  | 'overview'
+  | 'orders'
+  | 'drivers'
+  | 'clients'
+  | 'settlements'
+  | 'pro'
+  | 'referrals'
+  | 'settings'
+  | 'users'
+  | 'fleets'
+  | 'system'
+  | 'support';
 
-const adminSections: Array<{ id: AdminSectionId; title: string }> = [
-  { id: 'overview', title: 'Обзор' },
-  { id: 'orders', title: 'Заказы' },
-  { id: 'drivers', title: 'Водители' },
-  { id: 'settlements', title: 'Расчеты' },
-  { id: 'pro', title: 'PRO-заявки' },
-  { id: 'referrals', title: 'Рефералы' },
-  { id: 'settings', title: 'Настройки' },
+type AdminNavItem = {
+  id: AdminSectionId;
+  title: string;
+  subtitle: string;
+  icon: typeof ShieldCheck;
+};
+
+type AdminDriverSort = 'earnings' | 'hours' | 'rating';
+
+type AdminClientAnalytics = {
+  completedCount: number;
+  key: string;
+  lastOrderAt: string;
+  name: string;
+  ordersCount: number;
+  totalSpent: number;
+};
+
+const adminPrimarySections: AdminNavItem[] = [
+  { id: 'stats', title: 'Статистика', subtitle: 'Ключевые показатели', icon: ShieldCheck },
+  { id: 'drivers', title: 'Водители', subtitle: 'Рейтинг и активность', icon: UsersRound },
+  { id: 'clients', title: 'Клиенты', subtitle: 'Активность и база', icon: UsersRound },
+  { id: 'orders', title: 'Поездки', subtitle: 'Количество и маршруты', icon: ReceiptText },
+];
+
+const adminDrawerSections: AdminNavItem[] = [
+  { id: 'settlements', title: 'Расчеты', subtitle: 'Сверки и оплаты', icon: Wallet },
+  { id: 'pro', title: 'PRO-заявки', subtitle: 'Партнер PRO и оплаты', icon: Wallet },
+  { id: 'referrals', title: 'Рефералы', subtitle: 'Бонусы на подтверждение', icon: Gift },
+  { id: 'settings', title: 'Настройки', subtitle: 'Адресный слой и данные', icon: MapPinned },
+  { id: 'users', title: 'Пользователи', subtitle: 'Роли и доступы', icon: UsersRound },
+  { id: 'system', title: 'Системные действия', subtitle: 'Обновления и сервисы', icon: ShieldCheck },
+  { id: 'support', title: 'Поддержка', subtitle: 'Обращения пользователей', icon: Headphones },
 ];
 
 export function AdminPanelScreen({ navigation }: Props) {
@@ -65,7 +123,9 @@ export function AdminPanelScreen({ navigation }: Props) {
   const [adminDriverPayments, setAdminDriverPayments] = useState<DriverSubscriptionPayment[]>([]);
   const [serviceShareDate, setServiceShareDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [referralBusyId, setReferralBusyId] = useState<string | undefined>();
-  const [activeSection, setActiveSection] = useState<AdminSectionId>('overview');
+  const [activeSection, setActiveSection] = useState<AdminSectionId>('stats');
+  const [driverSort, setDriverSort] = useState<AdminDriverSort>('rating');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [addressForm, setAddressForm] = useState({
     category: 'address',
     latitude: '',
@@ -115,10 +175,60 @@ export function AdminPanelScreen({ navigation }: Props) {
   const activeAdminOrders = orders.filter((order) => !['completed', 'cancelled', 'canceled'].includes(order.status));
   const completedAdminOrders = orders.filter((order) => order.status === 'completed');
   const cancelledAdminOrders = orders.filter((order) => ['cancelled', 'canceled'].includes(order.status));
+  const deliveryAdminOrders = orders.filter((order) => order.serviceType === 'delivery');
   const dailyServiceShare = useMemo(
     () => serviceShareSummary ?? buildLocalServiceShareSummary(orders, serviceShareDate),
     [orders, serviceShareDate, serviceShareSummary],
   );
+  const driverAnalytics = useMemo(
+    () =>
+      drivers.map((driver) => {
+        const driverOrders = orders.filter((order) => order.driver?.id === driver.id);
+        const completedOrders = driverOrders.filter(isCompletedOrder);
+        const earnings = completedOrders.reduce(
+          (sum, order) => sum + (order.driverCollectedAmount ?? order.total ?? 0),
+          0,
+        );
+        const workHours = completedOrders.reduce((sum, order) => sum + getOrderWorkHours(order), 0);
+
+        return {
+          driver,
+          earnings,
+          ordersCount: driverOrders.length,
+          completedCount: completedOrders.length,
+          rating: driver.rating ?? 0,
+          workHours,
+        };
+      }),
+    [drivers, orders],
+  );
+  const sortedDriverAnalytics = useMemo(
+    () =>
+      [...driverAnalytics].sort((left, right) => {
+        if (driverSort === 'earnings') {
+          return right.earnings - left.earnings;
+        }
+
+        if (driverSort === 'hours') {
+          return right.workHours - left.workHours;
+        }
+
+        return right.rating - left.rating;
+      }),
+    [driverAnalytics, driverSort],
+  );
+  const clientAnalytics = useMemo(() => buildClientAnalytics(orders), [orders]);
+  const longestAdminOrder = useMemo(
+    () =>
+      orders.reduce<AppOrder | undefined>((longest, order) => {
+        const currentDistance = order.routeEstimate?.distanceKm ?? 0;
+        const longestDistance = longest?.routeEstimate?.distanceKm ?? 0;
+
+        return currentDistance > longestDistance ? order : longest;
+      }, undefined),
+    [orders],
+  );
+  const totalClientSpend = clientAnalytics.reduce((sum, client) => sum + client.totalSpent, 0);
 
   const loadAdminAddresses = useCallback(async () => {
     try {
@@ -300,9 +410,19 @@ export function AdminPanelScreen({ navigation }: Props) {
         helper: serverStatus === 'connected' ? 'Загружены с MVP backend' : 'Локальная сессия приложения',
       },
       {
+        label: 'Доставка',
+        value: String(deliveryAdminOrders.length),
+        helper: 'Заказы с типом delivery',
+      },
+      {
         label: 'Водители',
         value: String(drivers.length),
         helper: `${approvedDrivers.length} одобрено для заказов`,
+      },
+      {
+        label: 'Клиенты',
+        value: String(clientAnalytics.length),
+        helper: `${totalClientSpend} ₽ сумма поездок`,
       },
       {
         label: 'Обращения поддержки',
@@ -335,10 +455,13 @@ export function AdminPanelScreen({ navigation }: Props) {
       adminReferralDashboard?.summary.rewarded,
       adminReferralDashboard?.summary.walletTotal,
       approvedDrivers.length,
+      clientAnalytics.length,
+      deliveryAdminOrders.length,
       drivers.length,
       orders.length,
       serverStatus,
       supportThreads.length,
+      totalClientSpend,
     ],
   );
 
@@ -383,8 +506,19 @@ export function AdminPanelScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <View style={styles.adminShell}>
+      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" style={styles.adminScroll}>
         <View style={styles.topBar}>
+          {unlocked ? (
+            <Pressable
+              accessibilityLabel="Открыть меню"
+              accessibilityRole="button"
+              onPress={() => setDrawerOpen(true)}
+              style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+            >
+              <MenuIcon color="#008D49" size={24} strokeWidth={2.5} />
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             onPress={() => navigation.goBack()}
@@ -458,35 +592,28 @@ export function AdminPanelScreen({ navigation }: Props) {
             <View style={styles.headerCard}>
               <Text numberOfLines={2} style={styles.title}>Админ-панель</Text>
               <Text numberOfLines={2} style={styles.subtitle}>
-                Быстрый контроль MVP: заказы, поддержка, адресный слой и модель оплаты водителей.
+                Основные разделы снизу. Дополнительные проверки, рефералы, PRO и системные действия в меню.
               </Text>
             </View>
 
-            <View style={styles.adminTabs}>
-              {adminSections.map((section) => {
-                const active = section.id === activeSection;
-
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    key={section.id}
-                    onPress={() => setActiveSection(section.id)}
-                    style={({ pressed }) => [
-                      styles.adminTab,
-                      active && styles.adminTabActive,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text style={[styles.adminTabText, active && styles.adminTabTextActive]}>
-                      {section.title}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+            <View style={styles.adminPathRow}>
+              <Text style={styles.adminPathMuted}>Админ</Text>
+              <Text style={styles.adminPathDivider}>/</Text>
+              <Text style={styles.adminPathActive}>{getAdminSectionTitle(activeSection)}</Text>
             </View>
 
-            <View style={[styles.sectionCard, activeSection !== 'overview' && styles.hiddenSection]}>
+            <AdminWorkbench
+              activeOrdersCount={activeAdminOrders.length}
+              clientsCount={clientAnalytics.length}
+              driversCount={drivers.length}
+              onSelect={setActiveSection}
+              pendingProCount={pendingPartnerProPayments.length}
+              pendingReferralCount={adminReferralDashboard?.summary.qualified ?? 0}
+              selectedSection={activeSection}
+              settlementsAmount={dailyServiceShare.summary.pendingTransferAmount}
+            />
+
+            <View style={[styles.sectionCard, activeSection !== 'stats' && styles.hiddenSection]}>
               <View style={styles.sectionHeader}>
                 <ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Backend</Text>
@@ -515,7 +642,7 @@ export function AdminPanelScreen({ navigation }: Props) {
               </Pressable>
             </View>
 
-            <View style={[styles.statsGrid, activeSection !== 'overview' && styles.hiddenSection]}>
+            <View style={[styles.statsGrid, activeSection !== 'stats' && styles.hiddenSection]}>
               {stats.map((item) => (
                 <View key={item.label} style={styles.statCard}>
                   <Text numberOfLines={1} style={styles.statLabel}>{item.label}</Text>
@@ -749,6 +876,30 @@ export function AdminPanelScreen({ navigation }: Props) {
                 <ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />
                 <Text style={styles.sectionTitle}>Водители</Text>
               </View>
+              <View style={styles.adminTabs}>
+                {(['rating', 'earnings', 'hours'] as AdminDriverSort[]).map((sort) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: driverSort === sort }}
+                    key={sort}
+                    onPress={() => setDriverSort(sort)}
+                    style={({ pressed }) => [
+                      styles.adminTab,
+                      driverSort === sort && styles.adminTabActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={[styles.adminTabText, driverSort === sort && styles.adminTabTextActive]}>
+                      {formatDriverSortTitle(sort)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.statsGridCompact}>
+                <PlanRow title="Всего" value={String(drivers.length)} />
+                <PlanRow title="Одобрены" value={String(approvedDrivers.length)} />
+                <PlanRow title="На линии" value={String(drivers.filter((driver) => driver.isOnline).length)} />
+              </View>
               {expiringPolicyUploads.length ? (
                 <View style={styles.reviewBox}>
                   <Text style={styles.orderTitle}>Истекающие полисы</Text>
@@ -759,7 +910,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                   ))}
                 </View>
               ) : null}
-              {drivers.map((driver) => {
+              {sortedDriverAnalytics.map(({ completedCount, driver, earnings, ordersCount, rating, workHours }) => {
                 const uploadedDocumentKinds = (Object.keys(driver.documentUploads ?? {}) as DriverDocumentKind[]);
                 const requiredDocumentCount = Object.keys(documentLabels).length;
                 const rejectedDocumentKinds = driver.documentReview?.rejectedKinds.length
@@ -777,6 +928,9 @@ export function AdminPanelScreen({ navigation }: Props) {
                   </Text>
                   <Text numberOfLines={1} style={styles.orderText}>
                     Допуск к заказам: {driver.canReceiveOrders ? 'открыт' : 'закрыт'}.
+                  </Text>
+                  <Text numberOfLines={1} style={styles.orderText}>
+                    Рейтинг {rating ? rating.toFixed(2) : '-'} · заработок {earnings} ₽ · часы {formatWorkHours(workHours)} · заказы {ordersCount}/{completedCount}
                   </Text>
                   <Text numberOfLines={1} style={styles.orderText}>
                     Тариф: {driver.subscriptionPlan === 'partner_pro' ? 'Партнёр PRO' : 'Комиссия 7% / 5% / 3%'} · статус:{' '}
@@ -918,6 +1072,41 @@ export function AdminPanelScreen({ navigation }: Props) {
                 </View>
                 );
               })}
+              <View style={styles.reviewBox}>
+                <Text style={styles.orderTitle}>Общее количество водителей: {drivers.length}</Text>
+                <Text style={styles.orderText}>Сортировка не скрывает водителей и не меняет статусы допуска.</Text>
+              </View>
+            </View>
+
+            <View style={[styles.sectionCard, activeSection !== 'clients' && styles.hiddenSection]}>
+              <View style={styles.sectionHeader}>
+                <UsersRound color="#008D49" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Клиенты</Text>
+              </View>
+              <View style={styles.statsGridCompact}>
+                <PlanRow title="Всего" value={String(clientAnalytics.length)} />
+                <PlanRow title="Поездки" value={String(orders.filter((order) => order.role === 'client').length)} />
+                <PlanRow title="Сумма" value={`${totalClientSpend} ₽`} />
+              </View>
+              {clientAnalytics.length ? (
+                clientAnalytics.slice(0, 10).map((client) => (
+                  <View key={client.key} style={styles.orderRow}>
+                    <Text numberOfLines={1} style={styles.orderTitle}>{client.name}</Text>
+                    <Text numberOfLines={1} style={styles.orderText}>
+                      Поездок: {client.ordersCount} · завершено: {client.completedCount} · сумма: {client.totalSpent} ₽
+                    </Text>
+                    <Text numberOfLines={1} style={styles.orderText}>
+                      Последняя активность: {formatDate(client.lastOrderAt)}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.sectionTextMuted}>Клиенты появятся после первых заказов.</Text>
+              )}
+              <View style={styles.reviewBox}>
+                <Text style={styles.orderTitle}>Общее количество клиентов: {clientAnalytics.length}</Text>
+                <Text style={styles.orderText}>Список считается по заказам и не отключает клиентскую логику.</Text>
+              </View>
             </View>
 
             <View style={[styles.sectionCard, activeSection !== 'settings' && styles.hiddenSection]}>
@@ -926,9 +1115,9 @@ export function AdminPanelScreen({ navigation }: Props) {
                 <Text style={styles.sectionTitle}>Адресный слой</Text>
               </View>
               <Text numberOfLines={2} style={styles.sectionText}>
-                Подсказок адресов и POI: {salavatAddressSuggestions.length}. Улиц/дорог:{' '}
+                Подсказок адресов и POI: {salavatAddressSuggestionCount}. Улиц/дорог:{' '}
                 {salavatDistrictStreetSourceSummary.streets}. Домов:{' '}
-                {salavatDistrictHouses.length}.
+                {salavatDistrictHouseSourceSummary.houses}.
               </Text>
               <Text numberOfLines={2} style={styles.sectionTextMuted}>{salavatDistrictHouseSourceSummary.note}</Text>
               <Text numberOfLines={2} style={styles.sectionTextMuted}>
@@ -1040,25 +1229,164 @@ export function AdminPanelScreen({ navigation }: Props) {
               ))}
             </View>
 
+            <View style={[styles.sectionCard, activeSection !== 'users' && styles.hiddenSection]}>
+              <View style={styles.sectionHeader}>
+                <UsersRound color="#008D49" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Пользователи</Text>
+              </View>
+              <Text style={styles.sectionText}>
+                Клиентская, водительская, таксопарковая и админская логика остаются раздельными по ролям.
+              </Text>
+              <View style={styles.statsGridCompact}>
+                <PlanRow title="Водители" value={String(drivers.length)} />
+                <PlanRow title="Допущены" value={String(approvedDrivers.length)} />
+                <PlanRow title="Обращения" value={String(supportThreads.length)} />
+              </View>
+              {drivers.slice(0, 6).map((driver) => (
+                <View key={driver.id} style={styles.orderRow}>
+                  <Text numberOfLines={1} style={styles.orderTitle}>{driver.name}</Text>
+                  <Text numberOfLines={1} style={styles.orderText}>
+                    {driver.phone || 'телефон не указан'} · {driver.status} · доступ:{' '}
+                    {driver.canReceiveOrders ? 'открыт' : 'закрыт'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={[styles.sectionCard, activeSection !== 'fleets' && styles.hiddenSection]}>
+              <View style={styles.sectionHeader}>
+                <BriefcaseBusiness color="#008D49" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Таксопарки</Text>
+              </View>
+              <Text style={styles.sectionText}>
+                Роль таксопарка сохранена: парк управляет водителями, автомобилями, заказами и расчетами отдельно от водителя.
+              </Text>
+              <View style={styles.statsGridCompact}>
+                <PlanRow title="Модель" value="B2B-доступ" />
+                <PlanRow title="Водители парка" value="через приглашение" />
+                <PlanRow title="Расчеты" value="ручная сверка" />
+              </View>
+              <View style={styles.reviewBox}>
+                <Text style={styles.orderTitle}>Что контролирует парк</Text>
+                <Text style={styles.orderText}>Подключение водителей, автомобили, статусы допуска и дневные расчеты.</Text>
+              </View>
+            </View>
+
+            <View style={[styles.sectionCard, activeSection !== 'system' && styles.hiddenSection]}>
+              <View style={styles.sectionHeader}>
+                <ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Системные действия</Text>
+              </View>
+              <Text style={styles.sectionText}>
+                Backend, realtime, адресный слой, PRO-платежи и реферальная панель обновляются вручную из админки.
+              </Text>
+              <View style={styles.rowActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={refreshServerData}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.secondaryButtonText}>Обновить backend</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void refreshServiceShareSummary(serviceShareDate);
+                  }}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.secondaryButtonText}>Обновить расчеты</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void loadAdminDriverPayments();
+                  }}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.secondaryButtonText}>Обновить PRO</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void loadAdminAddresses();
+                  }}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.secondaryButtonText}>Обновить адреса</Text>
+                </Pressable>
+              </View>
+              <Text numberOfLines={2} style={styles.sectionTextMuted}>
+                Статус: {serverStatus === 'connected' ? 'backend подключен' : 'локальный режим'} · realtime:{' '}
+                {formatRealtimeStatus(realtimeStatus)}.
+              </Text>
+            </View>
+
+            <View style={[styles.sectionCard, activeSection !== 'support' && styles.hiddenSection]}>
+              <View style={styles.sectionHeader}>
+                <Headphones color="#008D49" size={20} strokeWidth={2.4} />
+                <Text style={styles.sectionTitle}>Поддержка</Text>
+              </View>
+              <Text style={styles.sectionText}>
+                Обращения пользователей не удалены из админки, но вынесены из основных вкладок.
+              </Text>
+              {supportThreads.length ? (
+                supportThreads.slice(0, 8).map((thread) => (
+                  <View key={thread.id} style={styles.orderRow}>
+                    <Text numberOfLines={1} style={styles.orderTitle}>{thread.title}</Text>
+                    <Text numberOfLines={1} style={styles.orderText}>
+                      {thread.role} · {thread.category} · {thread.status} · {formatDate(thread.updatedAt)}
+                    </Text>
+                    <Text numberOfLines={2} style={styles.orderText}>
+                      {thread.messages[thread.messages.length - 1]?.text || 'Сообщений пока нет.'}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.sectionTextMuted}>Открытых обращений пока нет.</Text>
+              )}
+            </View>
+
             <View style={[styles.sectionCard, activeSection !== 'orders' && styles.hiddenSection]}>
               <View style={styles.sectionHeader}>
                 <ReceiptText color="#008D49" size={20} strokeWidth={2.4} />
-                <Text style={styles.sectionTitle}>Последние заказы</Text>
+                <Text style={styles.sectionTitle}>Поездки</Text>
               </View>
               <View style={styles.statsGridCompact}>
+                <PlanRow title="Количество" value={String(orders.length)} />
+                <PlanRow title="Доставка" value={String(deliveryAdminOrders.length)} />
                 <PlanRow title="Активные" value={String(activeAdminOrders.length)} />
                 <PlanRow title="Завершенные" value={String(completedAdminOrders.length)} />
-                <PlanRow title="Отмененные" value={String(cancelledAdminOrders.length)} />
+                <PlanRow
+                  title="Самая долгая"
+                  value={longestAdminOrder ? formatDistanceKm(longestAdminOrder.routeEstimate?.distanceKm ?? 0) : '0 км'}
+                />
               </View>
+              {longestAdminOrder ? (
+                <View style={styles.reviewBox}>
+                  <Text style={styles.orderTitle}>Самый долгий заказ: {formatAdminOrderService(longestAdminOrder)}</Text>
+                  <Text numberOfLines={1} style={styles.orderText}>
+                    {longestAdminOrder.pickup} → {longestAdminOrder.destination}
+                  </Text>
+                  <Text style={styles.orderText}>
+                    {formatDistanceKm(longestAdminOrder.routeEstimate?.distanceKm ?? 0)} · {longestAdminOrder.total} ₽
+                  </Text>
+                </View>
+              ) : null}
               {orders.length > 0 ? (
                 orders.slice(0, 5).map((order) => (
                   <View key={order.id} style={styles.orderRow}>
                     <Text numberOfLines={1} style={styles.orderTitle}>
-                      {order.id} · {order.total} ₽ · {order.status}
+                      {order.id} · {formatAdminOrderService(order)} · {order.total} ₽ · {order.status}
                     </Text>
                     <Text numberOfLines={1} style={styles.orderText}>
                       {order.pickup} → {order.destination}
                     </Text>
+                    {order.serviceType === 'delivery' ? (
+                      <Text numberOfLines={1} style={styles.orderText}>
+                        {formatDeliveryAdminMeta(order)}
+                      </Text>
+                    ) : null}
                     <Text numberOfLines={1} style={styles.orderText}>
                       Водитель: {order.driver ? `${order.driver.name}, ${order.driver.vehicle}` : 'не назначен'}
                     </Text>
@@ -1104,10 +1432,42 @@ export function AdminPanelScreen({ navigation }: Props) {
               ) : (
                 <Text style={styles.sectionTextMuted}>Заказов в текущей сессии пока нет.</Text>
               )}
+              <View style={styles.reviewBox}>
+                <Text style={styles.orderTitle}>Всего поездок: {orders.length}</Text>
+                <Text style={styles.orderText}>Отмененные поездки: {cancelledAdminOrders.length}</Text>
+              </View>
             </View>
           </View>
         )}
       </ScrollView>
+      {unlocked ? (
+        <View style={styles.adminBottomTabs}>
+          {adminPrimarySections.map((section) => (
+            <AdminBottomTab
+              active={section.id === activeSection}
+              item={section}
+              key={section.id}
+              onPress={() => setActiveSection(section.id)}
+            />
+          ))}
+        </View>
+      ) : null}
+      <AdminSideDrawer
+        activeSection={activeSection}
+        items={adminDrawerSections}
+        onClose={() => setDrawerOpen(false)}
+        onItemPress={(section) => {
+          setActiveSection(section.id);
+          setDrawerOpen(false);
+        }}
+        onLogout={() => {
+          setDrawerOpen(false);
+          setUnlocked(false);
+          setPassword('');
+        }}
+        open={drawerOpen}
+      />
+      </View>
     </SafeAreaView>
   );
 }
@@ -1116,6 +1476,303 @@ type PlanRowProps = {
   title: string;
   value: string;
 };
+
+type AdminBottomTabProps = {
+  active: boolean;
+  item: AdminNavItem;
+  onPress: () => void;
+};
+
+type AdminWorkbenchProps = {
+  activeOrdersCount: number;
+  clientsCount: number;
+  driversCount: number;
+  onSelect: (section: AdminSectionId) => void;
+  pendingProCount: number;
+  pendingReferralCount: number;
+  selectedSection: AdminSectionId;
+  settlementsAmount: number;
+};
+
+function AdminWorkbench({
+  activeOrdersCount,
+  clientsCount,
+  driversCount,
+  onSelect,
+  pendingProCount,
+  pendingReferralCount,
+  selectedSection,
+  settlementsAmount,
+}: AdminWorkbenchProps) {
+  const tiles: Array<{
+    helper: string;
+    icon: typeof ShieldCheck;
+    id: AdminSectionId;
+    title: string;
+    tone: 'danger' | 'info' | 'neutral' | 'success' | 'warning';
+    value: string;
+  }> = [
+    {
+      helper: 'общая картина',
+      icon: ShieldCheck,
+      id: 'stats',
+      title: 'Статистика',
+      tone: activeOrdersCount > 0 ? 'success' : 'neutral',
+      value: `${activeOrdersCount} активных`,
+    },
+    {
+      helper: 'рейтинг, выручка, часы',
+      icon: UsersRound,
+      id: 'drivers',
+      title: 'Водители',
+      tone: driversCount > 0 ? 'info' : 'neutral',
+      value: `${driversCount} всего`,
+    },
+    {
+      helper: 'активность и траты',
+      icon: BriefcaseBusiness,
+      id: 'clients',
+      title: 'Клиенты',
+      tone: clientsCount > 0 ? 'success' : 'neutral',
+      value: `${clientsCount} всего`,
+    },
+    {
+      helper: 'долги и оплаты',
+      icon: Wallet,
+      id: 'settlements',
+      title: 'Расчеты',
+      tone: settlementsAmount > 0 ? 'warning' : 'success',
+      value: `${settlementsAmount} ₽`,
+    },
+    {
+      helper: 'подключение тарифа',
+      icon: ReceiptText,
+      id: 'pro',
+      title: 'PRO-заявки',
+      tone: pendingProCount > 0 ? 'warning' : 'neutral',
+      value: `${pendingProCount} новых`,
+    },
+    {
+      helper: 'бонусы к проверке',
+      icon: Gift,
+      id: 'referrals',
+      title: 'Рефералы',
+      tone: pendingReferralCount > 0 ? 'warning' : 'neutral',
+      value: `${pendingReferralCount} ждут`,
+    },
+  ];
+
+  return (
+    <KinetixCard tone="accent" style={styles.adminWorkbench}>
+      <View style={styles.adminWorkbenchHeader}>
+        <View style={styles.adminWorkbenchCopy}>
+          <Text style={styles.adminWorkbenchTitle}>Рабочая панель</Text>
+          <Text numberOfLines={2} style={styles.adminWorkbenchText}>
+            Быстрый вход в разделы, где чаще всего нужны решения.
+          </Text>
+        </View>
+        <KinetixStatus
+          label={settlementsAmount > 0 || pendingProCount > 0 || pendingReferralCount > 0 ? 'Есть задачи' : 'Спокойно'}
+          tone={settlementsAmount > 0 || pendingProCount > 0 || pendingReferralCount > 0 ? 'warning' : 'success'}
+        />
+      </View>
+      <View style={styles.adminWorkbenchGrid}>
+        {tiles.map((tile) => {
+          const Icon = tile.icon;
+          const selected = selectedSection === tile.id;
+
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={tile.id}
+              onPress={() => onSelect(tile.id)}
+              style={({ pressed }) => [
+                styles.adminWorkbenchTile,
+                selected && styles.adminWorkbenchTileActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={styles.adminWorkbenchTileTop}>
+                <View style={[styles.adminWorkbenchIcon, selected && styles.adminWorkbenchIconActive]}>
+                  <Icon color={selected ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.4} />
+                </View>
+                <KinetixStatus label={tile.value} tone={tile.tone} />
+              </View>
+              <Text numberOfLines={1} style={styles.adminWorkbenchTileTitle}>{tile.title}</Text>
+              <Text numberOfLines={1} style={styles.adminWorkbenchTileText}>{tile.helper}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </KinetixCard>
+  );
+}
+
+function AdminBottomTab({ active, item, onPress }: AdminBottomTabProps) {
+  const Icon = item.icon;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.adminBottomTab, active && styles.adminBottomTabActive, pressed && styles.pressed]}
+    >
+      <View style={[styles.adminBottomIndicator, active && styles.adminBottomIndicatorActive]} />
+      <View style={[styles.adminBottomIcon, active && styles.adminBottomIconActive]}>
+        <Icon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.4} />
+      </View>
+      <Text numberOfLines={1} style={[styles.adminBottomText, active && styles.adminBottomTextActive]}>
+        {item.title}
+      </Text>
+    </Pressable>
+  );
+}
+
+type AdminSideDrawerProps = {
+  activeSection: AdminSectionId;
+  items: AdminNavItem[];
+  onClose: () => void;
+  onItemPress: (item: AdminNavItem) => void;
+  onLogout: () => void;
+  open: boolean;
+};
+
+function AdminSideDrawer({
+  activeSection,
+  items,
+  onClose,
+  onItemPress,
+  onLogout,
+  open,
+}: AdminSideDrawerProps) {
+  const reducedMotion = useReducedMotionPreference();
+  const progress = useRef(new Animated.Value(open ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: open ? 1 : 0,
+      duration: reducedMotion ? 0 : 285,
+      easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [open, progress, reducedMotion]);
+
+  const panelAnimatedStyle = {
+    transform: [
+      {
+        translateX: progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-360, 0],
+        }),
+      },
+      {
+        scale: progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.96, 1],
+        }),
+      },
+    ],
+    opacity: progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.72, 1],
+    }),
+  };
+  const scrimAnimatedStyle = {
+    opacity: progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    }),
+  };
+
+  return (
+    <Modal animationType="none" onRequestClose={onClose} transparent visible={open}>
+      <View style={styles.drawerRoot}>
+        <Animated.View style={[styles.drawerPanel, panelAnimatedStyle]}>
+          <View style={styles.drawerHeader}>
+            <View style={styles.drawerTitleCopy}>
+              <Text style={styles.drawerTitle}>Админ-панель</Text>
+              <Text style={styles.drawerSubtitle}>Дополнительные разделы</Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Закрыть меню"
+              accessibilityRole="button"
+              onPress={onClose}
+              style={({ pressed }) => [styles.drawerClose, pressed && styles.pressed]}
+            >
+              <X color="#008D49" size={22} strokeWidth={2.5} />
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.drawerList} showsVerticalScrollIndicator={false}>
+            {items.map((item) => (
+              <AdminDrawerItem
+                active={item.id === activeSection}
+                item={item}
+                key={item.id}
+                onPress={() => onItemPress(item)}
+              />
+            ))}
+            <Pressable
+              accessibilityRole="button"
+              onPress={onLogout}
+              style={({ pressed }) => [styles.drawerItem, pressed && styles.pressed]}
+            >
+              <View style={styles.drawerIconWrap}>
+                <ArrowLeft color="#008D49" size={19} strokeWidth={2.4} />
+              </View>
+              <View style={styles.drawerItemCopy}>
+                <Text style={styles.drawerItemTitle}>Сменить роль / выйти</Text>
+                <Text style={styles.drawerItemSubtitle}>Закрыть админ-сессию и вернуться к входу.</Text>
+              </View>
+            </Pressable>
+          </ScrollView>
+        </Animated.View>
+        <Animated.View style={[styles.drawerScrim, scrimAnimatedStyle]}>
+          <Pressable accessibilityRole="button" onPress={onClose} style={StyleSheet.absoluteFillObject} />
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+type AdminDrawerItemProps = {
+  active: boolean;
+  item: AdminNavItem;
+  onPress: () => void;
+};
+
+function AdminDrawerItem({ active, item, onPress }: AdminDrawerItemProps) {
+  const Icon = item.icon;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.drawerItem, active && styles.drawerItemActive, pressed && styles.pressed]}
+    >
+      <View style={[styles.drawerIconWrap, active && styles.drawerIconWrapActive]}>
+        <Icon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.4} />
+      </View>
+      <View style={styles.drawerItemCopy}>
+        <Text numberOfLines={1} style={[styles.drawerItemTitle, active && styles.drawerItemTitleActive]}>
+          {item.title}
+        </Text>
+        <Text numberOfLines={2} style={styles.drawerItemSubtitle}>{item.subtitle}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function getAdminSectionTitle(sectionId: AdminSectionId) {
+  return (
+    adminPrimarySections.find((section) => section.id === sectionId)?.title ??
+    adminDrawerSections.find((section) => section.id === sectionId)?.title ??
+    'Раздел'
+  );
+}
 
 const documentLabels: Record<DriverDocumentKind, string> = {
   driverLicense: 'ВУ',
@@ -1162,6 +1819,144 @@ function formatDate(value?: string) {
   }
 
   return date.toLocaleDateString('ru-RU');
+}
+
+function formatDriverSortTitle(sort: AdminDriverSort) {
+  const labels: Record<AdminDriverSort, string> = {
+    earnings: 'По заработку',
+    hours: 'По часам',
+    rating: 'По рейтингу',
+  };
+
+  return labels[sort];
+}
+
+function isCompletedOrder(order: AppOrder) {
+  return ['closed', 'completed'].includes(order.status);
+}
+
+function getOrderWorkHours(order: AppOrder) {
+  const endAt = Date.parse(order.completedAt || '');
+  const startAt = Date.parse(order.startedAt || order.acceptedAt || order.createdAt || '');
+
+  if (Number.isFinite(startAt) && Number.isFinite(endAt) && endAt > startAt) {
+    return (endAt - startAt) / 3_600_000;
+  }
+
+  if (isCompletedOrder(order)) {
+    return Math.max(0.25, (order.routeEstimate?.durationMin ?? 30) / 60);
+  }
+
+  return 0;
+}
+
+function formatWorkHours(hours: number) {
+  if (hours <= 0) {
+    return '0 ч';
+  }
+
+  return `${hours.toLocaleString('ru-RU', {
+    maximumFractionDigits: hours < 10 ? 1 : 0,
+    minimumFractionDigits: hours < 10 ? 1 : 0,
+  })} ч`;
+}
+
+function formatDistanceKm(distanceKm: number) {
+  if (!distanceKm) {
+    return '0 км';
+  }
+
+  return `${distanceKm.toLocaleString('ru-RU', {
+    maximumFractionDigits: distanceKm < 10 ? 1 : 0,
+    minimumFractionDigits: distanceKm % 1 === 0 ? 0 : 1,
+  })} км`;
+}
+
+function formatAdminOrderService(order: AppOrder) {
+  return order.serviceType === 'delivery' ? 'Доставка' : 'Такси';
+}
+
+function formatDeliveryAdminMeta(order: AppOrder) {
+  return [
+    formatDeliveryPackageType(order.deliveryPackageType),
+    order.packageDescription,
+    formatDeliveryHandoff(order.deliveryHandoff),
+    order.recipientName || order.recipientPhone,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function formatDeliveryPackageType(value?: string) {
+  if (value === 'documents') {
+    return 'Документы';
+  }
+
+  if (value === 'food') {
+    return 'Еда / цветы';
+  }
+
+  if (value === 'fragile') {
+    return 'Хрупкое';
+  }
+
+  if (value === 'parcel') {
+    return 'Пакет';
+  }
+
+  if (value === 'other') {
+    return 'Другое';
+  }
+
+  return 'Посылка';
+}
+
+function formatDeliveryHandoff(value?: string) {
+  if (value === 'leave_at_door') {
+    return 'оставить у двери';
+  }
+
+  if (value === 'meet_outside') {
+    return 'встретят у входа';
+  }
+
+  return 'от двери до двери';
+}
+
+function buildClientAnalytics(orders: AppOrder[]): AdminClientAnalytics[] {
+  const clients = new Map<string, AdminClientAnalytics>();
+
+  orders
+    .filter((order) => order.role === 'client')
+    .forEach((order) => {
+      const key = order.userId || order.clientPhone || order.clientName || order.id;
+      const current = clients.get(key) ?? {
+        completedCount: 0,
+        key,
+        lastOrderAt: order.createdAt,
+        name: order.clientName || order.clientPhone || 'Клиент без имени',
+        ordersCount: 0,
+        totalSpent: 0,
+      };
+
+      current.ordersCount += 1;
+      current.completedCount += isCompletedOrder(order) ? 1 : 0;
+      current.totalSpent += order.total ?? 0;
+      current.lastOrderAt =
+        Date.parse(order.createdAt || '') > Date.parse(current.lastOrderAt || '')
+          ? order.createdAt
+          : current.lastOrderAt;
+
+      clients.set(key, current);
+    });
+
+  return Array.from(clients.values()).sort((left, right) => {
+    if (right.ordersCount !== left.ordersCount) {
+      return right.ordersCount - left.ordersCount;
+    }
+
+    return right.totalSpent - left.totalSpent;
+  });
 }
 
 function formatRealtimeStatus(status: 'connecting' | 'live' | 'offline' | 'polling') {
@@ -1426,423 +2221,3 @@ function CompliancePill({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  adminLayout: {
-    gap: 10,
-  },
-  complianceGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
-  },
-  complianceLabel: {
-    color: '#557669',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  complianceLabelReady: {
-    color: '#008D49',
-  },
-  compliancePill: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 2,
-    minWidth: 104,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  compliancePillReady: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-  },
-  complianceValue: {
-    color: '#12382C',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  complianceValueReady: {
-    color: '#008D49',
-  },
-  dangerButton: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#C17A70',
-  },
-  dangerButtonText: {
-    color: '#C17A70',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  auditBox: {
-    borderColor: '#E8F3EF',
-    borderTopWidth: 1,
-    gap: 3,
-    marginTop: 6,
-    paddingTop: 8,
-  },
-  documentMetaText: {
-    color: '#81786B',
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  documentAccessButton: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 6,
-    minHeight: 32,
-    paddingHorizontal: 9,
-  },
-  documentAccessButtonText: {
-    color: '#008D49',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  documentRejectText: {
-    color: '#C17A70',
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 17,
-  },
-  documentUploadBox: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 3,
-    marginTop: 4,
-    padding: 10,
-  },
-  documentUploadItem: {
-    gap: 2,
-  },
-  documentUploadText: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  documentUploadTitle: {
-    color: '#12382C',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  backButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    minHeight: 42,
-    paddingHorizontal: 12,
-  },
-  backButtonText: {
-    color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  adminTab: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(0, 141, 73, 0.22)',
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 40,
-    paddingHorizontal: 12,
-  },
-  adminTabActive: {
-    backgroundColor: '#008D49',
-    borderColor: '#008D49',
-  },
-  adminTabs: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  adminTabText: {
-    color: '#12382C',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  adminTabTextActive: {
-    color: '#FFFFFF',
-  },
-  errorText: {
-    color: '#C17A70',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  field: {
-    gap: 8,
-  },
-  headerCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 12,
-  },
-  helperText: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  hiddenSection: {
-    display: 'none',
-  },
-  iconWrap: {
-    alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    height: 46,
-    justifyContent: 'center',
-    width: 46,
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#557669',
-    borderRadius: 8,
-    borderWidth: 1,
-    color: '#12382C',
-    fontSize: 16,
-    minHeight: 48,
-    paddingHorizontal: 12,
-  },
-  disabledButton: {
-    opacity: 0.45,
-  },
-  inlineForm: {
-    alignItems: 'stretch',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  inlineInput: {
-    flex: 1,
-    minWidth: 220,
-  },
-  label: {
-    color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  loginCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 12,
-    padding: 12,
-  },
-  orderRow: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-    padding: 10,
-  },
-  orderText: {
-    color: '#557669',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  orderTitle: {
-    color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  mutedButton: {
-    opacity: 0.48,
-  },
-  page: {
-    backgroundColor: '#F4FAF6',
-    gap: 12,
-    minHeight: '100%',
-    padding: 14,
-  },
-  planRow: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-    padding: 10,
-  },
-  planTitle: {
-    color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  planValue: {
-    color: '#008D49',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  pressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.95 }],
-  },
-  reasonInput: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#557669',
-    borderRadius: 8,
-    borderWidth: 1,
-    color: '#12382C',
-    fontSize: 13,
-    minHeight: 42,
-    paddingHorizontal: 10,
-  },
-  reviewBox: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 6,
-    marginTop: 6,
-    padding: 10,
-  },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderRadius: 8,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 50,
-    paddingHorizontal: 16,
-  },
-  primaryButtonText: {
-    color: '#F4FAF6',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  rowActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  safeArea: {
-    backgroundColor: '#F4FAF6',
-    flex: 1,
-  },
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 12,
-  },
-  sectionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  sectionText: {
-    color: '#12382C',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  sectionTextMuted: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  sectionTitle: {
-    color: '#12382C',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: 12,
-  },
-  secondaryButtonText: {
-    color: '#008D49',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  smallButton: {
-    alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 36,
-    paddingHorizontal: 10,
-  },
-  smallButtonText: {
-    color: '#008D49',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  statCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    gap: 5,
-    minWidth: 132,
-    padding: 10,
-  },
-  statHelper: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  statLabel: {
-    color: '#557669',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  statValue: {
-    color: '#12382C',
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  statsGridCompact: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  subtitle: {
-    color: '#557669',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  title: {
-    color: '#12382C',
-    fontSize: 24,
-    fontWeight: '900',
-    lineHeight: 30,
-  },
-  topBar: {
-    alignItems: 'flex-start',
-  },
-});

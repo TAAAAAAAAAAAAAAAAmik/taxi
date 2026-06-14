@@ -16,7 +16,7 @@ Notifications.setNotificationHandler({
 });
 
 export async function configurePushNotifications(user?: AuthUser) {
-  if (!user || user.role === 'admin' || Platform.OS === 'web' || !Device.isDevice) {
+  if (!user || Platform.OS === 'web' || !Device.isDevice) {
     return;
   }
 

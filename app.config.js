@@ -15,7 +15,7 @@ assertProductionConfig();
 
 module.exports = {
   expo: {
-    name: 'Такси Салават',
+    name: 'Kinetix',
     slug: 'taxi-partner-app',
     version: '1.0.0',
     orientation: 'portrait',
@@ -26,7 +26,7 @@ module.exports = {
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#0C0C0C',
+      backgroundColor: '#F4FAF6',
     },
     ios: {
       supportsTablet: true,
@@ -75,6 +75,13 @@ module.exports = {
           color: '#F6C600',
           defaultChannel: 'driver-orders',
           enableBackgroundRemoteNotifications: true,
+        },
+      ],
+      [
+        'expo-location',
+        {
+          locationWhenInUsePermission:
+            'Нужно определить местоположение водителя, чтобы предложить ближайший заказ.',
         },
       ],
     ],

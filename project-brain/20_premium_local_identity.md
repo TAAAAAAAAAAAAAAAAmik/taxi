@@ -1,4 +1,4 @@
-﻿# Premium Local Identity
+# Premium Local Identity
 
 ## Главная мысль
 

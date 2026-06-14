@@ -73,7 +73,7 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
               style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
             >
               <Text style={styles.primaryButtonText}>
-                {isDriverRole ? 'К ленте заказов' : 'Новый заказ'}
+                {isDriverRole ? 'К ленте заказов' : 'Повтор маршрута'}
               </Text>
             </Pressable>
           </View>
@@ -135,7 +135,29 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
                     reason: order.review?.facets.join(', ') || 'Хорошая поездка',
                   });
                 }}
+                onComplaint={() =>
+                  navigation.navigate('SupportChat', {
+                    category: 'Жалоба',
+                    firstName,
+                    role,
+                  })
+                }
                 onPress={() =>
+                  navigation.navigate('OrderStatus', {
+                    firstName,
+                    order,
+                    role,
+                  })
+                }
+                onRepeatRoute={() =>
+                  navigation.navigate('OrderFlow', {
+                    firstName,
+                    presetDestination: order.destination,
+                    presetPickup: order.pickup,
+                    role,
+                  })
+                }
+                onReview={() =>
                   navigation.navigate('OrderStatus', {
                     firstName,
                     order,
@@ -149,6 +171,7 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
                     'Driver reported daily service share transfer',
                   )
                 }
+                isClientRole={!isDriverRole}
                 isDriverRole={isDriverRole}
                 order={order}
               />
@@ -170,16 +193,24 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
 function OrderCard({
   favorite,
   isDriverRole,
+  isClientRole,
+  onComplaint,
   onFavorite,
   onPress,
+  onRepeatRoute,
   onReportServiceShareTransfer,
+  onReview,
   order,
 }: {
   favorite: boolean;
   isDriverRole: boolean;
+  isClientRole: boolean;
+  onComplaint: () => void;
   onFavorite: () => void;
   onPress: () => void;
+  onRepeatRoute: () => void;
   onReportServiceShareTransfer: () => void;
+  onReview: () => void;
   order: AppOrder;
 }) {
   const isCompleted = ['closed', 'completed'].includes(order.status);
@@ -197,7 +228,7 @@ function OrderCard({
       style={({ pressed }) => [styles.orderCard, pressed && styles.pressed]}
     >
       <View style={styles.orderHeader}>
-        <Text style={styles.orderId}>{order.id}</Text>
+        <Text style={styles.orderId}>{order.id} · {formatOrderService(order)}</Text>
         <Text style={styles.status}>{statusLabels[order.status] ?? order.status}</Text>
       </View>
       <View style={styles.routeRow}>
@@ -217,6 +248,37 @@ function OrderCard({
       <Text style={styles.paymentLine}>
         {paymentStatusLabels[order.paymentStatus ?? 'pending']} · {order.paymentMethod}
       </Text>
+      {order.serviceType === 'delivery' ? (
+        <Text style={styles.paymentLine}>
+          {formatDeliveryPackageType(order.deliveryPackageType)} · {order.packageDescription || 'Посылка'} · {formatDeliveryHandoff(order.deliveryHandoff)} · {[order.recipientName, order.recipientPhone].filter(Boolean).join(' · ') || 'получатель не указан'}
+        </Text>
+      ) : null}
+
+      {isClientRole ? (
+        <View style={styles.clientTripActions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onReview}
+            style={({ pressed }) => [styles.clientTripActionButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.clientTripActionText}>Оставить отзыв</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onComplaint}
+            style={({ pressed }) => [styles.clientTripActionButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.clientTripActionText}>Жалоба</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onRepeatRoute}
+            style={({ pressed }) => [styles.clientTripActionButtonPrimary, pressed && styles.pressed]}
+          >
+            <Text style={styles.clientTripActionTextPrimary}>Повтор маршрута</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {isCompleted ? (
         <View style={styles.afterTripBox}>
@@ -310,10 +372,50 @@ function formatServiceShareStatus(status: AppOrder['serviceShareStatus']) {
   return labels[status ?? 'not_applicable'];
 }
 
+function formatOrderService(order: AppOrder) {
+  return order.serviceType === 'delivery' ? 'Доставка' : 'Такси';
+}
+
+function formatDeliveryPackageType(value?: string) {
+  if (value === 'documents') {
+    return 'Документы';
+  }
+
+  if (value === 'food') {
+    return 'Еда / цветы';
+  }
+
+  if (value === 'fragile') {
+    return 'Хрупкое';
+  }
+
+  if (value === 'parcel') {
+    return 'Пакет';
+  }
+
+  if (value === 'other') {
+    return 'Другое';
+  }
+
+  return 'Посылка';
+}
+
+function formatDeliveryHandoff(value?: string) {
+  if (value === 'leave_at_door') {
+    return 'у двери';
+  }
+
+  if (value === 'meet_outside') {
+    return 'у входа';
+  }
+
+  return 'дверь-дверь';
+}
+
 const styles = StyleSheet.create({
   afterTripBox: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
+    backgroundColor: '#F1F8F3',
+    borderColor: 'rgba(0, 141, 73, 0.28)',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -355,13 +457,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
-  empty: {
+  clientTripActionButton: {
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 38,
+    minWidth: 118,
+    paddingHorizontal: 10,
+  },
+  clientTripActionButtonPrimary: {
+    alignItems: 'center',
+    backgroundColor: '#008D49',
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 38,
+    minWidth: 132,
+    paddingHorizontal: 10,
+  },
+  clientTripActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  clientTripActionText: {
+    color: '#008D49',
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  clientTripActionTextPrimary: {
+    color: '#F4FAF6',
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  empty: {
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    elevation: 1,
     gap: 6,
     padding: 16,
+    shadowColor: 'rgba(18, 56, 44, 0.14)',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
   },
   emptyText: {
     color: '#557669',
@@ -433,11 +581,16 @@ const styles = StyleSheet.create({
   },
   orderCard: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
     borderRadius: 8,
     borderWidth: 1,
+    elevation: 1,
     gap: 12,
     padding: 14,
+    shadowColor: 'rgba(18, 56, 44, 0.14)',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
   },
   orderFooter: {
     alignItems: 'center',
@@ -462,22 +615,27 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#F4FAF6',
+    backgroundColor: '#F6F8F5',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   pressed: {
     opacity: 0.92,
-    transform: [{ scale: 0.95 }],
+    transform: [{ scale: 0.98 }],
   },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: '#008D49',
     borderRadius: 8,
+    elevation: 2,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: 12,
+    shadowColor: 'rgba(0, 111, 58, 0.22)',
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
   },
   primaryButtonText: {
     color: '#F4FAF6',

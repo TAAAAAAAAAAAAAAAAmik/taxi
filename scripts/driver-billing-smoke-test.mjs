@@ -37,7 +37,7 @@ try {
 
   assert(initialBilling.payments.length === 0, 'New driver should not have subscription payments');
 
-  const paid = await api(`/drivers/${encodeURIComponent(driver.id)}/billing/pay`, {
+  const pendingRequest = await api(`/drivers/${encodeURIComponent(driver.id)}/billing/pay`, {
     body: {
       billingMode: 'monthly',
       paymentMethod: 'Smoke demo card',
@@ -46,12 +46,44 @@ try {
     token: admin.session.token,
   });
 
-  assert(paid.driver.subscriptionStatus === 'active', 'Paid driver should have active access');
+  assert(pendingRequest.driver.subscriptionStatus !== 'active', 'Manual PRO request should wait for admin approval');
+  assert(pendingRequest.driver.billingMode === 'monthly', 'Driver billing mode should store requested monthly plan');
+  assert(!pendingRequest.driver.accessExpiresAt, 'Pending monthly request should not set access expiry');
+  assert(pendingRequest.payments.length === 1, 'Payment history should contain one request');
+  assert(pendingRequest.payments[0].status === 'pending', 'Manual PRO request should be pending');
+  assert(!pendingRequest.payments[0].receipt, 'Pending manual request should not have receipt yet');
+  assert(
+    pendingRequest.payments[0].providerPaymentStatus === 'awaiting_manual_transfer',
+    'Pending manual request should wait for transfer',
+  );
+
+  await api(`/drivers/${encodeURIComponent(driver.id)}/access`, {
+    body: {
+      billingMode: 'monthly',
+      paymentMethod: 'Smoke admin confirmed transfer',
+      subscriptionStatus: 'active',
+    },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+
+  const paid = await api(`/drivers/${encodeURIComponent(driver.id)}/billing`, {
+    token: admin.session.token,
+  });
+
+  assert(paid.driver.subscriptionStatus === 'active', 'Admin-confirmed driver should have active access');
   assert(paid.driver.billingMode === 'monthly', 'Driver billing mode should switch to monthly');
   assert(paid.driver.accessExpiresAt, 'Monthly payment should set access expiry');
-  assert(paid.payments.length === 1, 'Payment history should contain one payment');
-  assert(paid.payments[0].receipt, 'Paid subscription should have receipt');
-  assert(paid.payments[0].provider.name === 'smoke-demo-acquiring', 'Payment should store provider');
+  assert(paid.driver.subscriptionPlan === 'partner_pro', 'Monthly payment should activate Partner PRO plan');
+  assert(paid.payments.length >= 2, 'Payment history should contain request and admin activation');
+  assert(
+    paid.payments.some((payment) => payment.status === 'paid' && payment.provider?.name === 'manual-admin'),
+    'Admin activation should create paid manual payment',
+  );
+  assert(
+    paid.payments.some((payment) => payment.providerPaymentStatus === 'manual_admin_confirmed'),
+    'Original request should be marked as confirmed manually',
+  );
 
   const synced = await api(`/driver-payments/${encodeURIComponent(paid.payments[0].id)}/sync`, {
     method: 'POST',
@@ -60,7 +92,7 @@ try {
 
   assert(synced.payments[0].status === 'paid', 'Sync should keep paid demo payment active');
 
-  const renewed = await api(`/drivers/${encodeURIComponent(driver.id)}/billing/pay`, {
+  const renewalRequest = await api(`/drivers/${encodeURIComponent(driver.id)}/billing/pay`, {
     body: {
       billingMode: 'monthly',
       paymentMethod: 'Smoke demo card',
@@ -69,7 +101,23 @@ try {
     token: admin.session.token,
   });
 
-  assert(renewed.payments.length === 2, 'Renewal should add second payment');
+  assert(renewalRequest.payments[0].status === 'pending', 'Renewal should wait for admin approval');
+
+  await api(`/drivers/${encodeURIComponent(driver.id)}/access`, {
+    body: {
+      billingMode: 'monthly',
+      paymentMethod: 'Smoke admin confirmed renewal',
+      subscriptionStatus: 'active',
+    },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+
+  const renewed = await api(`/drivers/${encodeURIComponent(driver.id)}/billing`, {
+    token: admin.session.token,
+  });
+
+  assert(renewed.payments.length >= 4, 'Renewal should add request and admin activation payments');
   assert(
     Date.parse(renewed.driver.accessExpiresAt) > Date.parse(paid.driver.accessExpiresAt),
     'Renewal should extend access expiry',

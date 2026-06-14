@@ -34,6 +34,7 @@ import {
   sectionTitles,
   verificationSteps,
 } from '../data/registration';
+import { driverAccessPlans } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
 import {
   ConsentValues,
@@ -56,7 +57,7 @@ const roleIcons = {
   fleet: Building2,
 };
 
-const orderedRoles: AccountRole[] = ['client', 'self_employed_driver', 'park_admin', 'park_driver'];
+const orderedRoles: AccountRole[] = ['client', 'self_employed_driver'];
 const sectionOrder = ['account', 'identity', 'legal', 'vehicle', 'business', 'payments'] as const;
 
 export function RegistrationScreen({ navigation, route }: Props) {
@@ -330,6 +331,15 @@ export function RegistrationScreen({ navigation, route }: Props) {
                 Ссылка открывает регистрацию, подставляет код и для PARK-кода сразу включает роль водителя таксопарка.
               </Text>
             </InfoPanel>
+
+            {isSelfEmployedDriverRole(normalizeAccountRole(role)) ? (
+              <InfoPanel Icon={Car} title="Партнёр PRO">
+                <Text style={styles.panelText}>
+                  3 990 ₽ / месяц · заказы без комиссии · вся сумма поездки остается водителю.
+                </Text>
+                <Text style={styles.panelTextMuted}>{driverAccessPlans.monthly.description}</Text>
+              </InfoPanel>
+            ) : null}
           </View>
 
           <View style={styles.formArea}>
@@ -440,11 +450,17 @@ function normalizeReferralCodeParam(value?: string) {
 }
 
 function normalizeRoleParam(value?: AccountRole, referralCode?: string) {
-  if (!value && isFleetInviteCode(referralCode)) {
-    return 'park_driver';
+  const normalizedRole = normalizeAccountRole(value);
+
+  if (orderedRoles.includes(normalizedRole)) {
+    return normalizedRole;
   }
 
-  return normalizeAccountRole(value);
+  if (isFleetInviteCode(referralCode)) {
+    return 'self_employed_driver';
+  }
+
+  return 'client';
 }
 
 function getInviteLinkTemplate() {
@@ -511,11 +527,16 @@ const styles = StyleSheet.create({
   },
   formSection: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
     borderRadius: 8,
     borderWidth: 1,
+    elevation: 1,
     gap: 12,
     padding: 12,
+    shadowColor: 'rgba(18, 56, 44, 0.14)',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
   },
   formSectionHeader: {
     alignItems: 'center',
@@ -529,11 +550,16 @@ const styles = StyleSheet.create({
   },
   headerBand: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
     borderRadius: 8,
     borderWidth: 1,
+    elevation: 1,
     gap: 12,
     padding: 12,
+    shadowColor: 'rgba(18, 56, 44, 0.14)',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
   },
   heroCopy: {
     gap: 8,
@@ -551,8 +577,8 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   page: {
-    backgroundColor: '#F4FAF6',
-    gap: 12,
+    backgroundColor: '#F6F8F5',
+    gap: 14,
     minHeight: '100%',
     padding: 14,
   },
@@ -567,7 +593,8 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   pressedButton: {
-    opacity: 0.78,
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
   },
   roleList: {
     gap: 8,
@@ -580,13 +607,13 @@ const styles = StyleSheet.create({
     width: 210,
   },
   safeArea: {
-    backgroundColor: '#F4FAF6',
+    backgroundColor: '#F6F8F5',
     flex: 1,
   },
   secondaryButton: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: 'rgba(0, 141, 73, 0.28)',
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: 'center',
@@ -621,7 +648,7 @@ const styles = StyleSheet.create({
   },
   stepBadge: {
     alignItems: 'center',
-    backgroundColor: '#E8F3EF',
+    backgroundColor: '#F1F8F3',
     borderRadius: 8,
     height: 28,
     justifyContent: 'center',
@@ -646,7 +673,7 @@ const styles = StyleSheet.create({
   },
   steps: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
@@ -656,9 +683,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#008D49',
     borderRadius: 8,
+    elevation: 2,
     justifyContent: 'center',
     minHeight: 56,
     paddingHorizontal: 16,
+    shadowColor: 'rgba(0, 111, 58, 0.24)',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
   },
   submitButtonMuted: {
     backgroundColor: '#A9BBB3',

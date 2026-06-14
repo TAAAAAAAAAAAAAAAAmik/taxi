@@ -19,7 +19,7 @@ import { VerifyPhoneScreen } from '../screens/VerifyPhoneScreen';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { getPublicEnv, normalizePublicOrigin } from '../utils/runtimeFlags';
 import { normalizeAccountRole } from '../data/registration';
-import { kinetixColors } from '../theme/kinetixTokens';
+import { kinetixColors, kinetixMotion } from '../theme/kinetixTokens';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -152,11 +152,13 @@ export function AppNavigator() {
     <NavigationContainer initialState={getInitialWebState()} linking={linking}>
       <Stack.Navigator
         initialRouteName="Welcome"
-        screenOptions={{
-          animation: 'fade_from_bottom',
+        screenOptions={({ route }) => ({
+          animation: getScreenAnimation(route.name),
+          animationDuration: kinetixMotion.duration.screen,
           contentStyle: { backgroundColor: kinetixColors.graphite },
+          gestureEnabled: true,
           headerShown: false,
-        }}
+        })}
       >
         <Stack.Screen component={WelcomeScreen} name="Welcome" />
         <Stack.Screen component={LoginScreen} name="Login" />
@@ -177,4 +179,20 @@ export function AppNavigator() {
       </Stack.Navigator>
     </NavigationContainer>
   );
+}
+
+function getScreenAnimation(routeName: keyof RootStackParamList) {
+  if (['Login', 'AdminPanel', 'Welcome'].includes(routeName)) {
+    return 'fade' as const;
+  }
+
+  if (['OrderStatus', 'SupportChat', 'SavedPlace'].includes(routeName)) {
+    return 'slide_from_right' as const;
+  }
+
+  if (['Subscription', 'DriverDocuments', 'OrderHistory', 'Referral'].includes(routeName)) {
+    return 'slide_from_bottom' as const;
+  }
+
+  return 'slide_from_right' as const;
 }

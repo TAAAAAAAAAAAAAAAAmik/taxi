@@ -60,6 +60,10 @@ export function isDemoModeEnabled() {
     return false;
   }
 
+  if (['1', 'true', 'yes'].includes(value)) {
+    return true;
+  }
+
   return !isProductionApp() || isHostedDemoPage();
 }
 

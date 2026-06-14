@@ -1,6 +1,6 @@
 # Такси Салават
 
-Основа мобильного приложения Kinetix для такси на Expo и React Native. Главный MVP-фокус: клиенты сразу заказывают поездки, самозанятые водители выбирают 3000 ₽/мес без комиссии или 7% с поездки без ежемесячного платежа.
+Основа мобильного приложения Kinetix для такси на Expo и React Native. Главный MVP-фокус: клиенты сразу заказывают поездки, самозанятые водители выбирают Партнёр PRO за 3990 ₽/мес без комиссии или комиссию 7% / 5% / 3% без ежемесячного платежа.
 
 ## Что уже есть
 
@@ -28,7 +28,7 @@
 - отзыв после завершения поездки, чек и добавление хорошего водителя в избранные;
 - сохранение домашнего адреса через быстрый пункт "Дом";
 - простой чат поддержки внутри приложения с заделом под сервер сообщений;
-- выбор модели доступа водителя: 3000 ₽/мес без комиссии или 7% с поездки;
+- выбор модели доступа водителя: Партнёр PRO за 3990 ₽/мес без комиссии или комиссия 7% / 5% / 3%;
 - demo/manual/live-сценарии операций водительского доступа с платежной записью, чеком и возвратом для месячной модели;
 - уведомления о новых заказах через WebSocket и push-каналы FCM/APNs;
 - диспетчеризация ближайших водителей с Redis GEO и greedy/batch режимами в FastAPI logistics-сервисе;
@@ -55,7 +55,7 @@ npm run dev:local
 ```
 
 Скрипт поднимает backend на `http://localhost:3100` и Expo Web на `http://localhost:8093`.
-Demo-входы: `demo-client@example.test / password123`, `demo-driver@example.test / password123`, админка - `admin-demo-5000`.
+Demo-входы: `demo-client@example.test / Kinetix123`, `demo-driver@example.test / Kinetix123`, админка - `admin-demo-5000`.
 
 Для закрытого Android APK-пилота без SMS:
 
@@ -65,12 +65,18 @@ npm run prepare:pilot-apk
 npm run build:pilot-apk
 ```
 
-`backend:pilot` автоматически включает `MVP_SKIP_PHONE_VERIFICATION=true`, а `prepare:pilot-apk` подставляет текущий LAN-IP в `eas.json`. Если автоопределение IP не подходит, задайте `PILOT_API_HOST=<LAN-IP>`.
+Перед `backend:pilot` задайте приватный `MVP_ADMIN_PASSWORD`. Скрипт автоматически включает `MVP_SKIP_PHONE_VERIFICATION=true`, а `prepare:pilot-apk` подставляет текущий LAN-IP в `eas.json`. Если автоопределение IP не подходит, задайте `PILOT_API_HOST=<LAN-IP>`.
 
 Для проверки TypeScript:
 
 ```bash
 npm run typecheck
+```
+
+Перед закрытым пилотом:
+
+```bash
+npm run pilot:readiness
 ```
 
 Backend smoke-тесты:

@@ -1,6 +1,9 @@
-import { ComponentType, useMemo, useState } from 'react';
+import { ComponentType, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Pressable,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,15 +18,16 @@ import {
   FileText,
   Headphones,
   Home,
-  LogOut,
   LucideProps,
   MapPinned,
-  ReceiptText,
+  Menu as MenuIcon,
+  Package,
   Route,
   ShieldCheck,
   Star,
   UsersRound,
   Wallet,
+  X,
 } from 'lucide-react-native';
 
 import {
@@ -32,6 +36,7 @@ import {
   isSelfEmployedDriverRole,
   roleCopy,
 } from '../data/registration';
+import { KinetixEmptyState, KinetixStatus } from './KinetixUI';
 import {
   MenuActionTarget,
   MenuIconName,
@@ -40,16 +45,23 @@ import {
   roleMenuConfig,
 } from '../data/menu';
 import { SectionPage, SectionRow, sectionPages } from '../data/sectionPages';
+import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
+import { styles } from './PostRegistrationMenu.styles';
 
 type PostRegistrationMenuProps = {
   role: AccountRole;
   firstName?: string;
   fleetInviteCode?: string;
   availableCarsCount?: number;
+  clientOrderSummary?: ClientOrderSummary;
+  driverFeedBusyId?: string;
+  driverFeedLockedReason?: string;
+  driverFeedOrders?: DriverFeedPreviewOrder[];
   driverStats?: DriverStatsSummary;
   realtimeMessage?: string;
   realtimeStatus?: 'connecting' | 'live' | 'offline' | 'polling';
   realtimeUpdatedAt?: string;
+  savedHomeAddressLabel?: string;
   simpleMode?: boolean;
   driverLine?: {
     accessBlockers?: string[];
@@ -63,6 +75,8 @@ type PostRegistrationMenuProps = {
   onToggleDriverLine?: () => void;
   onToggleSimpleMode?: () => void;
   onOpenOrderFlow: () => void;
+  onOpenDeliveryFlow?: () => void;
+  onOrderHome?: () => void;
   onOpenDriverDocuments: () => void;
   onOpenFleetDriverRegistration?: () => void;
   onOpenOrderHistory: () => void;
@@ -70,6 +84,33 @@ type PostRegistrationMenuProps = {
   onOpenSavedPlace: () => void;
   onOpenSubscription: () => void;
   onOpenSupportChat: () => void;
+  onAcceptDriverOrder?: (orderId: string) => void | Promise<void>;
+};
+
+export type ClientOrderSummary = {
+  activeCount: number;
+  completedCount: number;
+  lastOrderLabel: string;
+  lastOrderStatus: string;
+  totalCount: number;
+  totalSpent: number;
+  activeOrder?: {
+    id: string;
+    routeLabel: string;
+    statusLabel: string;
+    priceLabel: string;
+    driverLabel: string;
+  };
+};
+
+export type DriverFeedPreviewOrder = {
+  id: string;
+  address: string;
+  badges: string[];
+  distanceLabel: string;
+  metaLabel: string;
+  priceLabel: string;
+  serviceLabel?: string;
 };
 
 export type DriverStatsSummary = {
@@ -77,13 +118,19 @@ export type DriverStatsSummary = {
   weekOrders: number;
   monthOrders: number;
   gross: number;
+  grossToday: number;
   commissionFreeUntil?: string;
   driverNet: number;
   serviceShare: number;
   serviceShareRate: number;
   serviceShareToday: number;
+  settlementStatus: 'confirmed' | 'not_applicable' | 'pending_transfer' | 'reported_transferred';
+  subscriptionExpiresAt?: string;
   subscriptionCost: number;
   billingMode: 'monthly' | 'commission';
+  trialActive?: boolean;
+  trialDaysLeft?: number;
+  trialOrdersLeft?: number;
 };
 
 const iconMap: Record<MenuIconName, ComponentType<LucideProps>> = {
@@ -104,6 +151,10 @@ const iconMap: Record<MenuIconName, ComponentType<LucideProps>> = {
 
 export function PostRegistrationMenu({
   availableCarsCount = 0,
+  clientOrderSummary,
+  driverFeedBusyId,
+  driverFeedLockedReason,
+  driverFeedOrders = [],
   driverStats,
   driverLine,
   firstName,
@@ -111,6 +162,7 @@ export function PostRegistrationMenu({
   realtimeMessage,
   realtimeStatus = 'connecting',
   realtimeUpdatedAt,
+  savedHomeAddressLabel,
   simpleMode = false,
   onBackToRegistration,
   onDeleteAccount,
@@ -119,31 +171,71 @@ export function PostRegistrationMenu({
   onToggleSimpleMode,
   onOpenOrderHistory,
   onOpenDriverDocuments,
+  onOpenDeliveryFlow,
   onOpenFleetDriverRegistration,
   onOpenOrderFlow,
+  onOrderHome,
   onOpenReferral,
   onOpenSavedPlace,
   onOpenSubscription,
   onOpenSupportChat,
+  onAcceptDriverOrder,
   role,
 }: PostRegistrationMenuProps) {
   const { width } = useWindowDimensions();
   const config = roleMenuConfig[role] ?? roleMenuConfig.client;
   const pages = sectionPages[role] ?? sectionPages.client;
   const isWide = width >= 820;
+  const isClientRole = role === 'client';
   const isDriverRole = isDriverLikeRole(role);
   const isSelfEmployedDriver = isSelfEmployedDriverRole(role);
   const [activeItemId, setActiveItemId] = useState(config.menuItems[0].id);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const reducedMotion = useReducedMotionPreference();
+  const pageTransition = useRef(new Animated.Value(1)).current;
 
+  const drawerItems = config.drawerItems ?? [];
   const activeItem = useMemo(
-    () => config.menuItems.find((item) => item.id === activeItemId) ?? config.menuItems[0],
-    [activeItemId, config.menuItems],
+    () =>
+      config.menuItems.find((item) => item.id === activeItemId) ??
+      drawerItems.find((item) => item.id === activeItemId) ??
+      config.menuItems[0],
+    [activeItemId, config.menuItems, drawerItems],
   );
   const activePage = useMemo(
     () => pages[activeItem.id] ?? pages[config.menuItems[0].id],
     [activeItem.id, config.menuItems, pages],
   );
   const displayName = firstName?.trim() || 'Пользователь';
+
+  useEffect(() => {
+    pageTransition.setValue(0);
+    Animated.timing(pageTransition, {
+      toValue: 1,
+      duration: reducedMotion ? 0 : 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [activeItem.id, pageTransition, reducedMotion]);
+
+  const pageAnimatedStyle = {
+    opacity: pageTransition,
+    transform: [
+      {
+        translateY: pageTransition.interpolate({
+          inputRange: [0, 1],
+          outputRange: [10, 0],
+        }),
+      },
+      {
+        scale: pageTransition.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.992, 1],
+        }),
+      },
+    ],
+  };
+
   const handleActionTarget = (target?: MenuActionTarget) => {
     if (target === 'order') {
       onOpenOrderFlow();
@@ -192,257 +284,1011 @@ export function PostRegistrationMenu({
 
     if (target === 'registration') {
       onBackToRegistration();
+      return;
+    }
+
+    if (target === 'logout') {
+      onLogout();
+    }
+  };
+  const handleMenuItemPress = (item: MenuItem) => {
+    if (item.target) {
+      setDrawerOpen(false);
+      handleActionTarget(item.target);
+      return;
+    }
+
+    if (pages[item.id]) {
+      setActiveItemId(item.id);
+      setDrawerOpen(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <View style={styles.brandMark}>
-            <Car color="#12382C" size={24} strokeWidth={2.4} />
+    <View style={styles.shell}>
+      <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityLabel="Открыть меню"
+            accessibilityRole="button"
+            onPress={() => setDrawerOpen(true)}
+            style={({ pressed }) => [styles.menuToggle, pressed && styles.pressed]}
+          >
+            <MenuIcon color="#008D49" size={24} strokeWidth={2.5} />
+          </Pressable>
+          <View style={styles.brandCopy}>
+            <Text style={styles.appName}>Такси Салават</Text>
+            <Text style={styles.appMeta}>
+              {roleCopy[role]?.title ?? roleCopy.client.title} · {activePage.title}
+            </Text>
+            <Text style={styles.liveText}>
+              {formatRealtimeStatus(realtimeStatus)}
+              {realtimeUpdatedAt ? ` · ${new Date(realtimeUpdatedAt).toLocaleTimeString('ru-RU')}` : ''}
+            </Text>
           </View>
-        <View style={styles.brandCopy}>
-          <Text style={styles.appName}>Такси Салават</Text>
-          <Text style={styles.appMeta}>{roleCopy[role]?.title ?? roleCopy.client.title}</Text>
-          <Text style={styles.liveText}>
-            {formatRealtimeStatus(realtimeStatus)}
-            {realtimeUpdatedAt ? ` · ${new Date(realtimeUpdatedAt).toLocaleTimeString('ru-RU')}` : ''}
+        </View>
+
+        {realtimeMessage && !isClientRole ? (
+          <View style={styles.livePanel}>
+            <View style={[styles.liveDot, realtimeStatus === 'live' && styles.liveDotActive]} />
+            <Text style={styles.livePanelText}>{realtimeMessage}</Text>
+          </View>
+        ) : null}
+
+        <View style={[styles.layout, !isClientRole && isWide && styles.layoutWide]}>
+          {!isClientRole ? (
+          <View style={[styles.sidebar, isWide && styles.sidebarWide]}>
+            <View style={styles.profilePanel}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
+              </View>
+              <View style={styles.profileCopy}>
+                <Text style={styles.hello}>Здравствуйте, {displayName}</Text>
+                <Text style={styles.profileStatus}>{config.statusTitle}</Text>
+              </View>
+            </View>
+
+            {role === 'park_admin' && onOpenFleetDriverRegistration ? (
+              <FleetInvitePanel
+                inviteCode={fleetInviteCode ?? 'PARK-SALAVAT'}
+                onOpenFleetDriverRegistration={onOpenFleetDriverRegistration}
+              />
+            ) : null}
+
+          </View>
+          ) : null}
+
+          <Animated.View style={[styles.main, isClientRole && styles.clientMain, pageAnimatedStyle]}>
+            {isClientRole ? (
+              <ClientPageView
+                activeItemId={activeItem.id}
+                availableCarsCount={availableCarsCount}
+                displayName={displayName}
+                onDeleteAccount={onDeleteAccount}
+                onOpenDeliveryFlow={onOpenDeliveryFlow ?? onOpenOrderFlow}
+                onOpenOrderFlow={onOpenOrderFlow}
+                onOpenOrderHistory={onOpenOrderHistory}
+                onOpenSavedPlace={onOpenSavedPlace}
+                onOpenSupportChat={onOpenSupportChat}
+                onOrderHome={onOrderHome ?? onOpenSavedPlace}
+                orderSummary={clientOrderSummary}
+                savedHomeAddressLabel={savedHomeAddressLabel}
+              />
+            ) : isDriverRole && activeItem.id === 'home' && driverLine ? (
+              <DriverHomePage
+                appTitle={config.title}
+                driverLine={driverLine}
+                driverStats={driverStats}
+                isSelfEmployedDriver={isSelfEmployedDriver}
+                onOpenOrderFlow={onOpenOrderFlow}
+                onOpenSubscription={onOpenSubscription}
+                onToggleDriverLine={onToggleDriverLine}
+              />
+            ) : (
+              <SectionPageView
+                activeItemId={activeItem.id}
+                appTitle={config.title}
+                driverFeedBusyId={driverFeedBusyId}
+                driverFeedLockedReason={driverFeedLockedReason}
+                driverFeedOrders={driverFeedOrders}
+                driverStats={activeItem.id === 'payouts' ? driverStats : undefined}
+                onAcceptDriverOrder={onAcceptDriverOrder}
+                onActionTarget={handleActionTarget}
+                page={activePage}
+              />
+            )}
+          </Animated.View>
+        </View>
+      </ScrollView>
+
+      <View style={styles.bottomTabs}>
+        {config.menuItems.map((item) => (
+          <BottomTabButton
+            active={item.id === activeItem.id}
+            item={item}
+            key={item.id}
+            onPress={() => handleMenuItemPress(item)}
+          />
+        ))}
+      </View>
+
+      <SideDrawer
+        activeItemId={activeItem.id}
+        appTitle={config.title}
+        items={drawerItems}
+        onClose={() => setDrawerOpen(false)}
+        onItemPress={handleMenuItemPress}
+        open={drawerOpen}
+        roleTitle={roleCopy[role]?.title ?? roleCopy.client.title}
+      />
+    </View>
+  );
+}
+
+type ClientPageViewProps = {
+  activeItemId: string;
+  availableCarsCount: number;
+  displayName: string;
+  orderSummary?: ClientOrderSummary;
+  savedHomeAddressLabel?: string;
+  onDeleteAccount: () => void;
+  onOpenDeliveryFlow: () => void;
+  onOpenOrderFlow: () => void;
+  onOpenOrderHistory: () => void;
+  onOpenSavedPlace: () => void;
+  onOpenSupportChat: () => void;
+  onOrderHome: () => void;
+};
+
+function ClientPageView({
+  activeItemId,
+  availableCarsCount,
+  displayName,
+  onDeleteAccount,
+  onOpenDeliveryFlow,
+  onOpenOrderFlow,
+  onOpenOrderHistory,
+  onOpenSavedPlace,
+  onOpenSupportChat,
+  onOrderHome,
+  orderSummary,
+  savedHomeAddressLabel,
+}: ClientPageViewProps) {
+  if (activeItemId === 'rides') {
+    return (
+      <ClientOrdersPage
+        onOpenOrderHistory={onOpenOrderHistory}
+        orderSummary={orderSummary}
+      />
+    );
+  }
+
+  if (activeItemId === 'about') {
+    return <ClientAboutPage onOpenSupportChat={onOpenSupportChat} />;
+  }
+
+  if (activeItemId === 'profile' || activeItemId === 'settings') {
+    return (
+      <ClientAccountPage
+        displayName={displayName}
+        initialPanel={activeItemId === 'settings' ? 'settings' : 'profile'}
+        onDeleteAccount={onDeleteAccount}
+        onOpenSavedPlace={onOpenSavedPlace}
+        onOpenSupportChat={onOpenSupportChat}
+        savedHomeAddressLabel={savedHomeAddressLabel}
+      />
+    );
+  }
+
+  return (
+    <ClientHomePage
+      availableCarsCount={availableCarsCount}
+      displayName={displayName}
+      onOpenDeliveryFlow={onOpenDeliveryFlow}
+      onOpenOrderFlow={onOpenOrderFlow}
+      onOpenSupportChat={onOpenSupportChat}
+      onOrderHome={onOrderHome}
+      orderSummary={orderSummary}
+      savedHomeAddressLabel={savedHomeAddressLabel}
+    />
+  );
+}
+
+function ClientHomePage({
+  availableCarsCount,
+  displayName,
+  onOpenDeliveryFlow,
+  onOpenOrderFlow,
+  onOpenSupportChat,
+  onOrderHome,
+  orderSummary,
+  savedHomeAddressLabel,
+}: {
+  availableCarsCount: number;
+  displayName: string;
+  orderSummary?: ClientOrderSummary;
+  savedHomeAddressLabel?: string;
+  onOpenDeliveryFlow: () => void;
+  onOpenOrderFlow: () => void;
+  onOpenSupportChat: () => void;
+  onOrderHome: () => void;
+}) {
+  return (
+    <View style={styles.clientFocusPage}>
+      <View style={styles.clientWelcomePanel}>
+        <Text style={styles.clientWelcomeTitle}>Здравствуйте, {displayName}</Text>
+        <Text numberOfLines={2} style={styles.clientWelcomeText}>
+          Закажите поездку, поезжайте домой или напишите поддержке.
+        </Text>
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpenOrderFlow}
+        style={({ pressed }) => [styles.clientMainOrderButton, pressed && styles.pressed]}
+      >
+        <View style={styles.clientMainOrderIcon}>
+          <MapPinned color="#F4FAF6" size={28} strokeWidth={2.6} />
+        </View>
+        <View style={styles.clientMainOrderCopy}>
+          <Text style={styles.clientMainOrderTitle}>Заказать такси</Text>
+          <Text style={styles.clientMainOrderText}>По адресу</Text>
+        </View>
+      </Pressable>
+
+      <View style={styles.clientHomeActionRow}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenDeliveryFlow}
+          style={({ pressed }) => [
+            styles.clientHomeActionButton,
+            styles.clientDeliveryActionButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <View style={styles.clientDeliveryActionTop}>
+            <Package color="#008D49" size={24} strokeWidth={2.5} />
+            <Text style={styles.clientDeliveryBadge}>быстро</Text>
+          </View>
+          <Text style={styles.clientHomeActionTitle}>Доставка</Text>
+          <Text numberOfLines={2} style={styles.clientHomeActionText}>Документы, пакет, цветы</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOrderHome}
+          style={({ pressed }) => [styles.clientHomeActionButton, pressed && styles.pressed]}
+        >
+          <Home color="#008D49" size={24} strokeWidth={2.5} />
+          <Text style={styles.clientHomeActionTitle}>Домой</Text>
+          <Text numberOfLines={2} style={styles.clientHomeActionText}>
+            {savedHomeAddressLabel ? savedHomeAddressLabel : 'Добавить дом'}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenSupportChat}
+          style={({ pressed }) => [styles.clientHomeActionButton, pressed && styles.pressed]}
+        >
+          <Headphones color="#008D49" size={24} strokeWidth={2.5} />
+          <Text style={styles.clientHomeActionTitle}>Поддержка</Text>
+          <Text numberOfLines={2} style={styles.clientHomeActionText}>Чат с оператором</Text>
+        </Pressable>
+      </View>
+
+      <ClientPremiumTrustRail
+        activeOrder={orderSummary?.activeOrder}
+        availableCarsCount={availableCarsCount}
+      />
+
+      <ClientMapPreview
+        activeOrder={orderSummary?.activeOrder}
+        availableCarsCount={availableCarsCount}
+      />
+    </View>
+  );
+}
+
+function ClientOrdersPage({
+  onOpenOrderHistory,
+  orderSummary,
+}: {
+  orderSummary?: ClientOrderSummary;
+  onOpenOrderHistory: () => void;
+}) {
+  const summary = orderSummary ?? {
+    activeCount: 0,
+    completedCount: 0,
+    lastOrderLabel: 'Пока нет поездок',
+    lastOrderStatus: 'Пусто',
+    totalCount: 0,
+    totalSpent: 0,
+  };
+
+  return (
+    <View style={styles.clientFocusPage}>
+      <View style={styles.clientSectionHeader}>
+        <Text style={styles.clientSectionTitle}>Заказы</Text>
+        <Text numberOfLines={2} style={styles.clientSectionText}>
+          Здесь только статистика и история. Новый заказ находится на Главной.
+        </Text>
+      </View>
+
+      <View style={styles.clientStatsGrid}>
+        <ClientStatPill label="Всего" value={String(summary.totalCount)} />
+        <ClientStatPill label="Активные" value={String(summary.activeCount)} />
+        <ClientStatPill label="Завершено" value={String(summary.completedCount)} />
+        <ClientStatPill label="Сумма" value={`${summary.totalSpent} ₽`} />
+      </View>
+
+      {summary.activeOrder ? (
+        <View style={styles.clientActiveOrderCard}>
+          <Text style={styles.clientActiveOrderLabel}>Активный заказ</Text>
+          <Text numberOfLines={1} style={styles.clientActiveOrderTitle}>{summary.activeOrder.routeLabel}</Text>
+          <Text style={styles.clientActiveOrderText}>
+            {summary.activeOrder.statusLabel} · {summary.activeOrder.priceLabel} · {summary.activeOrder.driverLabel}
+          </Text>
+        </View>
+      ) : (
+        <KinetixEmptyState
+          description="Когда поездка появится, статус будет здесь."
+          icon={<MapPinned color="#008D49" size={20} strokeWidth={2.4} />}
+          title="Активного заказа нет"
+        />
+      )}
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpenOrderHistory}
+        style={({ pressed }) => [styles.clientHistoryButton, pressed && styles.pressed]}
+      >
+        <Route color="#F4FAF6" size={20} strokeWidth={2.5} />
+        <Text style={styles.clientHistoryButtonText}>История поездок</Text>
+      </Pressable>
+
+      <View style={styles.clientHistoryActions}>
+        <ClientHistoryActionChip title="Оставить отзыв" />
+        <ClientHistoryActionChip title="Жалоба" />
+        <ClientHistoryActionChip title="Повтор маршрута" />
+      </View>
+
+      <View style={styles.clientLastOrderBox}>
+        <Text style={styles.clientLastOrderTitle}>Последняя поездка</Text>
+        <Text numberOfLines={2} style={styles.clientLastOrderText}>{summary.lastOrderLabel}</Text>
+        <Text style={styles.clientLastOrderStatus}>{summary.lastOrderStatus}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ClientAccountPage({
+  displayName,
+  initialPanel,
+  onDeleteAccount,
+  onOpenSavedPlace,
+  onOpenSupportChat,
+  savedHomeAddressLabel,
+}: {
+  displayName: string;
+  initialPanel: 'settings' | 'profile';
+  savedHomeAddressLabel?: string;
+  onDeleteAccount: () => void;
+  onOpenSavedPlace: () => void;
+  onOpenSupportChat: () => void;
+}) {
+  const [activePanel, setActivePanel] = useState<'settings' | 'profile'>(initialPanel);
+  const [doNotCall, setDoNotCall] = useState(false);
+  const [shareLocation, setShareLocation] = useState(true);
+
+  useEffect(() => {
+    setActivePanel(initialPanel);
+  }, [initialPanel]);
+
+  return (
+    <View style={styles.clientFocusPage}>
+      <View style={styles.clientSectionHeader}>
+        <Text style={styles.clientSectionTitle}>Аккаунт</Text>
+        <Text numberOfLines={2} style={styles.clientSectionText}>
+          Три быстрых входа: поддержка, настройки и профиль.
+        </Text>
+      </View>
+
+      <View style={styles.accountRoundRow}>
+        <ClientAccountRoundButton icon="support" title="Поддержка" onPress={onOpenSupportChat} />
+        <ClientAccountRoundButton icon="settings" title="Настройки" onPress={() => setActivePanel('settings')} />
+        <ClientAccountRoundButton icon="profile" title="Профиль" onPress={() => setActivePanel('profile')} />
+      </View>
+
+      {activePanel === 'settings' ? (
+        <View style={styles.accountPanel}>
+          <Text style={styles.accountPanelTitle}>Настройки поездки</Text>
+          <ClientSettingToggle
+            enabled={doNotCall}
+            onPress={() => setDoNotCall((current) => !current)}
+            text="Попросим водителей не звонить вам без срочной нужды."
+            title="Не звонить"
+          />
+          <ClientSettingToggle
+            enabled={shareLocation}
+            onPress={() => setShareLocation((current) => !current)}
+            text="Водитель будет видеть вас на карте, пока вы не сели в машину."
+            title="Показать водителю где я"
+          />
+        </View>
+      ) : (
+        <View style={styles.accountPanel}>
+          <Text style={styles.accountPanelTitle}>Профиль клиента</Text>
+          <View style={styles.accountProfileRow}>
+            <Text style={styles.accountProfileLabel}>Имя</Text>
+            <Text style={styles.accountProfileValue}>{displayName}</Text>
+          </View>
+          <View style={styles.accountProfileRow}>
+            <Text style={styles.accountProfileLabel}>Дом</Text>
+            <Text numberOfLines={1} style={styles.accountProfileValue}>
+              {savedHomeAddressLabel ?? 'Не указан'}
+            </Text>
+          </View>
+          <View style={styles.accountProfileActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onOpenSavedPlace}
+              style={({ pressed }) => [styles.accountSecondaryButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.accountSecondaryButtonText}>Домашний адрес</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onDeleteAccount}
+              style={({ pressed }) => [styles.accountDangerButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.accountDangerButtonText}>Удалить аккаунт</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ClientAboutPage({ onOpenSupportChat }: { onOpenSupportChat: () => void }) {
+  return (
+    <View style={styles.clientFocusPage}>
+      <View style={styles.clientSectionHeader}>
+        <Text style={styles.clientSectionTitle}>О приложении</Text>
+        <Text numberOfLines={3} style={styles.clientSectionText}>
+          Kinetix собирает заказ такси, статусы поездки, домашний адрес, историю и поддержку в одном спокойном интерфейсе.
+        </Text>
+      </View>
+      <View style={styles.accountPanel}>
+        <Text style={styles.accountPanelTitle}>Что осталось доступно</Text>
+        <ClientHistoryActionChip title="Заказ поездки" />
+        <ClientHistoryActionChip title="История поездок" />
+        <ClientHistoryActionChip title="Рефералы" />
+        <ClientHistoryActionChip title="Поддержка" />
+        <ClientHistoryActionChip title="Смена роли и выход" />
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpenSupportChat}
+        style={({ pressed }) => [styles.clientHistoryButton, pressed && styles.pressed]}
+      >
+        <Headphones color="#F4FAF6" size={20} strokeWidth={2.5} />
+        <Text style={styles.clientHistoryButtonText}>Поддержка</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ClientAccountRoundButton({
+  icon,
+  onPress,
+  title,
+}: {
+  icon: 'profile' | 'settings' | 'support';
+  title: string;
+  onPress: () => void;
+}) {
+  const Icon = icon === 'support' ? Headphones : icon === 'settings' ? ShieldCheck : UsersRound;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.accountRoundButton, pressed && styles.pressed]}
+    >
+      <View style={styles.accountRoundIcon}>
+        <Icon color="#008D49" size={24} strokeWidth={2.5} />
+      </View>
+      <Text numberOfLines={1} style={styles.accountRoundText}>{title}</Text>
+    </Pressable>
+  );
+}
+
+function ClientSettingToggle({
+  enabled,
+  onPress,
+  text,
+  title,
+}: {
+  enabled: boolean;
+  text: string;
+  title: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: enabled }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.clientSettingRow, pressed && styles.pressed]}
+    >
+      <View style={[styles.clientSettingSwitch, enabled && styles.clientSettingSwitchOn]}>
+        <View style={[styles.clientSettingKnob, enabled && styles.clientSettingKnobOn]} />
+      </View>
+      <View style={styles.clientSettingCopy}>
+        <Text style={styles.clientSettingTitle}>{title}</Text>
+        <Text numberOfLines={2} style={styles.clientSettingText}>{text}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function ClientPremiumTrustRail({
+  activeOrder,
+  availableCarsCount,
+}: {
+  activeOrder?: NonNullable<ClientOrderSummary['activeOrder']>;
+  availableCarsCount: number;
+}) {
+  const items = [
+    {
+      title: 'Цена заранее',
+      text: activeOrder?.priceLabel ?? 'До оформления',
+    },
+    {
+      title: 'Статус и PIN',
+      text: activeOrder?.statusLabel ?? 'Включим в заказ',
+    },
+    {
+      title: 'Номер скрыт',
+      text: 'Связь в приложении',
+    },
+    {
+      title: 'Машины рядом',
+      text: String(availableCarsCount),
+      live: true,
+    },
+  ];
+
+  return (
+    <View style={styles.clientTrustRail}>
+      {items.map((item) => (
+        <View key={item.title} style={styles.clientTrustChip}>
+          <View style={[styles.clientTrustDot, item.live && styles.clientTrustDotLive]} />
+          <View style={styles.clientTrustCopy}>
+            <Text numberOfLines={1} style={styles.clientTrustTitle}>{item.title}</Text>
+            <Text numberOfLines={1} style={styles.clientTrustText}>{item.text}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function ClientMapPreview({
+  activeOrder,
+  availableCarsCount,
+}: {
+  activeOrder?: NonNullable<ClientOrderSummary['activeOrder']>;
+  availableCarsCount: number;
+}) {
+  const reducedMotion = useReducedMotionPreference();
+  const mapMotion = useRef(new Animated.Value(0)).current;
+  const routeLabel = activeOrder?.routeLabel ?? 'Маршрут появится после заказа';
+  const title = activeOrder ? 'Водитель на карте' : 'Карта подачи';
+  const meta = activeOrder
+    ? `Машина зеленая · ${availableCarsCount} на линии`
+    : `${availableCarsCount} ${formatCarsWord(availableCarsCount)} рядом · выберите адрес`;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      mapMotion.setValue(1);
+      return;
+    }
+
+    const animation = Animated.loop(
+      Animated.timing(mapMotion, {
+        duration: 2200,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    );
+
+    animation.start();
+
+    return () => animation.stop();
+  }, [mapMotion, reducedMotion]);
+
+  const pulseScale = mapMotion.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.9, 2.25],
+  });
+  const pulseOpacity = mapMotion.interpolate({
+    inputRange: [0, 0.72, 1],
+    outputRange: [0.32, 0.14, 0],
+  });
+  const carTranslateX = mapMotion.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [-8, 6, -8],
+  });
+  const carTranslateY = mapMotion.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [3, -4, 3],
+  });
+  const routeOpacity = mapMotion.interpolate({
+    inputRange: [0, 0.25, 1],
+    outputRange: [0.54, 1, 0.78],
+  });
+
+  return (
+    <View style={styles.clientMapPanel}>
+      <View style={styles.clientMapCanvas}>
+        <View style={styles.clientMapGlow} />
+        <View style={styles.clientMapDistrictOne} />
+        <View style={styles.clientMapDistrictTwo} />
+        <View style={[styles.clientMapRoad, styles.clientMapRoadOne]} />
+        <View style={[styles.clientMapRoad, styles.clientMapRoadTwo]} />
+        <View style={[styles.clientMapRoad, styles.clientMapRoadThree]} />
+        <Animated.View style={[styles.clientMapRouteLine, { opacity: routeOpacity }]} />
+        <View style={styles.clientPassengerDot}>
+          <Animated.View
+            style={[
+              styles.clientPassengerPulseOuter,
+              {
+                opacity: pulseOpacity,
+                transform: [{ scale: pulseScale }],
+              },
+            ]}
+          />
+          <View style={styles.clientPassengerPulse} />
+        </View>
+        <Animated.View
+          style={[
+            styles.clientCarMarker,
+            { transform: [{ translateX: carTranslateX }, { translateY: carTranslateY }] },
+          ]}
+        >
+          <Car color="#F4FAF6" size={20} strokeWidth={2.6} />
+        </Animated.View>
+        <View style={styles.clientMapStatusPill}>
+          <Text style={styles.clientMapStatusText}>{activeOrder ? 'Live' : 'Готово'}</Text>
+        </View>
+      </View>
+      <View style={styles.clientMapCopy}>
+        <Text style={styles.clientMapTitle}>{title}</Text>
+        <Text numberOfLines={1} style={styles.clientMapText}>{routeLabel}</Text>
+        <Text style={styles.clientMapMeta}>{meta}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ClientStatPill({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.clientStatPill}>
+      <Text style={styles.clientStatValue}>{value}</Text>
+      <Text numberOfLines={1} style={styles.clientStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function ClientHistoryActionChip({ title }: { title: string }) {
+  return (
+    <View style={styles.clientHistoryChip}>
+      <Text numberOfLines={1} style={styles.clientHistoryChipText}>{title}</Text>
+    </View>
+  );
+}
+
+type ClientCommandCenterProps = {
+  availableCarsCount: number;
+  simpleMode: boolean;
+  onOpenOrderFlow: () => void;
+  onToggleSimpleMode?: () => void;
+};
+
+function ClientCommandCenter({
+  availableCarsCount,
+  onOpenOrderFlow,
+  onToggleSimpleMode,
+  simpleMode,
+}: ClientCommandCenterProps) {
+  const carsStatus =
+    availableCarsCount === 0
+      ? 'водителей рядом пока нет'
+      : availableCarsCount <= 2
+        ? 'машин мало'
+        : 'машины на линии';
+
+  return (
+    <View style={styles.commandPanel}>
+      <View style={styles.commandHeader}>
+        <View style={styles.commandIconPrimary}>
+          <MapPinned color="#12382C" size={30} strokeWidth={2.5} />
+        </View>
+        <View style={styles.commandCopy}>
+          <Text style={styles.commandEyebrow}>Главная</Text>
+          <Text style={styles.commandTitle}>Куда едем?</Text>
+          <Text style={styles.commandText}>Заказ, цена и водитель - в одном спокойном экране.</Text>
+        </View>
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpenOrderFlow}
+        style={({ pressed }) => [styles.commandPrimaryButton, pressed && styles.pressed]}
+      >
+        <Text style={styles.commandPrimaryButtonText}>Заказать поездку</Text>
+        <Route color="#F4FAF6" size={19} strokeWidth={2.4} />
+      </Pressable>
+
+      <View style={styles.commandMetaStrip}>
+        <View style={styles.commandMetaItem}>
+          <Text style={styles.commandMetaValue}>{availableCarsCount}</Text>
+          <Text numberOfLines={2} style={styles.commandMetaLabel}>{carsStatus}</Text>
+        </View>
+        <View style={styles.commandMetaDivider} />
+        <View style={styles.commandMetaItem}>
+          <Text style={styles.commandMetaValue}>Дом</Text>
+          <Text numberOfLines={2} style={styles.commandMetaLabel}>быстрый адрес</Text>
+        </View>
+        <View style={styles.commandMetaDivider} />
+        <View style={styles.commandMetaItem}>
+          <Text style={styles.commandMetaValue}>Работа</Text>
+          <Text numberOfLines={2} style={styles.commandMetaLabel}>частый маршрут</Text>
+        </View>
+      </View>
+
+      <View style={styles.routePreview}>
+        <View style={styles.routePreviewRail}>
+          <View style={styles.routePreviewDot} />
+          <View style={styles.routePreviewLine} />
+          <View style={[styles.routePreviewDot, styles.routePreviewDotEnd]} />
+        </View>
+        <View style={styles.routePreviewCopy}>
+          <Text style={styles.routePreviewTitle}>Водитель, ETA и оплата будут тут</Text>
+          <Text style={styles.routePreviewText}>После заказа экран покажет только главное: кто едет, сколько ждать, что дальше.</Text>
+        </View>
+      </View>
+
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: simpleMode }}
+        disabled={!onToggleSimpleMode}
+        onPress={() => onToggleSimpleMode?.()}
+        style={({ pressed }) => [styles.commandSwitchRow, pressed && styles.pressed]}
+      >
+        <View style={[styles.simpleModeSwitch, simpleMode && styles.simpleModeSwitchActive]}>
+          <View style={[styles.simpleModeKnob, simpleMode && styles.simpleModeKnobActive]} />
+        </View>
+        <View style={styles.commandSwitchCopy}>
+          <Text style={styles.commandSwitchTitle}>Простой режим</Text>
+          <Text style={styles.commandSwitchText}>Меньше подписей. Больше контроля.</Text>
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+type DriverCommandCenterProps = {
+  driverLine: NonNullable<PostRegistrationMenuProps['driverLine']>;
+  driverStats?: DriverStatsSummary;
+  isSelfEmployedDriver: boolean;
+  onOpenOrderFlow: () => void;
+  onOpenSubscription: () => void;
+  onToggleDriverLine?: () => void;
+};
+
+function DriverHomePage({
+  appTitle,
+  driverLine,
+  driverStats,
+  isSelfEmployedDriver,
+  onOpenOrderFlow,
+  onOpenSubscription,
+  onToggleDriverLine,
+}: DriverCommandCenterProps & { appTitle: string }) {
+  return (
+    <>
+      <View style={styles.routeRow}>
+        <Text style={styles.routeText}>{appTitle}</Text>
+        <Text style={styles.routeDivider}>/</Text>
+        <Text style={styles.routeTextActive}>Главная</Text>
+      </View>
+      <DriverCommandCenter
+        driverLine={driverLine}
+        driverStats={driverStats}
+        isSelfEmployedDriver={isSelfEmployedDriver}
+        onOpenOrderFlow={onOpenOrderFlow}
+        onOpenSubscription={onOpenSubscription}
+        onToggleDriverLine={onToggleDriverLine}
+      />
+    </>
+  );
+}
+
+function DriverCommandCenter({
+  driverLine,
+  driverStats,
+  isSelfEmployedDriver,
+  onOpenOrderFlow,
+  onOpenSubscription,
+  onToggleDriverLine,
+}: DriverCommandCenterProps) {
+  const lineLabel = driverLine.isOnline ? 'На линии' : 'Не на линии';
+  const lineHint = driverLine.canToggle
+    ? driverLine.isOnline
+      ? 'Нажмите, чтобы завершить смену'
+      : 'Нажмите, чтобы начать смену'
+    : `Доступ: ${driverLine.status}`;
+  const blockers = formatDriverBlockers(driverLine.accessBlockers ?? []);
+  const [statsOpen, setStatsOpen] = useState(false);
+
+  return (
+    <View style={[styles.commandPanel, driverLine.isOnline && styles.commandPanelOnline]}>
+      <View style={styles.commandHeader}>
+        <View style={[styles.commandIconPrimary, driverLine.isOnline && styles.commandIconOnline]}>
+          <Car color={driverLine.isOnline ? '#008D49' : '#12382C'} size={30} strokeWidth={2.5} />
+        </View>
+        <View style={styles.commandCopy}>
+          <Text style={styles.commandEyebrow}>{isSelfEmployedDriver ? 'Смена и расчеты' : 'Смена водителя'}</Text>
+          <Text style={styles.commandTitle}>{lineLabel}</Text>
+          <Text style={styles.commandText}>{lineHint}</Text>
+        </View>
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        disabled={!driverLine.canToggle}
+        onPress={onToggleDriverLine}
+        style={({ pressed }) => [
+          styles.commandPrimaryButton,
+          driverLine.isOnline && styles.commandPrimaryButtonOnline,
+          !driverLine.canToggle && styles.commandPrimaryButtonDisabled,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text
+          style={[
+            styles.commandPrimaryButtonText,
+            driverLine.isOnline && styles.commandPrimaryButtonTextOnline,
+          ]}
+        >
+          {driverLine.isOnline ? 'Завершить смену' : 'Выйти на линию'}
+        </Text>
+        <Route
+          color={driverLine.isOnline ? '#008D49' : '#F4FAF6'}
+          size={19}
+          strokeWidth={2.4}
+        />
+      </Pressable>
+
+      <DriverLineVisual online={driverLine.isOnline} stats={driverStats} />
+
+      <View style={styles.commandMetaStrip}>
+        <View style={styles.commandMetaItem}>
+          <Text style={styles.commandMetaValue}>{driverStats?.todayOrders ?? 0}</Text>
+          <Text numberOfLines={2} style={styles.commandMetaLabel}>заказов сегодня</Text>
+        </View>
+        <View style={styles.commandMetaDivider} />
+        <View style={styles.commandMetaItem}>
+          <Text style={styles.commandMetaValue}>{driverStats?.grossToday ?? 0} ₽</Text>
+          <Text numberOfLines={2} style={styles.commandMetaLabel}>собрано водителем</Text>
+        </View>
+        <View style={styles.commandMetaDivider} />
+        <View style={styles.commandMetaItem}>
+          <Text style={styles.commandMetaValue}>{driverStats?.serviceShareToday ?? 0} ₽</Text>
+          <Text numberOfLines={2} style={styles.commandMetaLabel}>к сверке</Text>
+        </View>
+      </View>
+
+      <View style={styles.driverAccessStrip}>
+        <View style={styles.driverAccessIcon}>
+          <ShieldCheck color="#008D49" size={18} strokeWidth={2.4} />
+        </View>
+        <View style={styles.driverAccessCopy}>
+          <Text style={styles.driverAccessTitle}>
+            {driverLine.canToggle ? 'Допуск готов' : 'Нужны действия'}
+          </Text>
+          <Text numberOfLines={2} style={styles.driverAccessText}>
+            {driverLine.canToggle
+              ? 'Проверка завершена, можно принимать заказы.'
+              : `Не закрыто: ${blockers}`}
           </Text>
         </View>
       </View>
 
-        <View style={styles.topActions}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onOpenOrderFlow}
-            style={({ pressed }) => [styles.orderButton, pressed && styles.pressed]}
-          >
-            <Route color="#F4FAF6" size={18} strokeWidth={2.4} />
-            <Text style={styles.orderButtonText}>{isDriverRole ? 'Заказы' : 'Вызвать'}</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onOpenOrderHistory}
-            style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
-          >
-            <ReceiptText color="#008D49" size={17} strokeWidth={2.4} />
-            <Text style={styles.outlineButtonText}>История</Text>
-          </Pressable>
-          {isSelfEmployedDriver ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onOpenSubscription}
-              style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
-            >
-              <Wallet color="#008D49" size={17} strokeWidth={2.4} />
-              <Text style={styles.outlineButtonText}>Расчеты</Text>
-            </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            onPress={onBackToRegistration}
-            style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.outlineButtonText}>К анкете</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onLogout}
-            style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
-          >
-            <LogOut color="#008D49" size={17} strokeWidth={2.4} />
-            <Text style={styles.outlineButtonText}>Выйти</Text>
-          </Pressable>
-        </View>
+      <View style={styles.commandSecondaryRow}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenOrderFlow}
+          style={({ pressed }) => [styles.commandSecondaryButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.commandSecondaryButtonText}>Лента заказов</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenSubscription}
+          style={({ pressed }) => [styles.commandSecondaryButton, pressed && styles.pressed]}
+        >
+          <Wallet color="#008D49" size={17} strokeWidth={2.4} />
+          <Text style={styles.commandSecondaryButtonText}>Расчитаться</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: statsOpen }}
+          onPress={() => setStatsOpen((current) => !current)}
+          style={({ pressed }) => [
+            styles.commandSecondaryButton,
+            statsOpen && styles.commandSecondaryButtonActive,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.commandSecondaryButtonText, statsOpen && styles.commandSecondaryButtonTextActive]}>
+            Статистика
+          </Text>
+        </Pressable>
       </View>
 
-      {realtimeMessage ? (
-        <View style={styles.livePanel}>
-          <View style={[styles.liveDot, realtimeStatus === 'live' && styles.liveDotActive]} />
-          <Text style={styles.livePanelText}>{realtimeMessage}</Text>
-        </View>
+      {statsOpen && driverStats ? <DriverStatsPanel stats={driverStats} /> : null}
+
+      {driverStats?.trialActive ? (
+        <Text style={styles.commandFootnote}>
+          Тестовый период: {driverStats.trialDaysLeft} дн. · {driverStats.trialOrdersLeft} бесплатных заказов
+        </Text>
       ) : null}
+    </View>
+  );
+}
 
-      <View style={[styles.layout, isWide && styles.layoutWide]}>
-        <View style={[styles.sidebar, isWide && styles.sidebarWide]}>
-          <View style={styles.profilePanel}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
-            </View>
-            <View style={styles.profileCopy}>
-              <Text style={styles.hello}>Здравствуйте, {displayName}</Text>
-              <Text style={styles.profileStatus}>{config.statusTitle}</Text>
-            </View>
-          </View>
-
-          {role === 'client' ? (
-            <>
-              <Pressable
-                accessibilityRole="button"
-                onPress={onOpenOrderFlow}
-                style={({ pressed }) => [styles.callTaxiButton, pressed && styles.pressed]}
-              >
-                <View style={styles.callTaxiIcon}>
-                  <MapPinned color="#12382C" size={30} strokeWidth={2.5} />
-                </View>
-                <View style={styles.callTaxiCopy}>
-                  <Text style={styles.callTaxiLabel}>Главная кнопка</Text>
-                  <Text style={styles.callTaxiTitle}>Вызвать такси</Text>
-                  <Text style={styles.callTaxiHint}>Адреса и тарифы только по Салаватскому району.</Text>
-                </View>
-              </Pressable>
-
-              <Pressable
-                accessibilityLabel={`Доступно машин: ${availableCarsCount}`}
-                accessibilityRole="button"
-                onPress={onOpenOrderFlow}
-                style={({ pressed }) => [styles.availableCarsButton, pressed && styles.pressed]}
-              >
-                <View style={styles.availableCarsIcon}>
-                  <Car color="#12382C" size={28} strokeWidth={2.5} />
-                </View>
-                <View style={styles.availableCarsCopy}>
-                  <Text style={styles.availableCarsLabel}>Машин доступно сейчас</Text>
-                  <Text style={styles.availableCarsValue}>{availableCarsCount}</Text>
-                  <Text style={styles.availableCarsHint}>Малояз, Эконом 120 ₽</Text>
-                </View>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="switch"
-                accessibilityState={{ checked: simpleMode }}
-                onPress={onToggleSimpleMode}
-                style={({ pressed }) => [styles.simpleModeButton, pressed && styles.pressed]}
-              >
-                <View style={[styles.simpleModeSwitch, simpleMode && styles.simpleModeSwitchActive]}>
-                  <View style={[styles.simpleModeKnob, simpleMode && styles.simpleModeKnobActive]} />
-                </View>
-                <View style={styles.simpleModeCopy}>
-                  <Text style={styles.simpleModeTitle}>Простой режим</Text>
-                  <Text style={styles.simpleModeText}>Крупнее шрифты, больше кнопки, только заказ.</Text>
-                </View>
-              </Pressable>
-            </>
-          ) : null}
-
-          {role === 'park_admin' && onOpenFleetDriverRegistration ? (
-            <FleetInvitePanel
-              inviteCode={fleetInviteCode ?? 'PARK-SALAVAT'}
-              onOpenFleetDriverRegistration={onOpenFleetDriverRegistration}
-            />
-          ) : null}
-
-          {isSelfEmployedDriver ? (
-            <Pressable
-              accessibilityRole="button"
-              disabled={!driverLine?.canToggle}
-              onPress={onToggleDriverLine}
-              style={({ pressed }) => [
-                styles.driverLineButton,
-                driverLine?.isOnline && styles.driverLineButtonOnline,
-                !driverLine?.canToggle && styles.driverLineButtonDisabled,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View
-                style={[
-                  styles.driverLineIcon,
-                  driverLine?.isOnline && styles.driverLineIconOnline,
-                ]}
-              >
-                <Car
-                  color={driverLine?.isOnline ? '#008D49' : '#12382C'}
-                  size={26}
-                  strokeWidth={2.5}
-                />
-              </View>
-              <View style={styles.driverLineCopy}>
-                <Text
-                  style={[
-                    styles.driverLineLabel,
-                    driverLine?.isOnline && styles.driverLineTextOnline,
-                  ]}
-                >
-                  Статус линии
-                </Text>
-                <Text
-                  style={[
-                    styles.driverLineValue,
-                    driverLine?.isOnline && styles.driverLineTextOnline,
-                  ]}
-                >
-                  {driverLine?.isOnline ? 'Работаю' : 'Не работаю'}
-                </Text>
-                <Text
-                  style={[
-                    styles.driverLineHint,
-                    driverLine?.isOnline && styles.driverLineTextOnline,
-                  ]}
-                >
-                  {driverLine?.canToggle
-                    ? driverLine.isOnline
-                      ? 'Нажмите, чтобы завершить смену'
-                      : 'Нажмите, чтобы начать смену'
-                    : `Доступ: ${driverLine?.status ?? 'нужен допуск'}`}
-                </Text>
-              </View>
-            </Pressable>
-          ) : null}
-
-          {isDriverRole && driverLine ? (
-            <View style={styles.accessPanel}>
-              <Text style={styles.accessTitle}>Документы и допуск</Text>
-              <Text style={styles.accessText}>
-                {driverLine.canToggle
-                  ? 'Проверка завершена, можно выходить на линию.'
-                  : `Не закрыто: ${formatDriverBlockers(driverLine.accessBlockers ?? [])}`}
-              </Text>
-            </View>
-          ) : null}
-
-          {isDriverRole && driverStats ? <DriverStatsCard stats={driverStats} /> : null}
-
-          {isWide ? (
-            <View style={styles.menuList}>
-              {config.menuItems.map((item) => (
-                <MenuButton
-                  active={item.id === activeItem.id}
-                  item={item}
-                  key={item.id}
-                  onPress={() => setActiveItemId(item.id)}
-                />
-              ))}
-            </View>
-          ) : (
-            <ScrollView
-              contentContainerStyle={styles.menuRail}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-            >
-              {config.menuItems.map((item) => (
-                <MenuButton
-                  active={item.id === activeItem.id}
-                  compact
-                  item={item}
-                  key={item.id}
-                  onPress={() => setActiveItemId(item.id)}
-                />
-              ))}
-            </ScrollView>
-          )}
-        </View>
-
-        <View style={styles.main}>
-          <SectionPageView
-            appTitle={config.title}
-            driverStats={activeItem.id === 'payouts' ? driverStats : undefined}
-            onActionTarget={handleActionTarget}
-            page={activePage}
-          />
+function DriverLineVisual({
+  online,
+  stats,
+}: {
+  online: boolean;
+  stats?: DriverStatsSummary;
+}) {
+  return (
+    <View style={[styles.driverLineVisual, online && styles.driverLineVisualOnline]}>
+      <View style={styles.driverLineMapLayer}>
+        <View style={[styles.driverLineRoad, styles.driverLineRoadOne]} />
+        <View style={[styles.driverLineRoad, styles.driverLineRoadTwo]} />
+        <View style={styles.driverLineRoute} />
+        <View style={styles.driverLineStartDot} />
+        <View style={styles.driverLineFinishDot} />
+        <View style={styles.driverLineCar}>
+          <Car color="#F4FAF6" size={20} strokeWidth={2.6} />
         </View>
       </View>
-    </ScrollView>
+      <View style={styles.driverLineVisualCopy}>
+        <Text style={styles.driverLineVisualTitle}>{online ? 'Линия активна' : 'Готов к смене'}</Text>
+        <Text numberOfLines={1} style={styles.driverLineVisualText}>
+          {online ? 'Заказы рядом появятся в ленте' : 'Нажмите кнопку и принимайте поездки'}
+        </Text>
+      </View>
+      <View style={styles.driverLineMiniStats}>
+        <View style={styles.driverLineMiniStat}>
+          <Text style={styles.driverLineMiniValue}>{stats?.todayOrders ?? 0}</Text>
+          <Text style={styles.driverLineMiniLabel}>заказы</Text>
+        </View>
+        <View style={styles.driverLineMiniStat}>
+          <Text style={styles.driverLineMiniValue}>{stats?.serviceShareToday ?? 0} ₽</Text>
+          <Text style={styles.driverLineMiniLabel}>к оплате</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -484,6 +1330,162 @@ function MenuButton({ active, compact = false, item, onPress }: MenuButtonProps)
   );
 }
 
+type BottomTabButtonProps = {
+  item: MenuItem;
+  active: boolean;
+  onPress: () => void;
+};
+
+function BottomTabButton({ active, item, onPress }: BottomTabButtonProps) {
+  const Icon = iconMap[item.icon];
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.bottomTab, active && styles.bottomTabActive, pressed && styles.pressed]}
+    >
+      <View style={[styles.bottomTabIndicator, active && styles.bottomTabIndicatorActive]} />
+      <View style={[styles.bottomTabIcon, active && styles.bottomTabIconActive]}>
+        <Icon color={active ? '#F4FAF6' : '#008D49'} size={20} strokeWidth={2.4} />
+      </View>
+      <Text numberOfLines={1} style={[styles.bottomTabText, active && styles.bottomTabTextActive]}>
+        {item.title}
+      </Text>
+    </Pressable>
+  );
+}
+
+type SideDrawerProps = {
+  activeItemId: string;
+  appTitle: string;
+  items: MenuItem[];
+  onClose: () => void;
+  onItemPress: (item: MenuItem) => void;
+  open: boolean;
+  roleTitle: string;
+};
+
+function SideDrawer({
+  activeItemId,
+  appTitle,
+  items,
+  onClose,
+  onItemPress,
+  open,
+  roleTitle,
+}: SideDrawerProps) {
+  const reducedMotion = useReducedMotionPreference();
+  const progress = useRef(new Animated.Value(open ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: open ? 1 : 0,
+      duration: reducedMotion ? 0 : 260,
+      easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [open, progress, reducedMotion]);
+
+  const panelAnimatedStyle = {
+    transform: [
+      {
+        translateX: progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-330, 0],
+        }),
+      },
+      {
+        scale: progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.985, 1],
+        }),
+      },
+    ],
+    opacity: progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.72, 1],
+    }),
+  };
+  const scrimAnimatedStyle = {
+    opacity: progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    }),
+  };
+
+  return (
+    <Modal animationType="none" onRequestClose={onClose} transparent visible={open}>
+      <View style={styles.drawerRoot}>
+        <Animated.View style={[styles.drawerPanel, panelAnimatedStyle]}>
+          <View style={styles.drawerHeader}>
+            <View style={styles.drawerTitleCopy}>
+              <Text style={styles.drawerTitle}>{appTitle}</Text>
+              <Text style={styles.drawerSubtitle}>{roleTitle}</Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Закрыть меню"
+              accessibilityRole="button"
+              onPress={onClose}
+              style={({ pressed }) => [styles.drawerClose, pressed && styles.pressed]}
+            >
+              <X color="#008D49" size={22} strokeWidth={2.5} />
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.drawerList} showsVerticalScrollIndicator={false}>
+            {items.map((item) => {
+              const active = item.id === activeItemId;
+
+              return (
+                <DrawerMenuItem
+                  active={active}
+                  item={item}
+                  key={item.id}
+                  onPress={() => onItemPress(item)}
+                />
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
+        <Animated.View style={[styles.drawerScrim, scrimAnimatedStyle]}>
+          <Pressable accessibilityRole="button" onPress={onClose} style={StyleSheet.absoluteFillObject} />
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+type DrawerMenuItemProps = {
+  active: boolean;
+  item: MenuItem;
+  onPress: () => void;
+};
+
+function DrawerMenuItem({ active, item, onPress }: DrawerMenuItemProps) {
+  const Icon = iconMap[item.icon];
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.drawerItem, active && styles.drawerItemActive, pressed && styles.pressed]}
+    >
+      <View style={[styles.drawerIconWrap, active && styles.drawerIconWrapActive]}>
+        <Icon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.4} />
+      </View>
+      <View style={styles.drawerItemCopy}>
+        <Text numberOfLines={1} style={[styles.drawerItemTitle, active && styles.drawerItemTitleActive]}>
+          {item.title}
+        </Text>
+        <Text numberOfLines={1} style={styles.drawerItemSubtitle}>{item.subtitle}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 type QuickActionCardProps = {
   action: QuickAction;
   onActionTarget: (target?: MenuActionTarget) => void;
@@ -508,14 +1510,50 @@ function QuickActionCard({ action, onActionTarget }: QuickActionCardProps) {
 }
 
 type SectionPageViewProps = {
+  activeItemId: string;
   appTitle: string;
+  driverFeedBusyId?: string;
+  driverFeedLockedReason?: string;
+  driverFeedOrders?: DriverFeedPreviewOrder[];
   driverStats?: DriverStatsSummary;
+  onAcceptDriverOrder?: (orderId: string) => void | Promise<void>;
   onActionTarget: (target?: MenuActionTarget) => void;
   page: SectionPage;
 };
 
-function SectionPageView({ appTitle, driverStats, onActionTarget, page }: SectionPageViewProps) {
+function SectionPageView({
+  activeItemId,
+  appTitle,
+  driverFeedBusyId,
+  driverFeedLockedReason,
+  driverFeedOrders = [],
+  driverStats,
+  onAcceptDriverOrder,
+  onActionTarget,
+  page,
+}: SectionPageViewProps) {
   const Icon = iconMap[page.icon];
+  const showDriverFeed = activeItemId === 'orders' && Boolean(onAcceptDriverOrder);
+
+  if (showDriverFeed) {
+    return (
+      <>
+        <View style={styles.routeRow}>
+          <Text style={styles.routeText}>{appTitle}</Text>
+          <Text style={styles.routeDivider}>/</Text>
+          <Text style={styles.routeTextActive}>Лента заказов</Text>
+        </View>
+
+        <DriverFeedPreview
+          busyId={driverFeedBusyId}
+          lockedReason={driverFeedLockedReason}
+          onAcceptOrder={onAcceptDriverOrder}
+          onOpenFullFeed={() => onActionTarget('order')}
+          orders={driverFeedOrders}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -628,16 +1666,140 @@ function FleetInvitePanel({
   );
 }
 
+function DriverFeedPreview({
+  busyId,
+  lockedReason,
+  onAcceptOrder,
+  onOpenFullFeed,
+  orders,
+}: {
+  busyId?: string;
+  lockedReason?: string;
+  onAcceptOrder?: (orderId: string) => void | Promise<void>;
+  onOpenFullFeed: () => void;
+  orders: DriverFeedPreviewOrder[];
+}) {
+  const [detailsOrderId, setDetailsOrderId] = useState<string | undefined>();
+  const visibleOrders = orders.slice(0, 5);
+
+  return (
+    <View style={styles.driverFeedPanel}>
+      <View style={styles.driverFeedHeader}>
+        <View>
+          <Text style={styles.driverFeedTitle}>Лента заказов</Text>
+          <Text numberOfLines={1} style={styles.driverFeedSubtitle}>
+            Расстояние, адрес, цена
+          </Text>
+        </View>
+        <Text style={styles.driverFeedCount}>{orders.length}</Text>
+      </View>
+
+      <View style={styles.driverFeedSignalRow}>
+        <Text style={styles.driverFeedSignal}>Такси + доставка</Text>
+        <Text style={styles.driverFeedSignal}>i = детали</Text>
+        <Text style={styles.driverFeedSignal}>1 тап принять</Text>
+      </View>
+
+      {lockedReason ? (
+        <View style={styles.driverFeedNotice}>
+          <KinetixStatus label={`Доступ: ${lockedReason}`} tone="warning" />
+        </View>
+      ) : null}
+
+      {visibleOrders.length ? (
+        <View style={styles.driverFeedList}>
+          {visibleOrders.map((order) => {
+            const detailsOpen = detailsOrderId === order.id;
+            const disabled = Boolean(lockedReason || busyId);
+
+            return (
+              <View key={order.id} style={styles.driverFeedCard}>
+                <View style={styles.driverFeedCardRow}>
+                  <View style={styles.driverFeedRouteMark}>
+                    <View style={styles.driverFeedRouteDot} />
+                    <View style={styles.driverFeedRouteLine} />
+                  </View>
+                  <Text numberOfLines={1} style={styles.driverFeedService}>{order.serviceLabel ?? 'Такси'}</Text>
+                  <Text numberOfLines={1} style={styles.driverFeedDistance}>{order.distanceLabel}</Text>
+                  <Text numberOfLines={1} style={styles.driverFeedAddress}>{order.address}</Text>
+                  <Text numberOfLines={1} style={styles.driverFeedPrice}>{order.priceLabel}</Text>
+                  <Pressable
+                    accessibilityLabel="Информация о заказе"
+                    accessibilityRole="button"
+                    onPress={() => setDetailsOrderId(detailsOpen ? undefined : order.id)}
+                    style={({ pressed }) => [styles.driverFeedInfoButton, detailsOpen && styles.driverFeedInfoButtonActive, pressed && styles.pressed]}
+                  >
+                    <Text style={[styles.driverFeedInfoText, detailsOpen && styles.driverFeedInfoTextActive]}>i</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={disabled}
+                    onPress={() => onAcceptOrder?.(order.id)}
+                    style={({ pressed }) => [
+                      styles.driverFeedAcceptButton,
+                      disabled && styles.disabledButton,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={styles.driverFeedAcceptText}>
+                      {busyId === order.id ? '...' : 'Принять'}
+                    </Text>
+                  </Pressable>
+                </View>
+                {busyId === order.id ? <View style={styles.driverFeedAcceptProgress} /> : null}
+                {detailsOpen ? (
+                  <View style={styles.driverFeedDetails}>
+                    <Text numberOfLines={1} style={styles.driverFeedMeta}>{order.metaLabel}</Text>
+                    <View style={styles.driverFeedBadges}>
+                      {order.badges.slice(0, 4).map((badge) => (
+                        <Text key={badge} style={styles.driverFeedBadge}>{badge}</Text>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <KinetixEmptyState
+          description="Как только клиент создаст поездку, здесь появится короткая карточка."
+          icon={<Route color="#008D49" size={20} strokeWidth={2.4} />}
+          title="Заказов рядом нет"
+        />
+      )}
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpenFullFeed}
+        style={({ pressed }) => [styles.driverFeedFullButton, pressed && styles.pressed]}
+      >
+        <Text style={styles.driverFeedFullButtonText}>Открыть полный экран</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function DriverStatsCard({ stats }: { stats: DriverStatsSummary }) {
   return (
     <View style={styles.driverStatsCard}>
-      <Text style={styles.driverStatsTitle}>Статистика месяца</Text>
+      <Text style={styles.driverStatsTitle}>Сегодня</Text>
       <View style={styles.driverStatsRows}>
-        <MiniStat label="Заказы" value={String(stats.monthOrders)} />
-        <MiniStat label="Собрано" value={`${stats.gross} ₽`} />
-        <MiniStat label="Доля сервиса" value={`${stats.serviceShare} ₽`} />
+        <MiniStat label="Заказы" value={String(stats.todayOrders)} />
+        <MiniStat label="Заработано" value={`${stats.grossToday} ₽`} />
+        <MiniStat label="К оплате" value={`${stats.serviceShareToday} ₽`} />
       </View>
-      <Text style={styles.driverStatsHint}>Сегодня к переводу: {stats.serviceShareToday} ₽</Text>
+      <Text style={styles.driverStatsHint}>
+        Комиссия: {stats.serviceShareRate}% · {formatSettlementStatus(stats.settlementStatus)}
+      </Text>
+      {stats.trialActive ? (
+        <Text style={styles.driverStatsHint}>
+          Тестовый период: {stats.trialDaysLeft} дн. · {stats.trialOrdersLeft} бесплатных заказов
+        </Text>
+      ) : null}
+      {stats.billingMode === 'monthly' && stats.subscriptionExpiresAt ? (
+        <Text style={styles.driverStatsHint}>Партнёр PRO активен до {formatDate(stats.subscriptionExpiresAt)}</Text>
+      ) : null}
     </View>
   );
 }
@@ -645,21 +1807,49 @@ function DriverStatsCard({ stats }: { stats: DriverStatsSummary }) {
 function DriverStatsPanel({ stats }: { stats: DriverStatsSummary }) {
   return (
     <View style={styles.financePanel}>
-      <Text style={styles.panelTitle}>Выручка и доля сервиса</Text>
+      <Text style={styles.panelTitle}>Статистика</Text>
       <Text style={styles.panelSubtitle}>
-        Клиент платит водителю напрямую. Приложение считает долю сервиса, которую водитель переводит в конце рабочего дня.
+        День, неделя и месяц в одном коротком блоке. Расчеты 7% / 5% / 3% сохранены.
       </Text>
       <View style={styles.metricsGrid}>
-        <MiniMetric label="Сегодня" value={`${stats.todayOrders} заказов`} />
+        <MiniMetric label="День" value={`${stats.grossToday} ₽`} />
+        <MiniMetric label="Заказы сегодня" value={String(stats.todayOrders)} />
+        <MiniMetric label="К оплате" value={`${stats.serviceShareToday} ₽`} />
         <MiniMetric label="Неделя" value={`${stats.weekOrders} заказов`} />
         <MiniMetric label="Месяц" value={`${stats.monthOrders} заказов`} />
-        <MiniMetric label="Собрано водителем" value={`${stats.gross} ₽`} />
-        <MiniMetric label="К переводу сегодня" value={`${stats.serviceShareToday} ₽`} />
-        <MiniMetric label={`Доля сервиса ${stats.serviceShareRate}%`} value={`${stats.serviceShare} ₽`} />
-        <MiniMetric label="Остается водителю" value={`${stats.driverNet} ₽`} />
+        <MiniMetric label="Статус" value={formatSettlementStatus(stats.settlementStatus)} />
       </View>
+      <Text style={styles.panelSubtitle}>
+        Чем больше заказов за день — тем ниже комиссия: после 15 заказов 5%, после 20 заказов 3%.
+      </Text>
     </View>
   );
+}
+
+function formatSettlementStatus(status: DriverStatsSummary['settlementStatus']) {
+  const labels: Record<DriverStatsSummary['settlementStatus'], string> = {
+    confirmed: 'оплачен',
+    not_applicable: 'не начисляется',
+    pending_transfer: 'не оплачен',
+    reported_transferred: 'ожидает проверки',
+  };
+
+  return labels[status];
+}
+
+function formatCarsWord(count: number) {
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+
+  if (lastDigit === 1 && lastTwoDigits !== 11) {
+    return 'машина';
+  }
+
+  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)) {
+    return 'машины';
+  }
+
+  return 'машин';
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
@@ -746,841 +1936,3 @@ function formatDate(value: string) {
     year: '2-digit',
   });
 }
-
-const styles = StyleSheet.create({
-  actionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  accessPanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 5,
-    padding: 12,
-  },
-  accessText: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  accessTitle: {
-    color: '#12382C',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  appMeta: {
-    color: '#557669',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  liveText: {
-    color: '#008D49',
-    fontSize: 12,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  appName: {
-    color: '#12382C',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  avatar: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderRadius: 8,
-    height: 42,
-    justifyContent: 'center',
-    width: 42,
-  },
-  avatarText: {
-    color: '#12382C',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  availableCarsButton: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 14,
-    minHeight: 88,
-    padding: 12,
-  },
-  availableCarsCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  availableCarsHint: {
-    color: '#E8F3EF',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  availableCarsIcon: {
-    alignItems: 'center',
-    backgroundColor: '#F4FAF6',
-    borderRadius: 8,
-    height: 46,
-    justifyContent: 'center',
-    width: 46,
-  },
-  availableCarsLabel: {
-    color: '#E8F3EF',
-    fontSize: 13,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  availableCarsValue: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    fontWeight: '900',
-    lineHeight: 38,
-  },
-  callTaxiButton: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 14,
-    minHeight: 112,
-    padding: 14,
-  },
-  callTaxiCopy: {
-    flex: 1,
-    gap: 4,
-    minWidth: 0,
-  },
-  callTaxiHint: {
-    color: '#E8F3EF',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  callTaxiIcon: {
-    alignItems: 'center',
-    backgroundColor: '#F4FAF6',
-    borderRadius: 8,
-    height: 52,
-    justifyContent: 'center',
-    width: 52,
-  },
-  callTaxiLabel: {
-    color: '#E8F3EF',
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  callTaxiTitle: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '900',
-    lineHeight: 32,
-  },
-  badge: {
-    backgroundColor: '#E8F3EF',
-    borderRadius: 6,
-    color: '#C17A70',
-    fontSize: 10,
-    fontWeight: '900',
-    overflow: 'hidden',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  brandCopy: {
-    minWidth: 0,
-  },
-  brandMark: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderRadius: 8,
-    height: 46,
-    justifyContent: 'center',
-    width: 46,
-  },
-  brandRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexShrink: 1,
-    gap: 12,
-    minWidth: 0,
-  },
-  contentPanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12,
-  },
-  driverLineButton: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 14,
-    minHeight: 88,
-    padding: 12,
-  },
-  driverLineButtonDisabled: {
-    backgroundColor: '#A9BBB3',
-    borderColor: '#A9BBB3',
-  },
-  driverLineButtonOnline: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-  },
-  driverLineCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  driverLineHint: {
-    color: '#E8F3EF',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  driverLineIcon: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderRadius: 8,
-    height: 46,
-    justifyContent: 'center',
-    width: 46,
-  },
-  driverLineIconOnline: {
-    backgroundColor: '#FFFFFF',
-  },
-  driverLineLabel: {
-    color: '#E8F3EF',
-    fontSize: 13,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  driverLineTextOnline: {
-    color: '#008D49',
-  },
-  driverLineValue: {
-    color: '#F4FAF6',
-    fontSize: 24,
-    fontWeight: '900',
-    lineHeight: 28,
-  },
-  driverStatsCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 14,
-  },
-  driverStatsHint: {
-    color: '#008D49',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  driverStatsRows: {
-    gap: 8,
-  },
-  driverStatsTitle: {
-    color: '#12382C',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  fleetInviteButton: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderRadius: 8,
-    justifyContent: 'center',
-    minHeight: 46,
-    paddingHorizontal: 12,
-  },
-  fleetInviteButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  fleetInviteCodeBox: {
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    gap: 4,
-    padding: 10,
-  },
-  fleetInviteCodeLabel: {
-    color: '#557669',
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  fleetInviteCodeValue: {
-    color: '#12382C',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  fleetInviteCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  fleetInviteHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  fleetInviteIcon: {
-    alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-  fleetInvitePanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12,
-  },
-  fleetInviteText: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  fleetInviteTitle: {
-    color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  financePanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 12,
-    padding: 12,
-  },
-  heroCopy: {
-    flex: 1,
-    gap: 6,
-    minWidth: 0,
-  },
-  heroIcon: {
-    alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  heroPanel: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    padding: 12,
-  },
-  heroText: {
-    color: '#557669',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  heroTitle: {
-    color: '#12382C',
-    fontSize: 20,
-    fontWeight: '900',
-    lineHeight: 24,
-  },
-  hello: {
-    color: '#12382C',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  layout: {
-    gap: 12,
-  },
-  liveDot: {
-    backgroundColor: '#5C8D89',
-    borderRadius: 5,
-    height: 10,
-    marginTop: 4,
-    width: 10,
-  },
-  liveDotActive: {
-    backgroundColor: '#7A9A7E',
-  },
-  livePanel: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 9,
-    padding: 12,
-  },
-  livePanelText: {
-    color: '#12382C',
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  layoutWide: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-  },
-  main: {
-    flex: 1,
-    gap: 10,
-    minWidth: 0,
-  },
-  menuButton: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 9,
-    padding: 10,
-  },
-  menuButtonCompact: {
-    alignItems: 'center',
-    minHeight: 76,
-    width: 152,
-  },
-  menuButtonActive: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-  },
-  menuCopy: {
-    flex: 1,
-    gap: 4,
-    minWidth: 0,
-  },
-  menuIconWrap: {
-    alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
-  },
-  menuIconWrapCompact: {
-    height: 34,
-    width: 34,
-  },
-  menuIconWrapActive: {
-    backgroundColor: '#008D49',
-  },
-  menuList: {
-    gap: 8,
-  },
-  menuRail: {
-    gap: 8,
-    paddingRight: 4,
-  },
-  menuSubtitle: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  menuTitle: {
-    color: '#12382C',
-    flexShrink: 1,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  menuTitleActive: {
-    color: '#008D49',
-  },
-  menuTitleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  metricCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    gap: 5,
-    minWidth: 132,
-    padding: 12,
-  },
-  metricHelper: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  metricLabel: {
-    color: '#557669',
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  metricValue: {
-    color: '#12382C',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  miniStat: {
-    alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-    padding: 10,
-  },
-  miniStatLabel: {
-    color: '#557669',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  miniStatValue: {
-    color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
-    textAlign: 'right',
-  },
-  notePanel: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    padding: 14,
-  },
-  noteText: {
-    color: '#12382C',
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  outlineButton: {
-    alignItems: 'center',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 7,
-    minHeight: 42,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  outlineButtonText: {
-    color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  orderButton: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderRadius: 8,
-    flexDirection: 'row',
-    gap: 8,
-    minHeight: 42,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  orderButtonText: {
-    color: '#F4FAF6',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  page: {
-    backgroundColor: '#F4FAF6',
-    gap: 12,
-    minHeight: '100%',
-    padding: 14,
-  },
-  panelSubtitle: {
-    color: '#557669',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  panelTitle: {
-    color: '#12382C',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  pressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.95 }],
-  },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderRadius: 8,
-    justifyContent: 'center',
-    minHeight: 46,
-    paddingHorizontal: 14,
-  },
-  primaryButtonText: {
-    color: '#F4FAF6',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  profileCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  profilePanel: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    padding: 12,
-  },
-  profileStatus: {
-    color: '#557669',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  quickCard: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    gap: 8,
-    minHeight: 104,
-    minWidth: 150,
-    padding: 12,
-  },
-  quickGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  quickIconWrap: {
-    alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-  quickSubtitle: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  quickTitle: {
-    color: '#12382C',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  routeDivider: {
-    color: '#557669',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  routeRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 7,
-  },
-  routeText: {
-    color: '#557669',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  routeTextActive: {
-    color: '#008D49',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 46,
-    paddingHorizontal: 14,
-  },
-  secondaryButtonText: {
-    color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  sectionRow: {
-    alignItems: 'flex-start',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
-    padding: 10,
-  },
-  sectionRowCopy: {
-    flex: 1,
-    gap: 4,
-    minWidth: 150,
-  },
-  sectionRowMeta: {
-    alignItems: 'flex-end',
-    gap: 4,
-    minWidth: 92,
-  },
-  sectionRows: {
-    gap: 9,
-  },
-  sectionRowStatus: {
-    backgroundColor: '#E8F3EF',
-    borderRadius: 6,
-    color: '#008D49',
-    fontSize: 11,
-    fontWeight: '900',
-    overflow: 'hidden',
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-  },
-  sectionRowSubtitle: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  sectionRowTitle: {
-    color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  sectionRowValue: {
-    color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
-    textAlign: 'right',
-  },
-  simpleModeButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    minHeight: 74,
-    padding: 12,
-  },
-  simpleModeCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  simpleModeKnob: {
-    backgroundColor: '#557669',
-    borderRadius: 10,
-    height: 20,
-    width: 20,
-  },
-  simpleModeKnobActive: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#F4FAF6',
-  },
-  simpleModeSwitch: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#557669',
-    borderRadius: 99,
-    borderWidth: 1,
-    justifyContent: 'center',
-    padding: 3,
-    width: 50,
-  },
-  simpleModeSwitchActive: {
-    backgroundColor: '#008D49',
-    borderColor: '#008D49',
-  },
-  simpleModeText: {
-    color: '#557669',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  simpleModeTitle: {
-    color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  sidebar: {
-    gap: 10,
-    width: '100%',
-  },
-  sidebarWide: {
-    flexShrink: 0,
-    width: 340,
-  },
-  statusPanel: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12,
-  },
-  statusText: {
-    color: '#557669',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  statusTitle: {
-    color: '#008D49',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  topBar: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
-    padding: 12,
-  },
-  topActions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-});

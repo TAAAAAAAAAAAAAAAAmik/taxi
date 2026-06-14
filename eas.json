@@ -10,7 +10,7 @@
       },
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://10.248.98.80:3100",
+        "EXPO_PUBLIC_API_URL": "http://10.36.224.80:3100",
         "EXPO_PUBLIC_APP_ENV": "pilot",
         "EXPO_PUBLIC_ENABLE_DEMO": "false",
         "EXPO_PUBLIC_SKIP_PHONE_VERIFICATION": "true"

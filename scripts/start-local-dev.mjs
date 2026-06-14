@@ -108,8 +108,8 @@ console.log('Open: http://localhost:8093');
 console.log('Admin: http://localhost:8093/admin');
 console.log('API health: http://localhost:3100/health');
 console.log('');
-console.log('Demo client: demo-client@example.test / password123');
-console.log('Demo driver: demo-driver@example.test / password123');
+console.log('Demo client: demo-client@example.test / Kinetix123');
+console.log('Demo driver: demo-driver@example.test / Kinetix123');
 console.log('Admin password: admin-demo-5000');
 
 if (failed.length > 0) {

@@ -33,12 +33,12 @@ const styles = StyleSheet.create({
   box: {
     alignItems: 'center',
     backgroundColor: kx.surface.input,
-    borderColor: kx.color.amber,
+    borderColor: kx.border.subtle,
     borderRadius: kx.radius.control,
-    borderWidth: 1.5,
-    height: 24,
+    borderWidth: 1,
+    height: 26,
     justifyContent: 'center',
-    width: 24,
+    width: 26,
   },
   checkedBox: {
     backgroundColor: kx.color.amber,
@@ -50,21 +50,27 @@ const styles = StyleSheet.create({
   },
   label: {
     color: kx.text.primary,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
+    lineHeight: 20,
   },
   pressedRow: {
-    opacity: 0.82,
+    opacity: 0.9,
   },
   row: {
     alignItems: 'flex-start',
+    backgroundColor: kx.surface.card,
+    borderColor: kx.border.muted,
+    borderRadius: kx.radius.card,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    paddingVertical: 8,
+    minHeight: 64,
+    padding: 12,
   },
   text: {
     color: kx.text.secondary,
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
   },
 });

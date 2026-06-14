@@ -30,6 +30,60 @@ try {
   const admin = await loginAdmin();
   const firstDriver = await createReadyDriver(admin.session.token, 'First Driver', '+79001000001', 'A101AA102');
   const secondDriver = await createReadyDriver(admin.session.token, 'Second Driver', '+79001000002', 'A202AA102');
+  await setDriverAvailability(admin.session.token, firstDriver.id, true, {
+    latitude: 55.2,
+    longitude: 58.2,
+  });
+  await setDriverAvailability(admin.session.token, secondDriver.id, true, {
+    latitude: 55.5,
+    longitude: 58.5,
+  });
+
+  const exclusiveOrder = await createOrder({
+    clientName: 'Exclusive Client',
+    clientPhone: '+79008888888',
+    destination: 'Exclusive destination',
+    paymentMethod: 'Карта',
+    pickup: 'Exclusive pickup',
+    pickupPoint: {
+      latitude: 55.2,
+      longitude: 58.2,
+    },
+    role: 'client',
+    tariff: 'economy',
+    total: 510,
+  });
+
+  assert(exclusiveOrder.dispatchMode === 'exclusive', 'Nearest order should start as exclusive');
+  assert(exclusiveOrder.exclusiveDriverId === firstDriver.id, 'Nearest driver should receive exclusive offer');
+
+  await expectApiFailure(`/orders/${encodeURIComponent(exclusiveOrder.id)}/assign`, {
+    body: { driverId: secondDriver.id },
+    method: 'PATCH',
+  });
+
+  const declinedOffer = await api(`/orders/${encodeURIComponent(exclusiveOrder.id)}/offer`, {
+    body: { action: 'decline', driverId: firstDriver.id },
+    method: 'PATCH',
+  });
+
+  assert(declinedOffer.order.dispatchMode === 'feed', 'Declined exclusive offer should move to feed');
+  assert(
+    declinedOffer.order.dispatchStatus === 'driver_declined_open_feed',
+    'Declined exclusive offer should record feed release status',
+  );
+
+  const acceptedFromFeed = await api(`/orders/${encodeURIComponent(exclusiveOrder.id)}/assign`, {
+    body: { driverId: secondDriver.id },
+    method: 'PATCH',
+  });
+
+  assert(acceptedFromFeed.order.driver?.id === secondDriver.id, 'Order from feed should be available to another driver');
+  assert(
+    acceptedFromFeed.order.dispatchStatus === 'accepted_from_feed',
+    'Order accepted after decline should be marked as feed acceptance',
+  );
+
   const order = await createOrder({
     clientName: 'Dispatch Client',
     clientPhone: '+79009999999',
@@ -76,18 +130,16 @@ try {
   assert(completed?.paymentEvents?.some((item) => item.status === 'paid'), 'Payment history should include paid');
   assert(completed?.statusHistory?.some((item) => item.status === 'accepted'), 'Status history should include accept');
   assert(completed?.driverCollectedAmount === completed?.total, 'Driver should collect the full trip amount');
-  assert(completed?.serviceShareRate === 7, `Expected 7% service share, got ${completed?.serviceShareRate}`);
-  assert(
-    completed?.serviceShareAmount === Math.round((completed?.total || 0) * 0.07),
-    `Expected service share from total, got ${completed?.serviceShareAmount}`,
-  );
-  assert(completed?.serviceShareStatus === 'pending_transfer', 'Service share should wait for daily transfer');
+  assert(completed?.driverTrialActive === true, 'First completed driver order should start free trial period');
+  assert(completed?.serviceShareRate === 0, `Expected 0% trial service share, got ${completed?.serviceShareRate}`);
+  assert(completed?.serviceShareAmount === 0, `Expected no service share during trial, got ${completed?.serviceShareAmount}`);
+  assert(completed?.serviceShareStatus === 'not_applicable', 'Trial service share should not require transfer');
   assert(
     completed?.driverNetAmount === (completed?.total || 0) - (completed?.serviceShareAmount || 0),
     'Driver net amount should be total minus service share',
   );
 
-  const reportedTransfer = await api(`/orders/${encodeURIComponent(order.id)}/service-share`, {
+  await expectApiFailure(`/orders/${encodeURIComponent(order.id)}/service-share`, {
     body: {
       note: 'Smoke driver transfer report',
       status: 'reported_transferred',
@@ -95,13 +147,8 @@ try {
     method: 'PATCH',
     token: admin.session.token,
   });
-  assert(
-    reportedTransfer.order.serviceShareStatus === 'reported_transferred',
-    'Driver should be able to report service share transfer',
-  );
-  assert(reportedTransfer.order.serviceShareReportedAt, 'Transfer report should store reportedAt');
 
-  const confirmedTransfer = await api(`/orders/${encodeURIComponent(order.id)}/service-share`, {
+  await expectApiFailure(`/orders/${encodeURIComponent(order.id)}/service-share`, {
     body: {
       note: 'Smoke admin transfer confirmation',
       status: 'confirmed',
@@ -109,22 +156,17 @@ try {
     method: 'PATCH',
     token: admin.session.token,
   });
-  assert(
-    confirmedTransfer.order.serviceShareStatus === 'confirmed',
-    'Admin should confirm service share receipt',
-  );
-  assert(confirmedTransfer.order.serviceShareConfirmedAt, 'Transfer confirmation should store confirmedAt');
 
   const shareSummary = await api(
-    `/service-share/summary?date=${encodeURIComponent(confirmedTransfer.order.serviceShareBatchDate)}`,
+    `/service-share/summary?date=${encodeURIComponent(completed.serviceShareBatchDate)}`,
     {
       token: admin.session.token,
     },
   );
   assert(shareSummary.summary.orders.length >= 1, 'Service share summary should include completed order');
   assert(
-    shareSummary.summary.summary.confirmedAmount >= completed.serviceShareAmount,
-    'Service share summary should include confirmed amount',
+    shareSummary.summary.summary.totalServiceShareAmount === 0,
+    'Trial service share summary should include zero service share',
   );
 
   const refunded = await api(`/orders/${encodeURIComponent(order.id)}/payment`, {
@@ -132,6 +174,44 @@ try {
     method: 'PATCH',
   });
   assert(refunded.order.paymentStatus === 'refunded', 'Payment endpoint should update payment status');
+
+  const deliveryOrder = await createOrder({
+    clientName: 'Delivery Client',
+    clientPhone: '+79007777777',
+    deliveryComment: 'Leave at reception',
+    deliveryHandoff: 'door_to_door',
+    deliveryPackageType: 'documents',
+    destination: 'Delivery dropoff',
+    packageDescription: 'Documents package',
+    paymentMethod: 'РќР°Р»РёС‡РЅС‹Рµ',
+    pickup: 'Delivery pickup',
+    pickupPoint: {
+      latitude: 55.2,
+      longitude: 58.2,
+    },
+    recipientName: 'Delivery Receiver',
+    recipientPhone: '+79006666666',
+    role: 'client',
+    serviceType: 'delivery',
+    tariff: 'economy',
+    total: 240,
+  });
+
+  assert(deliveryOrder.serviceType === 'delivery', 'Delivery order should keep serviceType');
+  assert(deliveryOrder.deliveryHandoff === 'door_to_door', 'Delivery order should keep handoff mode');
+  assert(deliveryOrder.deliveryPackageType === 'documents', 'Delivery order should keep package type');
+  assert(deliveryOrder.packageDescription === 'Documents package', 'Delivery order should keep package description');
+  assert(deliveryOrder.recipientName === 'Delivery Receiver', 'Delivery order should keep recipient name');
+  assert(deliveryOrder.total >= 160, `Delivery order should use delivery minimum, got ${deliveryOrder.total}`);
+
+  const acceptedDelivery = await api(`/orders/${encodeURIComponent(deliveryOrder.id)}/assign`, {
+    body: { driverId: firstDriver.id },
+    method: 'PATCH',
+  });
+
+  assert(acceptedDelivery.order.driver?.id === firstDriver.id, 'Delivery order should be accepted by driver');
+  assert(acceptedDelivery.order.serviceType === 'delivery', 'Accepted delivery should keep serviceType');
+  assert(acceptedDelivery.order.deliveryHandoff === 'door_to_door', 'Accepted delivery should keep handoff mode');
 
   console.log('Dispatch smoke test passed');
 } finally {
@@ -180,6 +260,20 @@ async function createReadyDriver(adminToken, name, phone, plate) {
 
   assert(compliant.driver.canReceiveOrders, `${name} should be allowed to receive orders`);
   return compliant.driver;
+}
+
+async function setDriverAvailability(adminToken, driverId, isOnline, location) {
+  const response = await api(`/drivers/${encodeURIComponent(driverId)}/availability`, {
+    body: {
+      isOnline,
+      location,
+    },
+    method: 'PATCH',
+    token: adminToken,
+  });
+
+  assert(response.driver.isOnline === isOnline, 'Driver availability should update');
+  return response.driver;
 }
 
 async function createOrder(body) {

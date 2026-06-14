@@ -22,7 +22,7 @@ export function FieldInput({ field, value, onChangeText }: FieldInputProps) {
         keyboardType={field.keyboardType ?? 'default'}
         onChangeText={onChangeText}
         placeholder={field.placeholder}
-        placeholderTextColor="#557669"
+        placeholderTextColor={kx.text.muted}
         secureTextEntry={field.secureTextEntry}
         style={styles.input}
         textContentType={field.textContentType}
@@ -35,27 +35,31 @@ export function FieldInput({ field, value, onChangeText }: FieldInputProps) {
 
 const styles = StyleSheet.create({
   field: {
-    gap: 8,
+    gap: 7,
   },
   helper: {
     color: kx.text.secondary,
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
   },
   input: {
     backgroundColor: kx.surface.input,
-    borderColor: kx.text.secondary,
+    borderColor: kx.border.muted,
     borderRadius: kx.radius.control,
     borderWidth: 1,
     color: kx.text.primary,
     fontSize: 16,
-    minHeight: kx.touch.regular,
-    paddingHorizontal: 14,
+    fontWeight: '600',
+    lineHeight: 22,
+    minHeight: 58,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
   },
   label: {
     color: kx.text.primary,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0,
   },
   required: {
     color: kx.color.danger,

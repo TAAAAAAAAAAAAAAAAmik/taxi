@@ -1,15 +1,27 @@
 import { AccountRole } from '../data/registration';
 
+export type OrderServiceType = 'delivery' | 'taxi';
+export type DeliveryHandoffType = 'door_to_door' | 'leave_at_door' | 'meet_outside';
+export type DeliveryPackageType = 'documents' | 'food' | 'fragile' | 'other' | 'parcel';
+
 export type OrderStatusSummary = {
   id: string;
   pickup: string;
   destination: string;
+  serviceType?: OrderServiceType;
+  deliveryHandoff?: DeliveryHandoffType | string;
+  deliveryPackageType?: DeliveryPackageType | string;
+  packageDescription?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  deliveryComment?: string;
   tariff: string;
   tariffId?: string;
   total: number;
   paymentMethod: string;
   options: string[];
   optionsTotal?: number;
+  scheduledAt?: string;
   routeEstimate?: {
     confidence: 'draft' | 'estimated' | 'preset';
     calculatedAt?: string;
@@ -23,6 +35,7 @@ export type OrderStatusSummary = {
     tariffId?: string;
     total: number;
   };
+  stops?: string[];
   surgeCoefficient?: number;
 };
 
@@ -55,6 +68,9 @@ export type RootStackParamList = {
   OrderFlow: {
     role: AccountRole;
     firstName?: string;
+    presetDestination?: string;
+    presetPickup?: string;
+    serviceType?: OrderServiceType;
   };
   OrderStatus: {
     role: AccountRole;

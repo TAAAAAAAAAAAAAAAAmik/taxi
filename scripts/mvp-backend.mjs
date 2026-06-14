@@ -50,16 +50,16 @@ const referralRewards = {
   clientQualificationOrders: readNumberEnv('MVP_REFERRAL_CLIENT_ORDERS', 5),
   clientReward: readNumberEnv('MVP_REFERRAL_CLIENT_REWARD', 60),
   driverQualificationOrders: readNumberEnv('MVP_REFERRAL_DRIVER_ORDERS', 10),
-  driverReward: readNumberEnv('MVP_REFERRAL_DRIVER_REWARD', 300),
+  driverReward: readNumberEnv('MVP_REFERRAL_DRIVER_REWARD', 200),
   driverTrialDays: readNumberEnv('MVP_REFERRAL_DRIVER_TRIAL_DAYS', 7),
-  invitedClientBonus: readNumberEnv('MVP_REFERRAL_INVITED_CLIENT_BONUS', 300),
+  invitedClientBonus: readNumberEnv('MVP_REFERRAL_INVITED_CLIENT_BONUS', 0),
 };
 const driverAccessPlans = {
   monthly: {
     accessDays: 30,
     commissionPercent: 0,
-    monthlyPrice: readNumberEnv('MVP_DRIVER_MONTHLY_PRICE', 3000),
-    name: 'Месячная подписка',
+    monthlyPrice: readNumberEnv('MVP_DRIVER_MONTHLY_PRICE', 3990),
+    name: 'Партнёр PRO',
   },
   commission: {
     commissionPercent: readNumberEnv('MVP_DRIVER_TRIP_COMMISSION_PERCENT', 7),
@@ -67,6 +67,14 @@ const driverAccessPlans = {
     name: 'Комиссия с поездки',
   },
 };
+const driverDailyCommissionTiers = [
+  { fromOrder: 1, toOrder: 15, percent: 7 },
+  { fromOrder: 16, toOrder: 20, percent: 5 },
+  { fromOrder: 21, percent: 3 },
+];
+const driverTrialFreeOrderLimit = readNumberEnv('MVP_DRIVER_TRIAL_FREE_ORDERS', 20);
+const dispatchExclusiveOfferSeconds = clampNumber(readNumberEnv('MVP_DISPATCH_EXCLUSIVE_SECONDS', 30), 15, 60, 30);
+const driverLocationMaxAgeMinutes = clampNumber(readNumberEnv('MVP_DRIVER_LOCATION_MAX_AGE_MINUTES', 20), 3, 180, 20);
 const parkAccessPlan = {
   accessDays: 30,
   commissionPercent: 0,
@@ -77,6 +85,7 @@ const paymentProviderMode = ['demo', 'live', 'manual'].includes(process.env.MVP_
   ? process.env.MVP_PAYMENT_PROVIDER_MODE
   : 'demo';
 const paymentProviderName = String(process.env.MVP_PAYMENT_PROVIDER || 'demo-acquiring').trim() || 'demo-acquiring';
+const paymentCardNumber = String(process.env.PAYMENT_CARD_NUMBER || '').trim();
 const yookassaConfig = {
   apiBaseUrl: String(process.env.MVP_YOOKASSA_API_URL || 'https://api.yookassa.ru/v3')
     .trim()
@@ -328,6 +337,12 @@ const seedDrivers = [
     plate: 'А123ВС 102',
     status: 'approved',
     isOnline: true,
+    lastLocation: {
+      latitude: 55.1784,
+      longitude: 58.1598,
+      updatedAt: new Date().toISOString(),
+    },
+    locationUpdatedAt: new Date().toISOString(),
     billingMode: 'monthly',
     subscriptionStatus: 'active',
     canReceiveOrders: true,
@@ -1067,7 +1082,7 @@ function addRealtimeNotification(db, input) {
 }
 
 function normalizeRealtimeNotification(notification) {
-  const audience = ['admin', 'all', 'client', 'driver'].includes(notification.audience)
+  const audience = ['admin', 'all', 'client', 'driver', 'park'].includes(notification.audience)
     ? notification.audience
     : 'all';
 
@@ -1100,7 +1115,7 @@ function normalizePushToken(token) {
     deviceType: token.deviceType ? String(token.deviceType) : undefined,
     id: String(token.id || `PT-${randomUUID().slice(0, 10)}`),
     platform: String(token.platform || 'unknown'),
-    role: normalizeRole(token.role),
+    role: token.role === 'admin' ? 'admin' : normalizeRole(token.role),
     token: value,
     tokenType: ['fcm', 'apns', 'expo'].includes(token.tokenType) ? token.tokenType : String(token.tokenType || 'unknown'),
     updatedAt: String(token.updatedAt || token.createdAt || new Date().toISOString()),
@@ -1111,11 +1126,29 @@ function normalizePushToken(token) {
 async function sendPushToDriver(db, driverId, notification, data = {}) {
   const driver = db.drivers.find((item) => item.id === driverId);
   const userId = driver?.userId;
-  const tokens = (db.pushTokens || []).filter(
-    (token) =>
-      token.userId === userId &&
-      ['self_employed_driver', 'park_driver', 'driver'].includes(token.role),
-  );
+  await sendPushToUser(db, userId, notification, data, ['self_employed_driver', 'park_driver', 'driver']);
+}
+
+async function sendPushToDrivers(db, driverIds, notification, data = {}) {
+  const uniqueDriverIds = Array.from(new Set((driverIds || []).map(String).filter(Boolean)));
+
+  await Promise.all(uniqueDriverIds.map((driverId) => sendPushToDriver(db, driverId, notification, data)));
+}
+
+async function sendPushToUser(db, userId, notification, data = {}, allowedRoles) {
+  const normalizedUserId = String(userId || '').trim();
+
+  if (!normalizedUserId) {
+    return;
+  }
+
+  const tokens = (db.pushTokens || []).filter((token) => {
+    if (token.userId !== normalizedUserId) {
+      return false;
+    }
+
+    return !allowedRoles || allowedRoles.includes(token.role);
+  });
 
   await Promise.all(
     tokens.map((token) =>
@@ -1128,6 +1161,38 @@ async function sendPushToDriver(db, driverId, notification, data = {}) {
       }),
     ),
   );
+}
+
+async function sendPushToPark(db, parkId, notification, data = {}) {
+  const park = db.parks.find((item) => item.id === parkId);
+
+  if (!park?.ownerUserId) {
+    return;
+  }
+
+  await sendPushToUser(db, park.ownerUserId, notification, data, ['park_admin']);
+}
+
+async function sendPushToAdmins(db, notification, data = {}) {
+  const adminUserIds = Array.from(
+    new Set(
+      (db.pushTokens || [])
+        .filter((token) => token.role === 'admin')
+        .map((token) => String(token.userId || '').trim())
+        .filter(Boolean),
+    ),
+  );
+
+  await Promise.all(adminUserIds.map((userId) => sendPushToUser(db, userId, notification, data, ['admin'])));
+}
+
+function getAvailableDriverIds(db) {
+  return db.drivers
+    .filter((driver) => {
+      applyDriverAccessState(driver);
+      return driver.isOnline && driver.canReceiveOrders && !isDriverBusy(db, driver.id);
+    })
+    .map((driver) => driver.id);
 }
 
 async function sendPushToken(token, notification, data) {
@@ -1641,6 +1706,7 @@ function estimateRouteFare(payload) {
   const destination = requireString(payload.destination, 'destination');
   const role = normalizeRole(payload.role);
   const tariffId = normalizeTariffId(payload.tariffId || payload.tariff);
+  const serviceType = normalizeOrderServiceType(payload.serviceType || payload.orderType || payload.kind);
   const optionsTotal = readNumber(payload.optionsTotal, estimateOptionsTotal(payload.options));
   const minimumPrice = readNumber(payload.minimumPrice, getTariffMinimum(tariffId) + optionsTotal);
   const preset = findLocalRoutePreset(pickup, destination);
@@ -1655,19 +1721,20 @@ function estimateRouteFare(payload) {
       : 9);
   const durationMin = preset?.durationMin ?? Math.max(8, Math.round(distanceKm * 1.35 + 6));
   if (!isDriverLikeRole(role) && tariffId === 'economy') {
+    const economyBase = serviceType === 'delivery' ? 160 : 120;
     return {
       calculatedAt: new Date().toISOString(),
       confidence: preset ? 'preset' : pickupPoint && destinationPoint ? 'estimated' : 'draft',
       currency: 'RUB',
       distanceKm: roundDistance(distanceKm),
-      distancePrice: 120,
+      distancePrice: economyBase,
       durationMin,
       eta: `${durationMin} мин`,
       note: 'фикс по Малоязу',
       provider: makeGeoProviderMeta('local'),
       surgeCoefficient: 1,
       tariffId,
-      total: 120 + optionsTotal,
+      total: economyBase + optionsTotal,
     };
   }
 
@@ -1822,6 +1889,179 @@ function getDistanceKm(left, right) {
     Math.cos(leftLat) * Math.cos(rightLat) * Math.sin(lonDelta / 2) * Math.sin(lonDelta / 2);
 
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function getOrderPickupPoint(order) {
+  return (
+    readGeoPoint(order.pickupPoint || order.pickupCoordinates || {}) ||
+    findRoutePoint(order.pickup)
+  );
+}
+
+function getDriverLocationPoint(driver, at = Date.now()) {
+  const location = driver?.lastLocation || driver?.location || driver?.coordinates || driver;
+  const point = readGeoPoint(location || {});
+
+  if (!point) {
+    return null;
+  }
+
+  const updatedAt = Date.parse(location.updatedAt || driver.locationUpdatedAt || driver.updatedAt || '');
+  const hasFreshTimestamp = Number.isFinite(updatedAt)
+    ? at - updatedAt <= driverLocationMaxAgeMinutes * 60 * 1000
+    : false;
+
+  if (!hasFreshTimestamp && !driver.coordinates && !driver.latitude) {
+    return null;
+  }
+
+  return point;
+}
+
+function isDriverBusy(db, driverId) {
+  const busyStatuses = new Set(['assigned', 'accepted', 'arrived', 'started']);
+
+  return db.orders.some(
+    (order) => String(order.driver?.id || '') === String(driverId) && busyStatuses.has(order.status),
+  );
+}
+
+function findNearestAvailableDriver(db, order) {
+  const pickupPoint = getOrderPickupPoint(order);
+
+  if (!pickupPoint) {
+    return null;
+  }
+
+  return db.drivers
+    .map((driver) => {
+      applyDriverAccessState(driver);
+      const driverPoint = getDriverLocationPoint(driver);
+
+      if (!driver.isOnline || !driver.canReceiveOrders || !driverPoint || isDriverBusy(db, driver.id)) {
+        return null;
+      }
+
+      return {
+        distanceKm: getDistanceKm(pickupPoint, driverPoint),
+        driver,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.distanceKm - right.distanceKm)[0] || null;
+}
+
+function isExclusiveOfferActive(order, at = Date.now()) {
+  if (!order?.exclusiveDriverId || order.exclusiveOfferStatus !== 'pending') {
+    return false;
+  }
+
+  const expiresAt = Date.parse(order.exclusiveOfferExpiresAt || '');
+
+  return Number.isFinite(expiresAt) && expiresAt > at;
+}
+
+function releaseExclusiveOffer(order, reason = 'expired') {
+  if (!order?.exclusiveDriverId || order.driver?.id || order.exclusiveOfferStatus !== 'pending') {
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  order.dispatchMode = 'feed';
+  order.dispatchStatus = reason === 'declined' ? 'driver_declined_open_feed' : 'open_feed';
+  order.exclusiveOfferStatus = reason === 'declined' ? 'declined' : 'expired';
+  order.exclusiveOfferReleasedAt = order.exclusiveOfferReleasedAt || now;
+  order.updatedAt = now;
+  addOrderStatusHistory(order, order.status, `exclusive-${reason}`);
+
+  return true;
+}
+
+async function publishOrderOpenFeed(db, order) {
+  const notification = addRealtimeNotification(db, {
+    audience: 'driver',
+    body: `${order.pickup} → ${order.destination} · ${order.total} ₽`,
+    kind: 'order_open_feed',
+    orderId: order.id,
+    title: 'Заказ открыт всем водителям',
+  });
+  await sendPushToDrivers(db, getAvailableDriverIds(db), notification, {
+    actionCategory: 'driver_order_offer',
+    orderId: order.id,
+    status: 'open_feed',
+  });
+  await sendPushToAdmins(db, notification, {
+    orderId: order.id,
+    status: 'open_feed',
+  });
+  broadcastRealtime('order_open_feed', { notification, order }, db);
+  return notification;
+}
+
+function scheduleExclusiveOfferRelease(db, orderId) {
+  const order = db.orders.find((item) => item.id === orderId);
+  const expiresAt = Date.parse(order?.exclusiveOfferExpiresAt || '');
+
+  if (!order || !Number.isFinite(expiresAt)) {
+    return;
+  }
+
+  const delayMs = Math.max(0, expiresAt - Date.now() + 150);
+
+  setTimeout(() => {
+    const currentOrder = db.orders.find((item) => item.id === orderId);
+
+    if (!releaseExclusiveOffer(currentOrder, 'expired')) {
+      return;
+    }
+
+    publishOrderOpenFeed(db, currentOrder)
+      .then(() => writeDb(db))
+      .catch((error) => {
+        console.error('[dispatch] failed to release exclusive offer', error);
+      });
+  }, delayMs);
+}
+
+function applyExclusiveOffer(db, order) {
+  const nearest = findNearestAvailableDriver(db, order);
+
+  if (!nearest?.driver) {
+    order.dispatchMode = 'feed';
+    order.dispatchStatus = 'open_feed';
+    return null;
+  }
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + dispatchExclusiveOfferSeconds * 1000);
+  order.dispatchMode = 'exclusive';
+  order.dispatchStatus = 'exclusive_offer';
+  order.exclusiveDriverId = nearest.driver.id;
+  order.exclusiveDriverName = nearest.driver.name;
+  order.exclusiveOfferCreatedAt = now.toISOString();
+  order.exclusiveOfferExpiresAt = expiresAt.toISOString();
+  order.exclusiveOfferSeconds = dispatchExclusiveOfferSeconds;
+  order.exclusiveOfferStatus = 'pending';
+  order.exclusiveDistanceKm = roundDistance(nearest.distanceKm);
+
+  return nearest;
+}
+
+async function releaseExpiredExclusiveOffers(db) {
+  const releasedOrders = db.orders.filter((order) => isExclusiveOfferActive(order) === false)
+    .filter((order) => order.exclusiveDriverId && order.exclusiveOfferStatus === 'pending' && !order.driver?.id);
+
+  if (releasedOrders.length === 0) {
+    return [];
+  }
+
+  for (const order of releasedOrders) {
+    if (releaseExclusiveOffer(order, 'expired')) {
+      await publishOrderOpenFeed(db, order);
+    }
+  }
+
+  return releasedOrders;
 }
 
 function toRadians(value) {
@@ -2042,11 +2282,13 @@ function readBody(request) {
 function makeOrder(payload) {
   const now = new Date().toISOString();
   const role = normalizeRole(payload.role);
+  const serviceType = normalizeOrderServiceType(payload.serviceType || payload.orderType || payload.kind);
   const status = isDriverLikeRole(role) ? 'accepted' : isParkAdminRole(role) ? 'created' : 'searching';
   const safetyPinRequired = payload.safetyPinRequired === false || payload.tripPinEnabled === false ? false : true;
   const paymentMethod = String(payload.paymentMethod || 'Наличные');
   const pickup = requireString(payload.pickup, 'pickup');
   const destination = requireString(payload.destination, 'destination');
+  const pickupPoint = readGeoPoint(payload.pickupPoint || payload.pickupCoordinates || payload);
   const routeEstimate = estimateRouteFare({
     destination,
     minimumPrice: Number(payload.total || 0),
@@ -2054,6 +2296,7 @@ function makeOrder(payload) {
     optionsTotal: payload.optionsTotal,
     pickup,
     role,
+    serviceType,
     tariff: payload.tariff,
     tariffId: payload.tariffId,
   });
@@ -2070,8 +2313,16 @@ function makeOrder(payload) {
   return {
     id: `TX-${Date.now().toString().slice(-6)}`,
     role,
+    serviceType,
     pickup,
+    pickupPoint: pickupPoint || findRoutePoint(pickup) || undefined,
     destination,
+    deliveryHandoff: payload.deliveryHandoff ? String(payload.deliveryHandoff).trim() : undefined,
+    deliveryPackageType: payload.deliveryPackageType ? String(payload.deliveryPackageType).trim() : undefined,
+    packageDescription: payload.packageDescription ? String(payload.packageDescription).trim() : undefined,
+    recipientName: payload.recipientName ? String(payload.recipientName).trim() : undefined,
+    recipientPhone: payload.recipientPhone ? String(payload.recipientPhone).trim() : undefined,
+    deliveryComment: payload.deliveryComment ? String(payload.deliveryComment).trim() : undefined,
     tariff: String(payload.tariff || 'Эконом'),
     tariffId,
     total,
@@ -2136,6 +2387,10 @@ function normalizeRole(value) {
   return ['client', 'self_employed_driver', 'park_admin', 'park_driver'].includes(value)
     ? value
     : 'client';
+}
+
+function normalizeOrderServiceType(value) {
+  return String(value || '').trim().toLowerCase() === 'delivery' ? 'delivery' : 'taxi';
 }
 
 function isSelfEmployedDriverRole(value) {
@@ -2237,6 +2492,7 @@ function normalizeOrder(order) {
     ...order,
     paymentMethod: String(order.paymentMethod || 'Наличные'),
     role: normalizeRole(order.role),
+    serviceType: normalizeOrderServiceType(order.serviceType || order.orderType || order.kind),
     total: Number(order.total || 0),
   };
   const paymentStatus = normalizePaymentStatus(
@@ -2275,6 +2531,12 @@ function normalizeOrder(order) {
   normalizedOrder.fulfilledByRole = normalizeFulfilledByRole(order.fulfilledByRole, normalizedOrder.role);
   normalizedOrder.parkId = order.parkId ? String(order.parkId) : undefined;
   normalizedOrder.quoteId = order.quoteId || order.quote_id || undefined;
+  normalizedOrder.deliveryHandoff = order.deliveryHandoff ? String(order.deliveryHandoff) : undefined;
+  normalizedOrder.deliveryPackageType = order.deliveryPackageType ? String(order.deliveryPackageType) : undefined;
+  normalizedOrder.packageDescription = order.packageDescription ? String(order.packageDescription) : undefined;
+  normalizedOrder.recipientName = order.recipientName ? String(order.recipientName) : undefined;
+  normalizedOrder.recipientPhone = order.recipientPhone ? String(order.recipientPhone) : undefined;
+  normalizedOrder.deliveryComment = order.deliveryComment ? String(order.deliveryComment) : undefined;
   normalizedOrder.serviceShareStatus = normalizeServiceShareStatus(
     order.serviceShareStatus,
     Number(order.serviceShareAmount || 0) > 0 ? 'pending_transfer' : 'not_applicable',
@@ -2365,14 +2627,63 @@ function updateOrderPayment(order, status, actor = 'system', note = '') {
   }
 }
 
-function settleOrderPayment(order, actor = 'system') {
-  if (order.paymentStatus !== 'paid') {
-    updateOrderPayment(order, 'paid', actor, `Payment captured after ${order.status}`);
+function getOrderSettlementDate(order) {
+  return String(order.serviceShareBatchDate || order.completedAt || order.updatedAt || new Date().toISOString()).slice(0, 10);
+}
+
+function getOrderSettlementTimestamp(order) {
+  return Date.parse(order.completedAt || order.updatedAt || order.createdAt || '') || 0;
+}
+
+function countRealDriverCompletedOrdersUntil(db, driverId, timestamp) {
+  return db.orders.filter((item) => {
+    const itemTimestamp = getOrderSettlementTimestamp(item);
+
+    return (
+      String(item.driver?.id || '') === String(driverId) &&
+      ['closed', 'completed'].includes(item.status) &&
+      !item.isTestOrder &&
+      !item.disputeStatus &&
+      itemTimestamp > 0 &&
+      itemTimestamp <= timestamp
+    );
+  }).length;
+}
+
+function ensureDriverTrialStarted(driver, orderTimestamp) {
+  if (!driver || driver.employmentType === 'park_driver' || driver.parkId || driver.commissionTrialStartedAt) {
+    return;
   }
 
-  const billingMode = normalizeBillingMode(order.driver?.billingMode || order.billingMode);
+  const startedAt = new Date(orderTimestamp || Date.now());
+  const endsAt = new Date(startedAt);
+  endsAt.setDate(endsAt.getDate() + referralRewards.driverTrialDays);
+  driver.commissionTrialStartedAt = startedAt.toISOString();
+  driver.commissionTrialEndsAt = endsAt.toISOString();
+  driver.commissionTrialOrderLimit = driverTrialFreeOrderLimit;
+  driver.workMode = driver.workMode || 'trial';
+}
+
+function isDriverTrialActiveForOrder(db, driver, order) {
+  if (!driver || driver.employmentType === 'park_driver' || driver.parkId) {
+    return false;
+  }
+
+  const orderTimestamp = getOrderSettlementTimestamp(order) || Date.now();
+  ensureDriverTrialStarted(driver, orderTimestamp);
+
+  const trialEndsAt = Date.parse(driver.commissionTrialEndsAt || '');
+  const completedUntilOrder = countRealDriverCompletedOrdersUntil(db, driver.id, orderTimestamp);
+
+  return (
+    Number.isFinite(trialEndsAt) &&
+    orderTimestamp <= trialEndsAt &&
+    completedUntilOrder <= driverTrialFreeOrderLimit
+  );
+}
+
+function applyOrderSettlement(order, billingMode, serviceShareRate, driverDailyOrderNumber) {
   const driverCollectedAmount = Number(order.total || 0);
-  const serviceShareRate = order.fulfilledByRole === 'park_driver' ? 0 : getDriverAccessPlan(billingMode).commissionPercent;
   const serviceShareAmount = Math.round((driverCollectedAmount * serviceShareRate) / 100);
   const driverNetAmount = Math.max(0, driverCollectedAmount - serviceShareAmount);
   const existingShareStatus = order.serviceShareStatus;
@@ -2387,12 +2698,59 @@ function settleOrderPayment(order, actor = 'system') {
   order.driverCollectedAmount = driverCollectedAmount;
   order.driverCommissionRate = serviceShareRate;
   order.driverCommission = serviceShareAmount;
+  order.driverDailyOrderNumber = driverDailyOrderNumber;
   order.driverNetAmount = driverNetAmount;
   order.driverPayout = driverNetAmount;
   order.serviceShareRate = serviceShareRate;
   order.serviceShareAmount = serviceShareAmount;
+  order.serviceShareBatchDate = getOrderSettlementDate(order);
   order.serviceShareStatus = serviceShareStatus;
-  order.serviceShareBatchDate = String(order.completedAt || order.updatedAt || new Date().toISOString()).slice(0, 10);
+}
+
+function recalculateDriverDailyServiceShare(db, driverId, batchDate) {
+  const targetDate = String(batchDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
+  const completedOrders = db.orders
+    .filter(
+      (item) =>
+        ['closed', 'completed'].includes(item.status) &&
+        String(item.driver?.id || '') === String(driverId) &&
+        getOrderSettlementDate(item) === targetDate,
+    )
+    .sort((left, right) => getOrderSettlementTimestamp(left) - getOrderSettlementTimestamp(right));
+
+  completedOrders.forEach((item, index) => {
+    const driver = db.drivers.find((driverItem) => driverItem.id === item.driver?.id);
+    const driverSnapshot = { ...(driver || {}), ...(item.driver || {}) };
+    const orderTimestamp = getOrderSettlementTimestamp(item) || Date.now();
+    const billingMode = item.fulfilledByRole === 'park_driver'
+      ? 'monthly'
+      : getEffectiveDriverBillingMode(driverSnapshot, orderTimestamp);
+    const trialActive = billingMode !== 'monthly' && isDriverTrialActiveForOrder(db, driver, item);
+    const serviceShareRate =
+      item.fulfilledByRole === 'park_driver' || billingMode === 'monthly' || trialActive
+        ? 0
+        : getDriverDailyCommissionPercent(index + 1);
+
+    applyOrderSettlement(item, billingMode, serviceShareRate, index + 1);
+    item.driverTrialActive = trialActive;
+    item.driverTrialRemainingOrders = trialActive
+      ? Math.max(0, driverTrialFreeOrderLimit - countRealDriverCompletedOrdersUntil(db, item.driver?.id, orderTimestamp))
+      : 0;
+  });
+}
+
+function settleOrderPayment(db, order, actor = 'system') {
+  if (order.paymentStatus !== 'paid') {
+    updateOrderPayment(order, 'paid', actor, `Payment captured after ${order.status}`);
+  }
+
+  const batchDate = getOrderSettlementDate(order);
+  order.serviceShareBatchDate = batchDate;
+  if (order.driver?.id) {
+    recalculateDriverDailyServiceShare(db, order.driver.id, batchDate);
+  } else {
+    applyOrderSettlement(order, 'commission', getDriverDailyCommissionPercent(1), 1);
+  }
 
   if (!order.receipt) {
     order.receipt = createReceipt(order);
@@ -2402,12 +2760,9 @@ function settleOrderPayment(order, actor = 'system') {
 function makeServiceShareSummary(db, batchDate = new Date().toISOString().slice(0, 10)) {
   const targetDate = String(batchDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
   const orders = db.orders.filter((order) => {
-    const serviceShareAmount = Number(order.serviceShareAmount || order.driverCommission || 0);
-
     return (
       ['closed', 'completed'].includes(order.status) &&
-      order.serviceShareBatchDate === targetDate &&
-      serviceShareAmount > 0
+      getOrderSettlementDate(order) === targetDate
     );
   });
   const byDriver = new Map();
@@ -2430,19 +2785,31 @@ function makeServiceShareSummary(db, batchDate = new Date().toISOString().slice(
     if (!byDriver.has(driverId)) {
       byDriver.set(driverId, {
         confirmedAmount: 0,
+        currentCommissionPercent: 0,
+        billingMode: normalizeBillingMode(order.driverBillingMode || order.driver?.billingMode),
         driverId,
         driverName,
         ordersCount: 0,
         pendingTransferAmount: 0,
         reportedTransferAmount: 0,
+        settlementStatus: 'not_applicable',
+        subscriptionExpiresAt: order.driver?.subscriptionExpiresAt || order.driver?.accessExpiresAt,
+        subscriptionPlan: order.driver?.subscriptionPlan || (order.driverBillingMode === 'monthly' ? 'partner_pro' : 'commission'),
         totalCollectedAmount: 0,
+        totalDriverNetAmount: 0,
         totalServiceShareAmount: 0,
       });
     }
 
     const driverSummary = byDriver.get(driverId);
     driverSummary.ordersCount += 1;
+    driverSummary.billingMode = normalizeBillingMode(order.driverBillingMode || order.driver?.billingMode);
+    driverSummary.currentCommissionPercent = Number(order.serviceShareRate || order.driverCommissionRate || 0);
+    driverSummary.subscriptionExpiresAt = order.driver?.subscriptionExpiresAt || order.driver?.accessExpiresAt;
+    driverSummary.subscriptionPlan =
+      order.driver?.subscriptionPlan || (driverSummary.billingMode === 'monthly' ? 'partner_pro' : 'commission');
     driverSummary.totalCollectedAmount += collectedAmount;
+    driverSummary.totalDriverNetAmount += Number(order.driverNetAmount || Math.max(0, collectedAmount - serviceShareAmount));
     driverSummary.totalServiceShareAmount += serviceShareAmount;
     summary.totalCollectedAmount += collectedAmount;
     summary.totalServiceShareAmount += serviceShareAmount;
@@ -2459,12 +2826,33 @@ function makeServiceShareSummary(db, batchDate = new Date().toISOString().slice(
     }
   }
 
+  for (const driverSummary of byDriver.values()) {
+    if (driverSummary.billingMode === 'monthly' || driverSummary.subscriptionPlan === 'partner_pro') {
+      driverSummary.currentCommissionPercent = 0;
+      driverSummary.settlementStatus = 'not_applicable';
+      continue;
+    }
+
+    driverSummary.currentCommissionPercent = getDriverDailyCommissionPercent(driverSummary.ordersCount + 1);
+    if (driverSummary.totalServiceShareAmount <= 0) {
+      driverSummary.settlementStatus = 'not_applicable';
+    } else if (driverSummary.confirmedAmount >= driverSummary.totalServiceShareAmount) {
+      driverSummary.settlementStatus = 'confirmed';
+    } else if (driverSummary.reportedTransferAmount > 0) {
+      driverSummary.settlementStatus = 'reported_transferred';
+    } else {
+      driverSummary.settlementStatus = 'pending_transfer';
+    }
+  }
+
   return {
     date: targetDate,
     drivers: Array.from(byDriver.values()).sort((left, right) =>
       right.totalServiceShareAmount - left.totalServiceShareAmount,
     ),
     orders: orders.map((order) => ({
+      commissionPercent: Number(order.serviceShareRate || order.driverCommissionRate || 0),
+      dailyOrderNumber: Number(order.driverDailyOrderNumber || 0),
       driverId: order.driver?.id,
       driverName: order.driver?.name,
       id: order.id,
@@ -2525,11 +2913,47 @@ function createReceipt(order) {
 }
 
 function normalizeBillingMode(value) {
-  return value === 'commission' ? 'commission' : 'monthly';
+  return value === 'monthly' ? 'monthly' : 'commission';
 }
 
 function getDriverAccessPlan(value) {
-  return driverAccessPlans[normalizeBillingMode(value)] || driverAccessPlans.monthly;
+  return driverAccessPlans[normalizeBillingMode(value)] || driverAccessPlans.commission;
+}
+
+function getDriverDailyCommissionPercent(orderNumber) {
+  if (orderNumber >= 21) {
+    return 3;
+  }
+
+  if (orderNumber >= 16) {
+    return 5;
+  }
+
+  return 7;
+}
+
+function maskPaymentCardNumber(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+
+  if (digits.length < 4) {
+    return '';
+  }
+
+  return `**** **** **** ${digits.slice(-4)}`;
+}
+
+function isDriverPartnerProActive(driver, at = Date.now()) {
+  if (!driver || normalizeBillingMode(driver.billingMode) !== 'monthly' || driver.subscriptionStatus !== 'active') {
+    return false;
+  }
+
+  const expiresAt = Date.parse(driver.subscriptionExpiresAt || driver.accessExpiresAt || '');
+  const timestamp = at instanceof Date ? at.getTime() : Number(at);
+  return Number.isFinite(expiresAt) && Number.isFinite(timestamp) && expiresAt > timestamp;
+}
+
+function getEffectiveDriverBillingMode(driver, at = Date.now()) {
+  return isDriverPartnerProActive(driver, at) ? 'monthly' : 'commission';
 }
 
 function normalizeDriverPaymentProvider(provider = driverPaymentProvider) {
@@ -3174,7 +3598,7 @@ async function makeDriverSubscriptionPayment(driver, payload = {}) {
   const amount = Number(payload.amount ?? plan.monthlyPrice);
   const provider = normalizeDriverPaymentProvider(payload.provider || driverPaymentProvider);
   const shouldUseProvider = shouldUseLivePaymentProvider(provider, amount);
-  const shouldCaptureNow = !shouldUseProvider && (provider.mode !== 'live' || amount === 0 || payload.captureNow === true);
+  const shouldCaptureNow = !shouldUseProvider && (payload.captureNow === true || amount === 0);
 
   assertSupportedLiveProvider(provider, amount);
 
@@ -3194,6 +3618,10 @@ async function makeDriverSubscriptionPayment(driver, payload = {}) {
     createdAt: now,
     updatedAt: now,
   };
+
+  if (!shouldCaptureNow && payment.billingMode === 'monthly') {
+    payment.providerPaymentStatus = 'awaiting_manual_transfer';
+  }
 
   if (payment.status === 'paid') {
     payment.paidAt = now;
@@ -3236,6 +3664,8 @@ function applyDriverAccessFromPayment(driver, payment) {
   const plan = getDriverAccessPlan(payment.billingMode);
 
   driver.billingMode = payment.billingMode;
+  driver.driverTariff = plan.name;
+  driver.subscriptionPlan = payment.billingMode === 'monthly' ? 'partner_pro' : 'commission';
 
   if (payment.status !== 'paid') {
     driver.updatedAt = new Date().toISOString();
@@ -3257,10 +3687,12 @@ function applyDriverAccessFromPayment(driver, payment) {
     }
 
     driver.accessExpiresAt = payment.accessExpiresAt;
+    driver.subscriptionExpiresAt = payment.accessExpiresAt;
   } else {
     payment.accessStartsAt = now.toISOString();
     payment.accessExpiresAt = undefined;
     driver.accessExpiresAt = undefined;
+    driver.subscriptionExpiresAt = undefined;
     driver.commissionTrialEndsAt = undefined;
     driver.commissionBillingStartedAt = driver.commissionBillingStartedAt || now.toISOString();
   }
@@ -3307,12 +3739,19 @@ function refundDriverSubscriptionPayment(db, payment, reason = 'Refund requested
 
     if (replacement) {
       driver.billingMode = replacement.billingMode;
+      driver.driverTariff = getDriverAccessPlan(replacement.billingMode).name;
       driver.subscriptionStatus = 'active';
       driver.accessExpiresAt = replacement.accessExpiresAt;
+      driver.subscriptionExpiresAt = replacement.accessExpiresAt;
+      driver.subscriptionPlan = replacement.billingMode === 'monthly' ? 'partner_pro' : 'commission';
       driver.lastPaymentId = replacement.id;
     } else if (driver.lastPaymentId === payment.id || driver.accessExpiresAt === payment.accessExpiresAt) {
+      driver.billingMode = 'commission';
+      driver.driverTariff = getDriverAccessPlan('commission').name;
       driver.subscriptionStatus = 'inactive';
       driver.accessExpiresAt = undefined;
+      driver.subscriptionExpiresAt = undefined;
+      driver.subscriptionPlan = 'commission';
       driver.lastPaymentId = undefined;
       driver.isOnline = false;
     }
@@ -4524,7 +4963,7 @@ function makeReferral(inviter, invitee, code) {
     note:
       isDriverLikeRole(inviteeRole)
         ? `Водитель получит ${referralRewards.driverTrialDays} дней доступа после одобрения; пригласивший получит бонус после первых ${referralRewards.driverQualificationOrders} заказов.`
-        : `Клиент получил бонус на первую поездку; пригласивший получит бонус после первых ${referralRewards.clientQualificationOrders} завершенных поездок клиента.`,
+        : `Пригласивший получит бонус после первых ${referralRewards.clientQualificationOrders} завершенных поездок клиента.`,
   };
 }
 
@@ -5253,7 +5692,7 @@ function attachReferral(db, invitee, rawCode) {
   db.referrals.unshift(referral);
   addReferralAudit(db, referral.id, 'created', invitee.id, `Регистрация по коду ${code}`);
 
-  if (invitee.role === 'client') {
+  if (invitee.role === 'client' && referralRewards.invitedClientBonus > 0) {
     creditWallet(
       db,
       invitee.id,
@@ -5338,26 +5777,29 @@ function settleDriverReferralForOrder(db, order) {
   }
 
   const completedOrders = db.orders.filter(
-    (item) => item.driver?.id === driver.id && ['closed', 'completed'].includes(item.status),
+    (item) =>
+      item.driver?.id === driver.id &&
+      ['closed', 'completed'].includes(item.status) &&
+      !item.isTestOrder &&
+      !item.disputeStatus,
   ).length;
 
   if (completedOrders < referralRewards.driverQualificationOrders) {
-    referral.status = 'qualified';
-    referral.qualifiedAt = referral.qualifiedAt || new Date().toISOString();
-    addReferralAudit(db, referral.id, 'qualified', 'system', `Прогресс водителя: ${completedOrders}/${referralRewards.driverQualificationOrders}`);
+    referral.status = 'registered';
+    addReferralAudit(db, referral.id, 'registered', 'system', `Прогресс водителя: ${completedOrders}/${referralRewards.driverQualificationOrders}`);
     return;
   }
 
-  rewardReferral(
-    db,
-    referral,
-    'Бонус за приглашенного водителя после квалификации',
-  );
+  referral.status = 'qualified';
+  referral.qualifiedAt = referral.qualifiedAt || new Date().toISOString();
+  referral.note = `Готов к начислению: водитель выполнил ${completedOrders}/${referralRewards.driverQualificationOrders} поездок.`;
+  addReferralAudit(db, referral.id, 'qualified', 'system', referral.note);
 }
 
 function makeDriverFromUser(user, payload, options = {}) {
   const employmentType = options.employmentType || (isParkDriverRole(user.role) ? 'park_driver' : 'self_employed');
   const isParkDriver = employmentType === 'park_driver';
+  const billingMode = isParkDriver ? 'monthly' : 'commission';
   return {
     id: `driver-${user.id}`,
     name: [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Водитель',
@@ -5367,7 +5809,9 @@ function makeDriverFromUser(user, payload, options = {}) {
     plate: String(payload.carPlate || ''),
     status: 'pending',
     isOnline: false,
-    billingMode: 'monthly',
+    billingMode,
+    driverTariff: getDriverAccessPlan(billingMode).name,
+    subscriptionPlan: billingMode === 'monthly' ? 'partner_pro' : 'commission',
     subscriptionStatus: isParkDriver ? 'active' : 'inactive',
     canReceiveOrders: false,
     contractStatus: 'pending',
@@ -5468,17 +5912,33 @@ function getParkSubscriptionSummary(park) {
 }
 
 function normalizeDriver(driver) {
+  const billingMode = normalizeBillingMode(driver.billingMode);
+  const subscriptionExpiresAt = driver.subscriptionExpiresAt || driver.accessExpiresAt;
+  const plan = getDriverAccessPlan(billingMode);
+  const trialEndsAt = Date.parse(driver.commissionTrialEndsAt || '');
+  const trialStillOpen = Number.isFinite(trialEndsAt) && trialEndsAt > Date.now();
+  const subscriptionStatus = normalizeDriverSubscriptionStatus(driver);
+  const workMode =
+    billingMode === 'monthly' && subscriptionStatus === 'active'
+      ? 'partner_pro'
+      : driver.commissionTrialStartedAt && trialStillOpen
+        ? 'trial'
+        : 'commission';
   const normalizedDriver = {
     ...driver,
-    billingMode: normalizeBillingMode(driver.billingMode),
+    billingMode,
     contractStatus: normalizeDriverContractStatus(driver.contractStatus),
     documentReview: normalizeDriverDocumentReview(driver.documentReview, driver.documentsStatus),
     documentUploads: normalizeDriverDocumentUploads(driver.documentUploads),
     documentsStatus: normalizeDriverComplianceStatus(driver.documentsStatus, driver),
+    driverTariff: plan.name,
     registryStatus: normalizeDriverRegistryStatus(driver.registryStatus, driver),
-    subscriptionStatus: normalizeDriverSubscriptionStatus(driver),
+    subscriptionExpiresAt: subscriptionExpiresAt ? String(subscriptionExpiresAt) : undefined,
+    subscriptionPlan: billingMode === 'monthly' ? 'partner_pro' : 'commission',
+    subscriptionStatus,
     taxProfileStatus: normalizeDriverComplianceStatus(driver.taxProfileStatus, driver),
     vehiclePermitStatus: normalizeDriverComplianceStatus(driver.vehiclePermitStatus, driver),
+    workMode,
   };
 
   normalizedDriver.accessBlockers = getDriverAccessBlockers(normalizedDriver);
@@ -5911,7 +6371,7 @@ function normalizeDriverSubscriptionStatus(driver) {
   const value = ['inactive', 'active', 'expired'].includes(driver.subscriptionStatus)
     ? driver.subscriptionStatus
     : 'inactive';
-  const expiresAt = Date.parse(driver.accessExpiresAt || '');
+  const expiresAt = Date.parse(driver.subscriptionExpiresAt || driver.accessExpiresAt || '');
 
   if (value === 'active' && Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
     return 'expired';
@@ -6051,6 +6511,10 @@ async function handleRequest(request, response) {
     const db = await readDb();
 
     if (request.method === 'GET' && url.pathname === '/realtime/snapshot') {
+      const releasedOffers = await releaseExpiredExclusiveOffers(db);
+      if (releasedOffers.length > 0) {
+        await writeDb(db);
+      }
       sendJson(response, 200, createRealtimeSnapshot(db));
       return;
     }
@@ -6137,6 +6601,7 @@ async function handleRequest(request, response) {
               optionsTotal: url.searchParams.get('optionsTotal'),
               pickup: url.searchParams.get('pickup'),
               role: url.searchParams.get('role'),
+              serviceType: url.searchParams.get('serviceType'),
               tariff: url.searchParams.get('tariff'),
               tariffId: url.searchParams.get('tariffId'),
             };
@@ -7139,10 +7604,91 @@ async function handleRequest(request, response) {
       return;
     }
 
+    if (request.method === 'GET' && url.pathname === '/admin/driver-payments') {
+      const sessionContext = getSessionContext(db, request);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
+      if (sessionContext.user.role !== 'admin') {
+        sendJson(response, 403, { error: 'Admin access required' });
+        return;
+      }
+
+      sendJson(response, 200, {
+        payments: db.driverPayments.map(normalizeDriverPayment),
+      });
+      return;
+    }
+
+    if (request.method === 'PATCH' && pathParts[0] === 'admin' && pathParts[1] === 'referrals' && pathParts[3] === 'status') {
+      const sessionContext = getSessionContext(db, request);
+      const payload = await readBody(request);
+      const referral = db.referrals.find((item) => item.id === pathParts[2]);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
+      if (sessionContext.user.role !== 'admin') {
+        sendJson(response, 403, { error: 'Admin access required' });
+        return;
+      }
+
+      if (!referral) {
+        sendJson(response, 404, { error: 'Referral not found' });
+        return;
+      }
+
+      const nextStatus = referralStatuses.includes(payload.status) ? payload.status : '';
+      if (!nextStatus) {
+        sendJson(response, 400, { error: 'Invalid referral status' });
+        return;
+      }
+
+      if (nextStatus === 'rewarded') {
+        rewardReferral(db, referral, payload.note || 'Реферальный бонус подтвержден администратором', sessionContext.user.id);
+      } else {
+        referral.status = nextStatus;
+        if (nextStatus === 'qualified') {
+          referral.qualifiedAt = referral.qualifiedAt || new Date().toISOString();
+        }
+        if (nextStatus === 'blocked') {
+          referral.blockedAt = referral.blockedAt || new Date().toISOString();
+        }
+        addReferralAudit(db, referral.id, nextStatus, sessionContext.user.id, payload.note || 'Статус изменен администратором');
+      }
+
+      await writeDb(db);
+      sendJson(response, 200, makeAdminReferralDashboard(db));
+      return;
+    }
+
     if (request.method === 'GET' && url.pathname === '/drivers') {
       const sessionContext = getSessionContext(db, request);
 
       sendJson(response, 200, { drivers: makeDriversResponse(db, sessionContext) });
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/driver-payments/settings') {
+      const sessionContext = getSessionContext(db, request);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
+      sendJson(response, 200, {
+        amount: driverAccessPlans.monthly.monthlyPrice,
+        cardMask: maskPaymentCardNumber(paymentCardNumber),
+        instructions:
+          'Для подключения тарифа переведите 3 990 ₽ на карту владельца проекта и отправьте чек администратору.',
+        planName: driverAccessPlans.monthly.name,
+      });
       return;
     }
 
@@ -7631,11 +8177,28 @@ async function handleRequest(request, response) {
         });
 
         db.driverPayments.unshift(payment);
+        const pendingRequest = db.driverPayments.find(
+          (item) =>
+            item.id !== payment.id &&
+            item.driverId === driver.id &&
+            item.billingMode === 'monthly' &&
+            item.status === 'pending',
+        );
+        if (pendingRequest) {
+          pendingRequest.status = 'paid';
+          pendingRequest.paidAt = pendingRequest.paidAt || payment.paidAt || new Date().toISOString();
+          pendingRequest.providerPaymentStatus = 'manual_admin_confirmed';
+          pendingRequest.updatedAt = new Date().toISOString();
+        }
         applyDriverAccessFromPayment(driver, payment);
       }
       if (driver.subscriptionStatus !== 'active') {
+        driver.billingMode = 'commission';
+        driver.driverTariff = getDriverAccessPlan('commission').name;
         driver.isOnline = false;
         driver.accessExpiresAt = undefined;
+        driver.subscriptionExpiresAt = undefined;
+        driver.subscriptionPlan = 'commission';
       }
       applyDriverAccessState(driver);
       driver.updatedAt = new Date().toISOString();
@@ -7686,6 +8249,16 @@ async function handleRequest(request, response) {
       }
 
       driver.isOnline = Boolean(payload.isOnline);
+      const locationPoint = readGeoPoint(payload.location || payload.lastLocation || payload);
+      if (driver.isOnline && locationPoint) {
+        driver.lastLocation = {
+          accuracy: readOptionalNumber(payload.accuracy ?? payload.location?.accuracy),
+          latitude: locationPoint.latitude,
+          longitude: locationPoint.longitude,
+          updatedAt: new Date().toISOString(),
+        };
+        driver.locationUpdatedAt = driver.lastLocation.updatedAt;
+      }
       driver.updatedAt = new Date().toISOString();
       const notification = notifyDriverChange(
         db,
@@ -7705,6 +8278,10 @@ async function handleRequest(request, response) {
     }
 
     if (request.method === 'GET' && url.pathname === '/orders') {
+      const releasedOffers = await releaseExpiredExclusiveOffers(db);
+      if (releasedOffers.length > 0) {
+        await writeDb(db);
+      }
       sendJson(response, 200, { orders: db.orders });
       return;
     }
@@ -7731,14 +8308,44 @@ async function handleRequest(request, response) {
     if (request.method === 'POST' && url.pathname === '/orders') {
       const payload = await readBody(request);
       const order = applyBonusToOrder(db, makeOrder(payload), payload);
+      const exclusiveOffer = applyExclusiveOffer(db, order);
       db.orders.unshift(order);
       const notification = notifyOrderChange(
         db,
         order,
-        'Новый заказ в ленте',
+        exclusiveOffer ? 'Заказ предложен ближайшему водителю' : 'Новый заказ в ленте',
         `${formatOrderRoute(order)} · ${order.total} ₽`,
         'order_created',
       );
+      if (exclusiveOffer?.driver) {
+        const driverNotification = addRealtimeNotification(db, {
+          audience: 'driver',
+          body: `${order.pickup} → ${order.destination} · ${order.total} ₽`,
+          driverId: exclusiveOffer.driver.id,
+          kind: 'dispatch_exclusive_offer',
+          orderId: order.id,
+          title: 'Заказ рядом с вами',
+        });
+        await sendPushToDriver(db, exclusiveOffer.driver.id, driverNotification, {
+          actionCategory: 'driver_order_offer',
+          distanceKm: order.exclusiveDistanceKm || '',
+          expiresInSeconds: order.exclusiveOfferSeconds || dispatchExclusiveOfferSeconds,
+          offerId: `${order.id}:${exclusiveOffer.driver.id}`,
+          orderId: order.id,
+          status: 'exclusive_offer',
+        });
+        scheduleExclusiveOfferRelease(db, order.id);
+      } else {
+        await sendPushToDrivers(db, getAvailableDriverIds(db), notification, {
+          actionCategory: 'driver_order_offer',
+          orderId: order.id,
+          status: 'open_feed',
+        });
+      }
+      await sendPushToAdmins(db, notification, {
+        orderId: order.id,
+        status: order.dispatchStatus || order.status,
+      });
       await writeDb(db);
       broadcastRealtime('order_created', { notification, order }, db);
       sendJson(response, 201, { order });
@@ -7783,7 +8390,7 @@ async function handleRequest(request, response) {
 
       if (['closed', 'completed'].includes(order.status)) {
         order.completedAt = order.completedAt || order.updatedAt;
-        settleOrderPayment(order, 'status-patch');
+        settleOrderPayment(db, order, 'status-patch');
       }
       settleClientReferralForOrder(db, order);
       settleDriverReferralForOrder(db, order);
@@ -7796,8 +8403,56 @@ async function handleRequest(request, response) {
         `${order.id}: ${getOrderStatusLabel(order.status)}.`,
         'order_status',
       );
+      await sendPushToUser(db, order.userId, notification, {
+        orderId: order.id,
+        status: order.status,
+      }, ['client']);
+      if (order.driver?.id) {
+        await sendPushToDriver(db, order.driver.id, notification, {
+          orderId: order.id,
+          status: order.status,
+        });
+      }
+      if (order.parkId) {
+        await sendPushToPark(db, order.parkId, notification, {
+          orderId: order.id,
+          status: order.status,
+        });
+      }
+      await sendPushToAdmins(db, notification, {
+        orderId: order.id,
+        status: order.status,
+      });
       await writeDb(db);
       broadcastRealtime('order_status', { notification, order }, db);
+      sendJson(response, 200, { order });
+      return;
+    }
+
+    if (request.method === 'PATCH' && pathParts[0] === 'orders' && pathParts[2] === 'offer') {
+      const payload = await readBody(request);
+      const order = db.orders.find((item) => item.id === pathParts[1]);
+      const driverId = String(payload.driverId || '');
+      const action = String(payload.action || '').trim();
+
+      if (!order) {
+        sendJson(response, 404, { error: 'Order not found' });
+        return;
+      }
+
+      if (action !== 'decline') {
+        sendJson(response, 400, { error: 'Unsupported offer action' });
+        return;
+      }
+
+      if (!isExclusiveOfferActive(order) || String(order.exclusiveDriverId || '') !== driverId) {
+        sendJson(response, 409, { error: 'Exclusive offer is not active for this driver', order });
+        return;
+      }
+
+      releaseExclusiveOffer(order, 'declined');
+      await publishOrderOpenFeed(db, order);
+      await writeDb(db);
       sendJson(response, 200, { order });
       return;
     }
@@ -8198,6 +8853,18 @@ async function handleRequest(request, response) {
         return;
       }
 
+      if (isExclusiveOfferActive(order) && String(order.exclusiveDriverId) !== String(driver.id)) {
+        sendJson(response, 409, {
+          error: 'Order is temporarily offered to another driver',
+          order,
+        });
+        return;
+      }
+
+      if (order.exclusiveDriverId && order.exclusiveOfferStatus === 'pending' && !isExclusiveOfferActive(order)) {
+        releaseExclusiveOffer(order, 'expired');
+      }
+
       if (!['created', 'searching'].includes(order.status)) {
         sendJson(response, 409, {
           error: 'Order is not open for dispatch',
@@ -8209,10 +8876,17 @@ async function handleRequest(request, response) {
       const now = new Date().toISOString();
       order.driver = {
         billingMode: driver.billingMode,
+        commissionTrialEndsAt: driver.commissionTrialEndsAt,
+        commissionTrialOrderLimit: driver.commissionTrialOrderLimit,
+        commissionTrialStartedAt: driver.commissionTrialStartedAt,
+        driverTariff: getDriverAccessPlan(driver.billingMode).name,
         id: driver.id,
         name: driver.name,
         phone: driver.phone,
         rating: driver.rating,
+        subscriptionExpiresAt: driver.subscriptionExpiresAt || driver.accessExpiresAt,
+        subscriptionPlan: driver.subscriptionPlan || (driver.billingMode === 'monthly' ? 'partner_pro' : 'commission'),
+        subscriptionStatus: driver.subscriptionStatus,
         vehicle: driver.vehicle,
         plate: driver.plate,
       };
@@ -8224,6 +8898,12 @@ async function handleRequest(request, response) {
       }
       order.acceptedAt = now;
       order.status = 'accepted';
+      if (String(order.exclusiveDriverId || '') === String(driver.id)) {
+        order.exclusiveOfferStatus = 'accepted';
+        order.dispatchStatus = 'accepted_from_exclusive';
+      } else {
+        order.dispatchStatus = 'accepted_from_feed';
+      }
       order.updatedAt = now;
       addOrderStatusHistory(order, order.status, driver.id);
       const notification = notifyOrderChange(
@@ -8233,6 +8913,20 @@ async function handleRequest(request, response) {
         `${driver.name} принял ${order.id}: ${formatOrderRoute(order)}.`,
         'order_assigned',
       );
+      await sendPushToUser(db, order.userId, notification, {
+        orderId: order.id,
+        status: order.status,
+      }, ['client']);
+      if (order.parkId) {
+        await sendPushToPark(db, order.parkId, notification, {
+          orderId: order.id,
+          status: order.status,
+        });
+      }
+      await sendPushToAdmins(db, notification, {
+        orderId: order.id,
+        status: order.status,
+      });
       await writeDb(db);
       broadcastRealtime('order_assigned', { notification, order }, db);
       sendJson(response, 200, { order });

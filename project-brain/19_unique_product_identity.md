@@ -1,4 +1,4 @@
-﻿# Unique Product Identity
+# Unique Product Identity
 
 ## Главная идея
 

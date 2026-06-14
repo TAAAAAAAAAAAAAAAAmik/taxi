@@ -37,8 +37,9 @@ export function RoleCard({ title, subtitle, active, Icon, onPress }: RoleCardPro
 
 const styles = StyleSheet.create({
   activeCard: {
-    backgroundColor: '#DDF1E7',
+    backgroundColor: '#F1F8F3',
     borderColor: kx.color.amber,
+    borderWidth: 1.5,
   },
   activeIconWrap: {
     backgroundColor: kx.color.amber,
@@ -49,12 +50,18 @@ const styles = StyleSheet.create({
   card: {
     alignItems: 'flex-start',
     backgroundColor: kx.surface.card,
-    borderColor: kx.color.amber,
+    borderColor: kx.border.muted,
     borderRadius: kx.radius.card,
     borderWidth: 1,
+    elevation: 1,
     flexDirection: 'row',
     gap: 12,
+    minHeight: 82,
     padding: 14,
+    shadowColor: kx.color.shadow,
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
   },
   copy: {
     flex: 1,
@@ -69,16 +76,18 @@ const styles = StyleSheet.create({
     width: 38,
   },
   pressedCard: {
-    opacity: 0.82,
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
   },
   subtitle: {
     color: kx.text.secondary,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   title: {
     color: kx.text.primary,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
+    lineHeight: 22,
   },
 });

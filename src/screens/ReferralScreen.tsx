@@ -13,7 +13,7 @@ import {
 } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
-import { isSelfEmployedDriverRole, roleCopy } from '../data/registration';
+import { AccountRole, isDriverLikeRole, roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { ReferralDashboard, ReferralRecord } from '../services/apiClient';
 import { useAppState } from '../state/AppState';
@@ -23,9 +23,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Referral'>;
 type InviteRole = 'client' | 'self_employed_driver';
 
 const referralStatusLabels = {
-  blocked: 'Заблокировано',
-  qualified: 'В процессе',
-  registered: 'Регистрация',
+  blocked: 'Отклонён',
+  qualified: 'Готов к начислению',
+  registered: 'Ожидает условия',
   rewarded: 'Начислено',
 };
 
@@ -36,22 +36,29 @@ export function ReferralScreen({ navigation, route }: Props) {
     referralDashboard,
     refreshReferralDashboard,
   } = useAppState();
-  const [activeInviteRole, setActiveInviteRole] = useState<InviteRole>('client');
+  const [activeInviteRole, setActiveInviteRole] = useState<InviteRole>(() => getDefaultInviteRole(role));
   const [copyStatus, setCopyStatus] = useState('');
 
   useEffect(() => {
     refreshReferralDashboard();
   }, [refreshReferralDashboard]);
 
-  const inviteCode = referralDashboard?.referralCode ?? currentUser?.referralCode ?? 'После входа';
-  const inviteUrl = createInviteUrl(referralDashboard, inviteCode, activeInviteRole);
+  useEffect(() => {
+    setActiveInviteRole(getDefaultInviteRole(role));
+  }, [role]);
+
+  const inviteCode = referralDashboard?.referralCode ?? currentUser?.referralCode;
+  const inviteCodeLabel = inviteCode ?? 'После входа';
+  const inviteUrl = inviteCode
+    ? createInviteUrl(referralDashboard, inviteCode, activeInviteRole)
+    : 'Войдите, чтобы получить ссылку';
   const rewards = referralDashboard?.rewards;
   const visibleReferrals = useMemo(
     () =>
       (referralDashboard?.referrals ?? []).filter(
         (referral) =>
           activeInviteRole === 'self_employed_driver'
-            ? isSelfEmployedDriverRole(referral.inviteeRole)
+            ? isDriverLikeRole(referral.inviteeRole)
             : referral.inviteeRole === activeInviteRole,
       ),
     [activeInviteRole, referralDashboard?.referrals],
@@ -60,13 +67,11 @@ export function ReferralScreen({ navigation, route }: Props) {
     activeInviteRole === 'self_employed_driver'
       ? {
           icon: <Car color="#008D49" size={20} strokeWidth={2.4} />,
-          reward: rewards?.driverReward ?? 300,
+          reward: rewards?.driverReward ?? 200,
           title: 'Пригласить водителя',
-          text: `Вы получите ${rewards?.driverReward ?? 300} ₽ после первых ${
+          text: `Вы получите ${rewards?.driverReward ?? 200} ₽ после ${
             rewards?.driverQualificationOrders ?? 10
-          } завершенных заказов водителя. Водитель получает ${
-            rewards?.driverTrialDays ?? 7
-          } дней доступа после одобрения.`,
+          } реальных завершенных поездок водителя. Бонус начисляет администратор после проверки.`,
         }
       : {
           icon: <UserRound color="#008D49" size={20} strokeWidth={2.4} />,
@@ -74,9 +79,7 @@ export function ReferralScreen({ navigation, route }: Props) {
           title: 'Пригласить клиента',
           text: `Вы получите ${rewards?.clientReward ?? 60} ₽ после первых ${
             rewards?.clientQualificationOrders ?? 5
-          } завершенных поездок клиента. Приглашенный получает ${
-            rewards?.invitedClientBonus ?? 300
-          } ₽ на первую поездку.`,
+          } завершенных поездок клиента.`,
         };
 
   const handleCopy = async (label: string, text: string) => {
@@ -85,6 +88,11 @@ export function ReferralScreen({ navigation, route }: Props) {
   };
 
   const handleShare = async () => {
+    if (!inviteCode) {
+      setCopyStatus('Код появится после входа');
+      return;
+    }
+
     await Share.share({
       message: `Такси Салават: ${inviteUrl}\nКод приглашения: ${inviteCode}`,
     });
@@ -121,13 +129,13 @@ export function ReferralScreen({ navigation, route }: Props) {
 
         <View style={styles.codeCard}>
           <Text style={styles.codeLabel}>Ваш личный код</Text>
-          <Text style={styles.codeValue}>{inviteCode}</Text>
+          <Text style={styles.codeValue}>{inviteCodeLabel}</Text>
           <Text style={styles.linkText}>{inviteUrl}</Text>
           <View style={styles.codeActions}>
             <ActionButton
               icon={<Copy color="#12382C" size={16} strokeWidth={2.4} />}
               label="Код"
-              onPress={() => handleCopy('Код', inviteCode)}
+              onPress={() => handleCopy('Код', inviteCode ?? 'Код появится после входа')}
             />
             <ActionButton
               icon={<Copy color="#12382C" size={16} strokeWidth={2.4} />}
@@ -216,6 +224,10 @@ export function ReferralScreen({ navigation, route }: Props) {
   );
 }
 
+function getDefaultInviteRole(role: AccountRole): InviteRole {
+  return role === 'client' ? 'client' : 'self_employed_driver';
+}
+
 async function copyToClipboard(text: string) {
   const host = globalThis as typeof globalThis & {
     navigator?: {
@@ -240,6 +252,10 @@ function createInviteUrl(
 ) {
   if (dashboard?.inviteUrls?.[inviteRole]) {
     return dashboard.inviteUrls[inviteRole];
+  }
+
+  if (inviteRole === 'self_employed_driver' && dashboard?.inviteUrls?.driver) {
+    return dashboard.inviteUrls.driver;
   }
 
   const baseUrl = dashboard?.inviteUrl ?? createFallbackInviteUrl(inviteCode);
@@ -297,7 +313,8 @@ function SegmentButton({ active, label, onPress }: { active: boolean; label: str
 function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
   const progress = referral.progress;
   const completed = progress?.completedOrders ?? 0;
-  const required = progress?.requiredOrders ?? (isSelfEmployedDriverRole(referral.inviteeRole) ? 10 : 5);
+  const isDriverReferral = isDriverLikeRole(referral.inviteeRole);
+  const required = progress?.requiredOrders ?? (isDriverReferral ? 10 : 5);
   const percent = progress?.percent ?? 0;
   const relation = referral.viewerRelation === 'invitee' ? 'Вас пригласили' : 'Вы пригласили';
 
@@ -306,10 +323,10 @@ function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
       <View style={styles.referralTop}>
         <View style={styles.referralCopy}>
           <Text style={styles.referralTitle}>
-            {relation}: {referral.inviteeName ?? (isSelfEmployedDriverRole(referral.inviteeRole) ? 'водитель' : 'клиент')}
+            {relation}: {referral.inviteeName ?? (isDriverReferral ? 'водитель' : 'клиент')}
           </Text>
           <Text style={styles.referralText}>
-              {isSelfEmployedDriverRole(referral.inviteeRole) ? 'Водитель' : 'Клиент'} · {referral.code}
+              {isDriverReferral ? 'Водитель' : 'Клиент'} · {referral.code}
           </Text>
         </View>
         <View style={styles.referralMeta}>

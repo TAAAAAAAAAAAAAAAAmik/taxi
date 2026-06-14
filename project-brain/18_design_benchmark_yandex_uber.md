@@ -1,4 +1,4 @@
-﻿# Design Benchmark: Yandex Go + Uber
+# Design Benchmark: Yandex Go + Uber
 
 ## Назначение
 

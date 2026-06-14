@@ -6,6 +6,19 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { AppStateProvider } from './src/state/AppState';
 import { kinetixColors } from './src/theme/kinetixTokens';
 
+const splashColors = {
+  background: kinetixColors.graphite,
+  brand: kinetixColors.textPrimary,
+  guideLine: 'rgba(0, 107, 182, 0.08)',
+  markerCore: kinetixColors.surface,
+  panel: 'rgba(255, 255, 255, 0.86)',
+  panelBorder: 'rgba(0, 141, 73, 0.18)',
+  route: kinetixColors.amber,
+  routeGlow: 'rgba(0, 141, 73, 0.32)',
+  routeSoft: 'rgba(0, 141, 73, 0.14)',
+  secondaryText: kinetixColors.textSecondary,
+} as const;
+
 export default function App() {
   const [splashVisible, setSplashVisible] = useState(true);
   const handleSplashDone = useCallback(() => setSplashVisible(false), []);
@@ -308,8 +321,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   backdropPanel: {
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-    borderColor: kinetixColors.line,
+    backgroundColor: splashColors.panel,
+    borderColor: splashColors.panelBorder,
     borderRadius: 8,
     borderWidth: 1,
     height: 178,
@@ -331,7 +344,7 @@ const styles = StyleSheet.create({
     marginTop: 28,
   },
   gridLine: {
-    backgroundColor: 'rgba(0, 141, 73, 0.1)',
+    backgroundColor: splashColors.guideLine,
     height: 1,
     position: 'absolute',
     width: '120%',
@@ -355,14 +368,14 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   logoKinetix: {
-    color: kinetixColors.textPrimary,
+    color: splashColors.brand,
     fontSize: 38,
     fontWeight: '900',
     letterSpacing: 0,
     lineHeight: 44,
   },
   logoPartner: {
-    color: kinetixColors.textSecondary,
+    color: splashColors.secondaryText,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0,
@@ -379,28 +392,28 @@ const styles = StyleSheet.create({
     width: 62,
   },
   markerCore: {
-    backgroundColor: kinetixColors.surface,
+    backgroundColor: splashColors.markerCore,
     borderRadius: 999,
     height: 8,
     width: 8,
   },
   markerPin: {
     alignItems: 'center',
-    backgroundColor: kinetixColors.amber,
-    borderColor: kinetixColors.surface,
+    backgroundColor: splashColors.route,
+    borderColor: splashColors.markerCore,
     borderRadius: 999,
     borderWidth: 2,
     height: 26,
     justifyContent: 'center',
-    shadowColor: kinetixColors.amber,
+    shadowColor: splashColors.routeGlow,
     shadowOffset: { height: 0, width: 0 },
     shadowOpacity: 0.34,
     shadowRadius: 16,
     width: 26,
   },
   markerPulse: {
-    backgroundColor: kinetixColors.amberSoft,
-    borderColor: kinetixColors.line,
+    backgroundColor: splashColors.routeSoft,
+    borderColor: splashColors.panelBorder,
     borderRadius: 999,
     borderWidth: 1,
     height: 38,
@@ -408,15 +421,15 @@ const styles = StyleSheet.create({
     width: 38,
   },
   markerStem: {
-    backgroundColor: kinetixColors.amber,
+    backgroundColor: splashColors.route,
     borderRadius: 999,
     height: 10,
     marginTop: -2,
     width: 3,
   },
   routeAnchor: {
-    backgroundColor: kinetixColors.surface,
-    borderColor: kinetixColors.amber,
+    backgroundColor: splashColors.markerCore,
+    borderColor: splashColors.route,
     borderRadius: 999,
     borderWidth: 3,
     height: 18,
@@ -434,10 +447,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   routeSegment: {
-    backgroundColor: kinetixColors.amber,
+    backgroundColor: splashColors.route,
     borderRadius: 999,
     position: 'absolute',
-    shadowColor: kinetixColors.amber,
+    shadowColor: splashColors.routeGlow,
     shadowOffset: { height: 0, width: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
@@ -465,13 +478,13 @@ const styles = StyleSheet.create({
   },
   splash: {
     alignItems: 'center',
-    backgroundColor: kinetixColors.graphite,
+    backgroundColor: splashColors.background,
     flex: 1,
     justifyContent: 'center',
     padding: 24,
   },
   splashText: {
-    color: kinetixColors.textSecondary,
+    color: splashColors.secondaryText,
     fontSize: 15,
     fontWeight: '600',
     lineHeight: 22,

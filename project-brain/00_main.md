@@ -22,3 +22,10 @@
 
 главное правило:
 не раздувать проект сразу. дти от малого к большему.
+
+# Навыки Codex
+
+- [[22_codex_skill_taxi_ui_ux]]
+- [[23_codex_skill_visual_qa]]
+- [[24_codex_skill_project_memory]]
+

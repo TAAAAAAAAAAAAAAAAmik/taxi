@@ -24,7 +24,7 @@ import { isDemoModeEnabled } from '../utils/runtimeFlags';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
-const roles: AccountRole[] = ['client', 'self_employed_driver', 'park_admin', 'park_driver'];
+const roles: AccountRole[] = ['client', 'self_employed_driver'];
 const roleIcons = {
   client: UserRound,
   self_employed_driver: Car,
@@ -104,10 +104,10 @@ export function LoginScreen({ navigation }: Props) {
         <View style={styles.header}>
           <Text style={styles.title}>Вход</Text>
           <Text style={styles.subtitle}>
-            Вход идет через MVP backend. Роль должна совпадать с аккаунтом.
+            Выберите тип аккаунта и войдите по телефону или email.
           </Text>
           <Text style={styles.serverText}>
-            {serverStatus === 'connected' ? 'Backend подключен' : serverMessage}
+            {serverStatus === 'connected' ? 'Сервер подключен' : serverMessage}
           </Text>
         </View>
 
@@ -241,8 +241,8 @@ export function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   adminButton: {
     alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
+    backgroundColor: '#F1F8F3',
+    borderColor: 'rgba(0, 141, 73, 0.28)',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -267,8 +267,8 @@ const styles = StyleSheet.create({
   },
   demoButton: {
     alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
+    backgroundColor: '#F7FBF8',
+    borderColor: 'rgba(18, 56, 44, 0.1)',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -296,27 +296,38 @@ const styles = StyleSheet.create({
   },
   form: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
     borderRadius: 8,
     borderWidth: 1,
+    elevation: 1,
     gap: 16,
     padding: 16,
+    shadowColor: 'rgba(18, 56, 44, 0.14)',
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
   },
   header: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
     borderRadius: 8,
     borderWidth: 1,
+    elevation: 1,
     gap: 8,
     padding: 18,
+    shadowColor: 'rgba(18, 56, 44, 0.14)',
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
   },
   input: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#557669',
+    borderColor: 'rgba(18, 56, 44, 0.16)',
     borderRadius: 8,
     borderWidth: 1,
     color: '#12382C',
     fontSize: 16,
+    fontWeight: '600',
     minHeight: 56,
     paddingHorizontal: 14,
   },
@@ -336,24 +347,29 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#F4FAF6',
+    backgroundColor: '#F6F8F5',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   pressed: {
     opacity: 0.92,
-    transform: [{ scale: 0.95 }],
+    transform: [{ scale: 0.98 }],
   },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: '#008D49',
     borderRadius: 8,
+    elevation: 2,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
     minHeight: 56,
     paddingHorizontal: 16,
+    shadowColor: 'rgba(0, 111, 58, 0.24)',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
   },
   primaryButtonMuted: {
     backgroundColor: '#008D49',
@@ -366,8 +382,8 @@ const styles = StyleSheet.create({
   },
   roleButton: {
     alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
+    backgroundColor: '#F7FBF8',
+    borderColor: 'rgba(18, 56, 44, 0.1)',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -398,7 +414,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   safeArea: {
-    backgroundColor: '#F4FAF6',
+    backgroundColor: '#F6F8F5',
     flex: 1,
   },
   sectionTitle: {

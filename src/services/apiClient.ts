@@ -171,6 +171,7 @@ export type CreateOrderPayload = OrderStatusSummary & {
   clientName?: string;
   clientPhone?: string;
   optionsTotal?: number;
+  pickupPoint?: ApiGeoPoint;
   routeEstimate?: ApiRouteEstimate;
   safetyPinRequired?: boolean;
   tariffId?: string;
@@ -194,18 +195,33 @@ export type DriverBillingDashboard = {
   activePayment?: DriverSubscriptionPayment;
 };
 
+export type DriverPaymentSettings = {
+  amount: number;
+  cardMask?: string;
+  instructions: string;
+  planName: string;
+};
+
 export type DriverServiceShareSummaryDriver = {
+  billingMode?: DriverBillingMode;
   confirmedAmount: number;
+  currentCommissionPercent?: number;
   driverId: string;
   driverName: string;
   ordersCount: number;
   pendingTransferAmount: number;
   reportedTransferAmount: number;
+  settlementStatus?: DriverServiceShareStatus;
+  subscriptionExpiresAt?: string;
+  subscriptionPlan?: string;
   totalCollectedAmount: number;
+  totalDriverNetAmount?: number;
   totalServiceShareAmount: number;
 };
 
 export type DriverServiceShareSummaryOrder = {
+  commissionPercent?: number;
+  dailyOrderNumber?: number;
   driverId?: string;
   driverName?: string;
   id: string;
@@ -512,6 +528,7 @@ export type ApiRouteEstimateRequest = {
   optionsTotal?: number;
   pickup: string;
   role: AccountRole;
+  serviceType?: 'delivery' | 'taxi';
   tariff?: string;
   tariffId?: string;
 };
@@ -530,7 +547,7 @@ export type ReferralCodeValidation = {
 };
 
 export type RealtimeNotification = {
-  audience: 'admin' | 'all' | 'client' | 'driver';
+  audience: 'admin' | 'all' | 'client' | 'driver' | 'park';
   body: string;
   createdAt: string;
   driverId?: string;
@@ -555,6 +572,7 @@ export type RealtimeEventPayload = {
   driver?: DriverProfile;
   notification?: RealtimeNotification;
   order?: AppOrder;
+  offer?: unknown;
   sentAt: string;
   snapshot: RealtimeSnapshot;
   type: string;
@@ -1130,6 +1148,10 @@ export async function fetchServiceShareSummary(date?: string) {
   return response.summary;
 }
 
+export async function fetchDriverPaymentSettings() {
+  return request<DriverPaymentSettings>('/driver-payments/settings');
+}
+
 export async function updateOrderServiceShareStatus(
   orderId: string,
   status: DriverServiceShareStatus,
@@ -1156,6 +1178,15 @@ export async function assignOrder(orderId: string, driverId: string) {
 export async function assignOrderWithStatus(orderId: string, driverId: string, status: string) {
   const response = await request<{ order: AppOrder }>(`/orders/${encodeURIComponent(orderId)}/assign`, {
     body: JSON.stringify({ driverId, status }),
+    method: 'PATCH',
+  });
+
+  return response.order;
+}
+
+export async function declineOrderOffer(orderId: string, driverId: string) {
+  const response = await request<{ order: AppOrder }>(`/orders/${encodeURIComponent(orderId)}/offer`, {
+    body: JSON.stringify({ action: 'decline', driverId }),
     method: 'PATCH',
   });
 
@@ -1189,6 +1220,18 @@ export async function ensureReferralCode(userId: string) {
 
 export async function fetchAdminReferralDashboard() {
   return request<AdminReferralDashboard>('/admin/referrals');
+}
+
+export async function updateAdminReferralStatus(referralId: string, status: ReferralStatus, note?: string) {
+  return request<AdminReferralDashboard>(`/admin/referrals/${encodeURIComponent(referralId)}/status`, {
+    body: JSON.stringify({ note, status }),
+    method: 'PATCH',
+  });
+}
+
+export async function fetchAdminDriverPayments() {
+  const response = await request<{ payments: DriverSubscriptionPayment[] }>('/admin/driver-payments');
+  return response.payments;
 }
 
 export async function fetchDrivers() {
@@ -1415,11 +1458,15 @@ export async function fetchDriverDocumentFile(
   };
 }
 
-export async function updateDriverAvailability(driverId: string, isOnline: boolean) {
+export async function updateDriverAvailability(
+  driverId: string,
+  isOnline: boolean,
+  location?: ApiGeoPoint & { accuracy?: number },
+) {
   const response = await request<{ driver: DriverProfile }>(
     `/drivers/${encodeURIComponent(driverId)}/availability`,
     {
-      body: JSON.stringify({ isOnline }),
+      body: JSON.stringify({ isOnline, location }),
       method: 'PATCH',
     },
   );
