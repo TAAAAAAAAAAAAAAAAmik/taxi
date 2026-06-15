@@ -8403,106 +8403,114 @@ async function handleRequest(request, response) {
 
     if (request.method === 'PATCH' && pathParts[0] === 'orders' && pathParts[2] === 'status') {
       const payload = await readBody(request);
-      const order = db.orders.find((item) => item.id === pathParts[1]);
+      // Смена статуса — через сериализованную критическую секцию: переход, расчёт
+      // (settlement) и реферальные/маркетинговые начисления идут на свежем состоянии
+      // под замком, чтобы не затирать параллельное назначение/оплату того же заказа.
+      const outcome = await mutateDb(async (db) => {
+        const order = db.orders.find((item) => item.id === pathParts[1]);
 
-      if (!order) {
-        sendJson(response, 404, { error: 'Order not found' });
-        return;
-      }
+        if (!order) {
+          return { status: 404, body: { error: 'Order not found' } };
+        }
 
-      const nextStatus = String(payload.status || order.status);
+        const nextStatus = String(payload.status || order.status);
 
-      if (
-        nextStatus === 'started' &&
-        order.safetyPinRequired &&
-        !order.safetyPinVerifiedAt &&
-        !isValidTripPin(order, payload.pinCode || payload.tripPin)
-      ) {
-        sendJson(response, 403, { error: 'Trip PIN does not match', order });
-        return;
-      }
+        if (
+          nextStatus === 'started' &&
+          order.safetyPinRequired &&
+          !order.safetyPinVerifiedAt &&
+          !isValidTripPin(order, payload.pinCode || payload.tripPin)
+        ) {
+          return { status: 403, body: { error: 'Trip PIN does not match', order } };
+        }
 
-      order.status = nextStatus;
-      order.updatedAt = new Date().toISOString();
-      addOrderStatusHistory(order, order.status, 'status-patch');
+        order.status = nextStatus;
+        order.updatedAt = new Date().toISOString();
+        addOrderStatusHistory(order, order.status, 'status-patch');
 
-      if (order.status === 'arrived') {
-        order.arrivedAt = order.arrivedAt || order.updatedAt;
-      }
+        if (order.status === 'arrived') {
+          order.arrivedAt = order.arrivedAt || order.updatedAt;
+        }
 
-      if (order.status === 'started') {
-        order.startedAt = order.startedAt || order.updatedAt;
-        order.safetyPinVerifiedAt = order.safetyPinRequired
-          ? order.safetyPinVerifiedAt || order.updatedAt
-          : order.safetyPinVerifiedAt;
-      }
+        if (order.status === 'started') {
+          order.startedAt = order.startedAt || order.updatedAt;
+          order.safetyPinVerifiedAt = order.safetyPinRequired
+            ? order.safetyPinVerifiedAt || order.updatedAt
+            : order.safetyPinVerifiedAt;
+        }
 
-      if (['closed', 'completed'].includes(order.status)) {
-        order.completedAt = order.completedAt || order.updatedAt;
-        settleOrderPayment(db, order, 'status-patch');
-      }
-      settleClientReferralForOrder(db, order);
-      settleDriverReferralForOrder(db, order);
-      settleMarketingForOrder(db, order);
+        if (['closed', 'completed'].includes(order.status)) {
+          order.completedAt = order.completedAt || order.updatedAt;
+          settleOrderPayment(db, order, 'status-patch');
+        }
+        settleClientReferralForOrder(db, order);
+        settleDriverReferralForOrder(db, order);
+        settleMarketingForOrder(db, order);
 
-      const notification = notifyOrderChange(
-        db,
-        order,
-        'Статус заказа обновлен',
-        `${order.id}: ${getOrderStatusLabel(order.status)}.`,
-        'order_status',
-      );
-      await sendPushToUser(db, order.userId, notification, {
-        orderId: order.id,
-        status: order.status,
-      }, ['client']);
-      if (order.driver?.id) {
-        await sendPushToDriver(db, order.driver.id, notification, {
+        const notification = notifyOrderChange(
+          db,
+          order,
+          'Статус заказа обновлен',
+          `${order.id}: ${getOrderStatusLabel(order.status)}.`,
+          'order_status',
+        );
+        await sendPushToUser(db, order.userId, notification, {
+          orderId: order.id,
+          status: order.status,
+        }, ['client']);
+        if (order.driver?.id) {
+          await sendPushToDriver(db, order.driver.id, notification, {
+            orderId: order.id,
+            status: order.status,
+          });
+        }
+        if (order.parkId) {
+          await sendPushToPark(db, order.parkId, notification, {
+            orderId: order.id,
+            status: order.status,
+          });
+        }
+        await sendPushToAdmins(db, notification, {
           orderId: order.id,
           status: order.status,
         });
-      }
-      if (order.parkId) {
-        await sendPushToPark(db, order.parkId, notification, {
-          orderId: order.id,
-          status: order.status,
-        });
-      }
-      await sendPushToAdmins(db, notification, {
-        orderId: order.id,
-        status: order.status,
+        broadcastRealtime('order_status', { notification, order }, db);
+
+        return { status: 200, body: { order } };
       });
-      await writeDb(db);
-      broadcastRealtime('order_status', { notification, order }, db);
-      sendJson(response, 200, { order });
+
+      sendJson(response, outcome.status, outcome.body);
       return;
     }
 
     if (request.method === 'PATCH' && pathParts[0] === 'orders' && pathParts[2] === 'offer') {
       const payload = await readBody(request);
-      const order = db.orders.find((item) => item.id === pathParts[1]);
       const driverId = String(payload.driverId || '');
       const action = String(payload.action || '').trim();
+      // Отклонение эксклюзивного оффера — под замком, чтобы не пересечься с принятием
+      // того же заказа другим водителем и не вернуть заказ в общий фид внахлёст.
+      const outcome = await mutateDb(async (db) => {
+        const order = db.orders.find((item) => item.id === pathParts[1]);
 
-      if (!order) {
-        sendJson(response, 404, { error: 'Order not found' });
-        return;
-      }
+        if (!order) {
+          return { status: 404, body: { error: 'Order not found' } };
+        }
 
-      if (action !== 'decline') {
-        sendJson(response, 400, { error: 'Unsupported offer action' });
-        return;
-      }
+        if (action !== 'decline') {
+          return { status: 400, body: { error: 'Unsupported offer action' } };
+        }
 
-      if (!isExclusiveOfferActive(order) || String(order.exclusiveDriverId || '') !== driverId) {
-        sendJson(response, 409, { error: 'Exclusive offer is not active for this driver', order });
-        return;
-      }
+        if (!isExclusiveOfferActive(order) || String(order.exclusiveDriverId || '') !== driverId) {
+          return { status: 409, body: { error: 'Exclusive offer is not active for this driver', order } };
+        }
 
-      releaseExclusiveOffer(order, 'declined');
-      await publishOrderOpenFeed(db, order);
-      await writeDb(db);
-      sendJson(response, 200, { order });
+        releaseExclusiveOffer(order, 'declined');
+        await publishOrderOpenFeed(db, order);
+
+        return { status: 200, body: { order } };
+      });
+
+      sendJson(response, outcome.status, outcome.body);
       return;
     }
 
@@ -8546,76 +8554,78 @@ async function handleRequest(request, response) {
     }
 
     if (request.method === 'PATCH' && pathParts[0] === 'orders' && pathParts[2] === 'service-share') {
-      const sessionContext = getSessionContext(db, request);
       const payload = await readBody(request);
-      const order = db.orders.find((item) => item.id === pathParts[1]);
-      const nextStatus = normalizeServiceShareStatus(payload.status, '');
+      // Передача доли сервиса — деньги; ведём под замком на свежем состоянии, чтобы
+      // параллельные обновления доли/статуса того же заказа не затирали друг друга.
+      const outcome = await mutateDb(async (db) => {
+        const sessionContext = getSessionContext(db, request);
+        const order = db.orders.find((item) => item.id === pathParts[1]);
+        const nextStatus = normalizeServiceShareStatus(payload.status, '');
 
-      if (!sessionContext) {
-        sendJson(response, 401, { error: 'Authentication required' });
-        return;
-      }
+        if (!sessionContext) {
+          return { status: 401, body: { error: 'Authentication required' } };
+        }
 
-      if (!order) {
-        sendJson(response, 404, { error: 'Order not found' });
-        return;
-      }
+        if (!order) {
+          return { status: 404, body: { error: 'Order not found' } };
+        }
 
-      if (!['pending_transfer', 'reported_transferred', 'confirmed'].includes(nextStatus)) {
-        sendJson(response, 400, { error: 'Invalid service share status' });
-        return;
-      }
+        if (!['pending_transfer', 'reported_transferred', 'confirmed'].includes(nextStatus)) {
+          return { status: 400, body: { error: 'Invalid service share status' } };
+        }
 
-      if (!['closed', 'completed'].includes(order.status)) {
-        sendJson(response, 409, { error: 'Service share can be updated only after trip completion' });
-        return;
-      }
+        if (!['closed', 'completed'].includes(order.status)) {
+          return { status: 409, body: { error: 'Service share can be updated only after trip completion' } };
+        }
 
-      if (Number(order.serviceShareAmount || order.driverCommission || 0) <= 0) {
-        sendJson(response, 400, { error: 'Order has no service share to transfer' });
-        return;
-      }
+        if (Number(order.serviceShareAmount || order.driverCommission || 0) <= 0) {
+          return { status: 400, body: { error: 'Order has no service share to transfer' } };
+        }
 
-      const driver = order.driver?.id
-        ? db.drivers.find((item) => item.id === order.driver.id)
-        : undefined;
+        const driver = order.driver?.id
+          ? db.drivers.find((item) => item.id === order.driver.id)
+          : undefined;
 
-      if (nextStatus === 'confirmed' && !isAdminSession(sessionContext)) {
-        sendJson(response, 403, { error: 'Admin access required to confirm transfer' });
-        return;
-      }
+        if (nextStatus === 'confirmed' && !isAdminSession(sessionContext)) {
+          return { status: 403, body: { error: 'Admin access required to confirm transfer' } };
+        }
 
-      if (
-        !isAdminSession(sessionContext) &&
-        (nextStatus !== 'reported_transferred' || !canAccessDriver(sessionContext, driver))
-      ) {
-        sendJson(response, 403, { error: 'Service share access denied' });
-        return;
-      }
+        if (
+          !isAdminSession(sessionContext) &&
+          (nextStatus !== 'reported_transferred' || !canAccessDriver(sessionContext, driver))
+        ) {
+          return { status: 403, body: { error: 'Service share access denied' } };
+        }
 
-      const actor = makeActorFromSession(sessionContext);
-      const actorLabel = `${actor.role}:${actor.id}`;
+        const actor = makeActorFromSession(sessionContext);
+        const actorLabel = `${actor.role}:${actor.id}`;
 
-      updateOrderServiceShare(
-        order,
-        nextStatus,
-        actorLabel,
-        payload.note || 'Service share status updated',
-      );
+        updateOrderServiceShare(
+          order,
+          nextStatus,
+          actorLabel,
+          payload.note || 'Service share status updated',
+        );
 
-      const notification = notifyOrderChange(
-        db,
-        order,
-        'Service share updated',
-        `${order.id}: ${order.serviceShareStatus}.`,
-        'order_service_share',
-      );
-      await writeDb(db);
-      broadcastRealtime('order_service_share', { notification, order }, db);
-      sendJson(response, 200, {
-        order,
-        summary: makeServiceShareSummary(db, order.serviceShareBatchDate),
+        const notification = notifyOrderChange(
+          db,
+          order,
+          'Service share updated',
+          `${order.id}: ${order.serviceShareStatus}.`,
+          'order_service_share',
+        );
+        broadcastRealtime('order_service_share', { notification, order }, db);
+
+        return {
+          status: 200,
+          body: {
+            order,
+            summary: makeServiceShareSummary(db, order.serviceShareBatchDate),
+          },
+        };
       });
+
+      sendJson(response, outcome.status, outcome.body);
       return;
     }
 
