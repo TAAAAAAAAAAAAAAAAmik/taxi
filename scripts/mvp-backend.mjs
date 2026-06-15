@@ -7972,9 +7972,10 @@ async function handleRequest(request, response) {
       const payload = await readBody(request);
 
       try {
-        const result = await applyYooKassaWebhook(db, payload);
-
-        await writeDb(db);
+        // Под замком: вебхук — денежный путь. Сериализация не даёт параллельной
+        // обработке/синку затереть выданный водителю доступ и защищает идемпотентность
+        // (повторный вебхук не выдаст доступ дважды).
+        const result = await mutateDb((db) => applyYooKassaWebhook(db, payload));
         sendJson(response, 200, { ok: true, ...result });
       } catch (error) {
         sendJson(response, 409, { error: error.message });
@@ -7992,9 +7993,8 @@ async function handleRequest(request, response) {
       }
 
       try {
-        const result = await applyTBankWebhook(db, payload);
-
-        await writeDb(db);
+        // Под замком — тот же денежный путь, что и YooKassa-вебхук.
+        const result = await mutateDb((db) => applyTBankWebhook(db, payload));
         sendJson(response, 200, { ok: true, ...result });
       } catch (error) {
         sendJson(response, 409, { error: error.message });
