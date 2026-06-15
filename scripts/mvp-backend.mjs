@@ -666,6 +666,52 @@ async function mutateDb(mutator) {
   return run;
 }
 
+// Жизненный цикл заказа: created → searching → accepted/assigned → arrived → started →
+// completed/closed, плюс отмена. Ранги нужны для проверки «только вперёд».
+const ORDER_STATUS_RANK = {
+  created: 0,
+  searching: 1,
+  assigned: 2,
+  accepted: 2,
+  arrived: 3,
+  started: 4,
+  completed: 5,
+  closed: 5,
+  cancelled: 6,
+};
+
+function isKnownOrderStatus(status) {
+  return Object.prototype.hasOwnProperty.call(ORDER_STATUS_RANK, status);
+}
+
+// Разрешаем: тот же статус (идемпотентность), движение вперёд по схеме и отмену из
+// любого активного статуса. Запрещаем: откат назад и «воскрешение» терминального заказа
+// (completed/closed/cancelled нельзя вернуть в активные). Неизвестный исходный статус не
+// блокируем — чтобы не падать на легаси-данных.
+function isAllowedOrderStatusTransition(current, next) {
+  if (current === next) {
+    return true;
+  }
+
+  if (!isKnownOrderStatus(current)) {
+    return true;
+  }
+
+  if (current === 'cancelled') {
+    return false;
+  }
+
+  if (current === 'completed' || current === 'closed') {
+    return next === 'completed' || next === 'closed';
+  }
+
+  if (next === 'cancelled') {
+    return true;
+  }
+
+  return ORDER_STATUS_RANK[next] >= ORDER_STATUS_RANK[current];
+}
+
 function normalizeDb(parsed) {
   const source = parsed && typeof parsed === 'object' ? parsed : {};
   const defaultDb = createDefaultDb();
@@ -8414,6 +8460,17 @@ async function handleRequest(request, response) {
         }
 
         const nextStatus = String(payload.status || order.status);
+
+        if (!isKnownOrderStatus(nextStatus)) {
+          return { status: 400, body: { error: `Unknown order status: ${nextStatus}`, order } };
+        }
+
+        if (!isAllowedOrderStatusTransition(order.status, nextStatus)) {
+          return {
+            status: 422,
+            body: { error: `Illegal status transition ${order.status} -> ${nextStatus}`, order },
+          };
+        }
 
         if (
           nextStatus === 'started' &&
