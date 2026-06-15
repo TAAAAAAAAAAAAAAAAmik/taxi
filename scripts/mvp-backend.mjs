@@ -7855,50 +7855,57 @@ async function handleRequest(request, response) {
     }
 
     if (request.method === 'POST' && pathParts[0] === 'driver-payments' && pathParts[2] === 'sync') {
-      const sessionContext = getSessionContext(db, request);
-      const payment = db.driverPayments.find((item) => item.id === pathParts[1]);
-
-      if (!sessionContext) {
-        sendJson(response, 401, { error: 'Authentication required' });
-        return;
-      }
-
-      if (!payment) {
-        sendJson(response, 404, { error: 'Driver payment not found' });
-        return;
-      }
-
-      const paymentDriver = db.drivers.find((item) => item.id === payment.driverId);
-
-      if (
-        (paymentDriver && !canAccessDriver(sessionContext, paymentDriver)) ||
-        (!paymentDriver && !isAdminSession(sessionContext))
-      ) {
-        sendJson(response, 403, { error: 'Driver payment access denied' });
-        return;
-      }
-
+      // Денежный путь под замком: синк статуса платежа у провайдера и пересчёт доступа
+      // водителя не должны пересекаться с вебхуком или другим синком того же платежа.
+      // Ошибка провайдера пробрасывается из mutateDb, поэтому запись пропускается.
       try {
-        const driver = await syncDriverPaymentWithProvider(db, payment);
-        const notification = driver
-          ? notifyDriverChange(
-              db,
-              driver,
-              'Платеж водителя обновлен',
-              `${driver.name}: статус платежа ${payment.status}.`,
-              'driver_payment',
-            )
-          : undefined;
+        const outcome = await mutateDb(async (db) => {
+          const sessionContext = getSessionContext(db, request);
+          const payment = db.driverPayments.find((item) => item.id === pathParts[1]);
 
-        await writeDb(db);
-        if (driver) {
-          broadcastRealtime(
-            'driver_payment',
-            { driver: makeDriverResponse(db, driver, null), notification },
-            db,
-          );
-        }
-        sendJson(response, 200, makeDriverBillingDashboard(db, driver || { id: payment.driverId }, sessionContext));
+          if (!sessionContext) {
+            return { status: 401, body: { error: 'Authentication required' } };
+          }
+
+          if (!payment) {
+            return { status: 404, body: { error: 'Driver payment not found' } };
+          }
+
+          const paymentDriver = db.drivers.find((item) => item.id === payment.driverId);
+
+          if (
+            (paymentDriver && !canAccessDriver(sessionContext, paymentDriver)) ||
+            (!paymentDriver && !isAdminSession(sessionContext))
+          ) {
+            return { status: 403, body: { error: 'Driver payment access denied' } };
+          }
+
+          const driver = await syncDriverPaymentWithProvider(db, payment);
+          const notification = driver
+            ? notifyDriverChange(
+                db,
+                driver,
+                'Платеж водителя обновлен',
+                `${driver.name}: статус платежа ${payment.status}.`,
+                'driver_payment',
+              )
+            : undefined;
+
+          if (driver) {
+            broadcastRealtime(
+              'driver_payment',
+              { driver: makeDriverResponse(db, driver, null), notification },
+              db,
+            );
+          }
+
+          return {
+            status: 200,
+            body: makeDriverBillingDashboard(db, driver || { id: payment.driverId }, sessionContext),
+          };
+        });
+
+        sendJson(response, outcome.status, outcome.body);
       } catch (error) {
         sendJson(response, 409, { error: error.message });
       }
@@ -7907,55 +7914,62 @@ async function handleRequest(request, response) {
     }
 
     if (request.method === 'POST' && pathParts[0] === 'driver-payments' && pathParts[2] === 'refund') {
-      const sessionContext = getSessionContext(db, request);
       const payload = await readBody(request);
-      const payment = db.driverPayments.find((item) => item.id === pathParts[1]);
-
-      if (!sessionContext) {
-        sendJson(response, 401, { error: 'Authentication required' });
-        return;
-      }
-
-      if (!payment) {
-        sendJson(response, 404, { error: 'Driver payment not found' });
-        return;
-      }
-
-      const paymentDriver = db.drivers.find((item) => item.id === payment.driverId);
-
-      if (
-        (paymentDriver && !canAccessDriver(sessionContext, paymentDriver)) ||
-        (!paymentDriver && !isAdminSession(sessionContext))
-      ) {
-        sendJson(response, 403, { error: 'Driver payment access denied' });
-        return;
-      }
-
+      // Денежный путь под замком: возврат через провайдера и пересчёт доступа водителя
+      // сериализуются, чтобы не пересечься с вебхуком/синком того же платежа. Ошибка
+      // провайдера пробрасывается из mutateDb, поэтому запись пропускается.
       try {
-        const driver = await refundDriverSubscriptionPaymentWithProvider(
-          db,
-          payment,
-          String(payload.reason || 'Refund requested in MVP'),
-        );
-        const notification = driver
-          ? notifyDriverChange(
-              db,
-              driver,
-              'Возврат подписки',
-              `${driver.name}: доступ пересчитан после возврата.`,
-              'driver_payment_refund',
-            )
-          : undefined;
+        const outcome = await mutateDb(async (db) => {
+          const sessionContext = getSessionContext(db, request);
+          const payment = db.driverPayments.find((item) => item.id === pathParts[1]);
 
-        await writeDb(db);
-        if (driver) {
-          broadcastRealtime(
-            'driver_payment_refund',
-            { driver: makeDriverResponse(db, driver, null), notification },
+          if (!sessionContext) {
+            return { status: 401, body: { error: 'Authentication required' } };
+          }
+
+          if (!payment) {
+            return { status: 404, body: { error: 'Driver payment not found' } };
+          }
+
+          const paymentDriver = db.drivers.find((item) => item.id === payment.driverId);
+
+          if (
+            (paymentDriver && !canAccessDriver(sessionContext, paymentDriver)) ||
+            (!paymentDriver && !isAdminSession(sessionContext))
+          ) {
+            return { status: 403, body: { error: 'Driver payment access denied' } };
+          }
+
+          const driver = await refundDriverSubscriptionPaymentWithProvider(
             db,
+            payment,
+            String(payload.reason || 'Refund requested in MVP'),
           );
-        }
-        sendJson(response, 200, makeDriverBillingDashboard(db, driver || { id: payment.driverId }, sessionContext));
+          const notification = driver
+            ? notifyDriverChange(
+                db,
+                driver,
+                'Возврат подписки',
+                `${driver.name}: доступ пересчитан после возврата.`,
+                'driver_payment_refund',
+              )
+            : undefined;
+
+          if (driver) {
+            broadcastRealtime(
+              'driver_payment_refund',
+              { driver: makeDriverResponse(db, driver, null), notification },
+              db,
+            );
+          }
+
+          return {
+            status: 200,
+            body: makeDriverBillingDashboard(db, driver || { id: payment.driverId }, sessionContext),
+          };
+        });
+
+        sendJson(response, outcome.status, outcome.body);
       } catch (error) {
         sendJson(response, 409, { error: error.message });
       }
@@ -8967,6 +8981,12 @@ async function handleRequest(request, response) {
         }
 
         if (order.driver?.id) {
+          // Идемпотентность: повторный «принять» тем же водителем (ретрай сети, двойной
+          // тап) — не конфликт, а no-op. Возвращаем текущий заказ и НЕ трогаем статус,
+          // чтобы не откатить уже продвинувшийся заказ (arrived/started) обратно в accepted.
+          if (String(order.driver.id) === String(driver.id)) {
+            return { status: 200, body: { order } };
+          }
           return {
             status: 409,
             body: { error: 'Order is already accepted by another driver', order },
