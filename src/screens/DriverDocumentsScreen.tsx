@@ -66,13 +66,29 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
     () => (currentUser ? drivers.find((driver) => driver.userId === currentUser.id) : undefined),
     [currentUser, drivers],
   );
-  const selectedCount = Object.keys(selectedDocuments).length;
-  const uploadedCount = documentSpecs.filter(
-    (spec) => currentDriver?.documentUploads?.[spec.kind]?.status === 'pending' ||
-      currentDriver?.documentUploads?.[spec.kind]?.status === 'approved',
-  ).length;
-  const rejectedDocuments = documentSpecs.filter(
-    (spec) => currentDriver?.documentUploads?.[spec.kind]?.status === 'rejected',
+  const selectedCount = useMemo(() => Object.keys(selectedDocuments).length, [selectedDocuments]);
+  const { rejectedDocuments, uploadedCount } = useMemo(
+    () =>
+      documentSpecs.reduce(
+        (summary, spec) => {
+          const status = currentDriver?.documentUploads?.[spec.kind]?.status;
+
+          if (status === 'pending' || status === 'approved') {
+            summary.uploadedCount += 1;
+          }
+
+          if (status === 'rejected') {
+            summary.rejectedDocuments.push(spec);
+          }
+
+          return summary;
+        },
+        {
+          rejectedDocuments: [] as typeof documentSpecs,
+          uploadedCount: 0,
+        },
+      ),
+    [currentDriver?.documentUploads],
   );
   const canSubmit = Boolean(currentDriver?.id && selectedCount > 0 && !isSubmitting);
 

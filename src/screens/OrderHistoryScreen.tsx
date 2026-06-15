@@ -1,5 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ArrowLeft, Clock3, Heart, ReceiptText, Route, Star, Wallet } from 'lucide-react-native';
+import { useMemo } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { isDriverLikeRole, roleCopy } from '../data/registration';
@@ -41,18 +42,48 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
     updateOrderServiceShareStatus,
   } = useAppState();
   const isDriverRole = isDriverLikeRole(role);
-  const currentDriver =
-    isDriverRole && currentUser
-      ? drivers.find((driver) => driver.userId === currentUser.id)
-      : undefined;
-  const visibleOrders = orders.filter((order) =>
-    isDriverRole
-      ? isDriverLikeRole(order.role) || order.driver?.id === currentDriver?.id
-      : order.role === role,
+  const currentDriver = useMemo(
+    () =>
+      isDriverRole && currentUser
+        ? drivers.find((driver) => driver.userId === currentUser.id)
+        : undefined,
+    [currentUser, drivers, isDriverRole],
   );
-  const completedCount = visibleOrders.filter((order) =>
-    ['completed', 'closed'].includes(String(order.status)),
-  ).length;
+  const visibleOrders = useMemo(
+    () =>
+      orders.filter((order) =>
+        isDriverRole
+          ? isDriverLikeRole(order.role) || order.driver?.id === currentDriver?.id
+          : order.role === role,
+      ),
+    [currentDriver?.id, isDriverRole, orders, role],
+  );
+  const favoriteDriverIds = useMemo(
+    () => new Set(favoriteDrivers.map((driver) => driver.id)),
+    [favoriteDrivers],
+  );
+  const historySummary = useMemo(
+    () =>
+      visibleOrders.reduce(
+        (summary, order) => {
+          const isCompleted = ['completed', 'closed'].includes(String(order.status));
+
+          return {
+            activeCount: summary.activeCount + (isCompleted ? 0 : 1),
+            completedCount: summary.completedCount + (isCompleted ? 1 : 0),
+            reviewedCount: summary.reviewedCount + (order.review ? 1 : 0),
+            totalSpent: summary.totalSpent + order.total,
+          };
+        },
+        {
+          activeCount: 0,
+          completedCount: 0,
+          reviewedCount: 0,
+          totalSpent: 0,
+        },
+      ),
+    [visibleOrders],
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -79,7 +110,7 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
           </View>
           <View style={styles.historyMeta}>
             <Text style={styles.roleText}>{roleCopy[role].title}</Text>
-            <Text style={styles.completedText}>Завершено: {completedCount}</Text>
+            <Text style={styles.completedText}>Завершено: {historySummary.completedCount}</Text>
           </View>
         </View>
 
@@ -100,17 +131,14 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
           <StatCard label="Всего" value={String(visibleOrders.length)} />
           <StatCard
             label="Сумма"
-            value={`${visibleOrders.reduce((sum, order) => sum + order.total, 0)} ₽`}
+            value={`${historySummary.totalSpent} ₽`}
           />
           <StatCard
             label={role === 'client' ? 'Отзывы' : 'Активные'}
             value={
               role === 'client'
-                ? String(visibleOrders.filter((order) => order.review).length)
-                : String(
-                    visibleOrders.filter((order) => !['closed', 'completed'].includes(order.status))
-                      .length,
-                  )
+                ? String(historySummary.reviewedCount)
+                : String(historySummary.activeCount)
             }
           />
         </View>
@@ -121,7 +149,7 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
               <OrderCard
                 key={order.id}
                 favorite={Boolean(
-                  order.driver && favoriteDrivers.some((driver) => driver.id === order.driver?.id),
+                  order.driver && favoriteDriverIds.has(order.driver.id),
                 )}
                 onFavorite={() => {
                   if (!order.driver) {

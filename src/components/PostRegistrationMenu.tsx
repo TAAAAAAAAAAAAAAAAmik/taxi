@@ -1,4 +1,4 @@
-import { ComponentType, useEffect, useMemo, useRef, useState } from 'react';
+import { ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -1680,7 +1680,11 @@ function DriverFeedPreview({
   orders: DriverFeedPreviewOrder[];
 }) {
   const [detailsOrderId, setDetailsOrderId] = useState<string | undefined>();
-  const visibleOrders = orders.slice(0, 5);
+  const visibleOrders = useMemo(() => orders.slice(0, 5), [orders]);
+  const disabled = Boolean(lockedReason || busyId);
+  const toggleDetailsOrder = useCallback((orderId: string) => {
+    setDetailsOrderId((current) => (current === orderId ? undefined : orderId));
+  }, []);
 
   return (
     <View style={styles.driverFeedPanel}>
@@ -1710,7 +1714,6 @@ function DriverFeedPreview({
         <View style={styles.driverFeedList}>
           {visibleOrders.map((order) => {
             const detailsOpen = detailsOrderId === order.id;
-            const disabled = Boolean(lockedReason || busyId);
 
             return (
               <View key={order.id} style={styles.driverFeedCard}>
@@ -1726,7 +1729,7 @@ function DriverFeedPreview({
                   <Pressable
                     accessibilityLabel="Информация о заказе"
                     accessibilityRole="button"
-                    onPress={() => setDetailsOrderId(detailsOpen ? undefined : order.id)}
+                    onPress={() => toggleDetailsOrder(order.id)}
                     style={({ pressed }) => [styles.driverFeedInfoButton, detailsOpen && styles.driverFeedInfoButtonActive, pressed && styles.pressed]}
                   >
                     <Text style={[styles.driverFeedInfoText, detailsOpen && styles.driverFeedInfoTextActive]}>i</Text>

@@ -170,6 +170,7 @@ export type CreateOrderPayload = OrderStatusSummary & {
   role: AccountRole;
   clientName?: string;
   clientPhone?: string;
+  clientRequestId?: string;
   optionsTotal?: number;
   pickupPoint?: ApiGeoPoint;
   routeEstimate?: ApiRouteEstimate;
@@ -639,7 +640,18 @@ function getRealtimeWebSocketUrl() {
   const url = new URL('/realtime/ws', getApiBaseUrl());
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
 
-  return url.toString();
+  return appendRealtimeAuthToken(url.toString());
+}
+
+function appendRealtimeAuthToken(url: string) {
+  if (!apiAuthToken) {
+    return url;
+  }
+
+  const targetUrl = new URL(url);
+  targetUrl.searchParams.set('token', apiAuthToken);
+
+  return targetUrl.toString();
 }
 
 function getRealtimeDelay(attempt: number) {
@@ -667,7 +679,7 @@ export function subscribeRealtime({
   pollingMs?: number;
 }) {
   const wsUrl = getRealtimeWebSocketUrl();
-  const streamUrl = `${getApiBaseUrl()}/realtime/stream`;
+  const streamUrl = appendRealtimeAuthToken(`${getApiBaseUrl()}/realtime/stream`);
   const WebSocketCtor = (
     globalThis as {
       WebSocket?: new (url: string) => WebSocketLike;
@@ -1107,7 +1119,10 @@ export async function estimateRoutePrice(payload: ApiRouteEstimateRequest) {
 
 export async function createOrder(payload: CreateOrderPayload) {
   const response = await request<{ order: AppOrder }>('/orders', {
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      clientRequestId: payload.clientRequestId || payload.id,
+    }),
     method: 'POST',
   });
 

@@ -28,6 +28,8 @@ try {
   await waitForBackend();
 
   const admin = await loginAdmin();
+  const client = await registerClient();
+  const clientToken = client.session.token;
   const firstDriver = await createReadyDriver(admin.session.token, 'First Driver', '+79001000001', 'A101AA102');
   const secondDriver = await createReadyDriver(admin.session.token, 'Second Driver', '+79001000002', 'A202AA102');
   await setDriverAvailability(admin.session.token, firstDriver.id, true, {
@@ -52,7 +54,7 @@ try {
     role: 'client',
     tariff: 'economy',
     total: 510,
-  });
+  }, clientToken);
 
   assert(exclusiveOrder.dispatchMode === 'exclusive', 'Nearest order should start as exclusive');
   assert(exclusiveOrder.exclusiveDriverId === firstDriver.id, 'Nearest driver should receive exclusive offer');
@@ -60,11 +62,13 @@ try {
   await expectApiFailure(`/orders/${encodeURIComponent(exclusiveOrder.id)}/assign`, {
     body: { driverId: secondDriver.id },
     method: 'PATCH',
+    token: admin.session.token,
   });
 
   const declinedOffer = await api(`/orders/${encodeURIComponent(exclusiveOrder.id)}/offer`, {
     body: { action: 'decline', driverId: firstDriver.id },
     method: 'PATCH',
+    token: admin.session.token,
   });
 
   assert(declinedOffer.order.dispatchMode === 'feed', 'Declined exclusive offer should move to feed');
@@ -76,6 +80,7 @@ try {
   const acceptedFromFeed = await api(`/orders/${encodeURIComponent(exclusiveOrder.id)}/assign`, {
     body: { driverId: secondDriver.id },
     method: 'PATCH',
+    token: admin.session.token,
   });
 
   assert(acceptedFromFeed.order.driver?.id === secondDriver.id, 'Order from feed should be available to another driver');
@@ -93,7 +98,7 @@ try {
     role: 'client',
     tariff: 'economy',
     total: 420,
-  });
+  }, clientToken);
 
   assert(order.status === 'searching', `Expected searching order, got ${order.status}`);
   assert(order.paymentStatus === 'authorized', `Expected authorized payment, got ${order.paymentStatus}`);
@@ -101,6 +106,7 @@ try {
   const accepted = await api(`/orders/${encodeURIComponent(order.id)}/assign`, {
     body: { driverId: firstDriver.id },
     method: 'PATCH',
+    token: admin.session.token,
   });
 
   assert(accepted.order.status === 'accepted', `Expected accepted order, got ${accepted.order.status}`);
@@ -110,18 +116,20 @@ try {
   await expectApiFailure(`/orders/${encodeURIComponent(order.id)}/assign`, {
     body: { driverId: secondDriver.id },
     method: 'PATCH',
+    token: admin.session.token,
   });
 
   for (const status of ['arrived', 'started', 'completed']) {
     const result = await api(`/orders/${encodeURIComponent(order.id)}/status`, {
       body: { pinCode: status === 'started' ? accepted.order.tripPin : undefined, status },
       method: 'PATCH',
+      token: admin.session.token,
     });
 
     assert(result.order.status === status, `Expected ${status}, got ${result.order.status}`);
   }
 
-  const orders = await api('/orders');
+  const orders = await api('/orders', { token: admin.session.token });
   const completed = orders.orders.find((item) => item.id === order.id);
 
   assert(completed?.receipt, 'Completed order should have receipt');
@@ -172,6 +180,7 @@ try {
   const refunded = await api(`/orders/${encodeURIComponent(order.id)}/payment`, {
     body: { note: 'Smoke refund check', paymentStatus: 'refunded' },
     method: 'PATCH',
+    token: admin.session.token,
   });
   assert(refunded.order.paymentStatus === 'refunded', 'Payment endpoint should update payment status');
 
@@ -195,7 +204,7 @@ try {
     serviceType: 'delivery',
     tariff: 'economy',
     total: 240,
-  });
+  }, clientToken);
 
   assert(deliveryOrder.serviceType === 'delivery', 'Delivery order should keep serviceType');
   assert(deliveryOrder.deliveryHandoff === 'door_to_door', 'Delivery order should keep handoff mode');
@@ -207,6 +216,7 @@ try {
   const acceptedDelivery = await api(`/orders/${encodeURIComponent(deliveryOrder.id)}/assign`, {
     body: { driverId: firstDriver.id },
     method: 'PATCH',
+    token: admin.session.token,
   });
 
   assert(acceptedDelivery.order.driver?.id === firstDriver.id, 'Delivery order should be accepted by driver');
@@ -226,6 +236,22 @@ async function loginAdmin() {
   return api('/auth/admin-login', {
     body: {
       password: 'smoke-admin',
+    },
+    method: 'POST',
+  });
+}
+
+async function registerClient() {
+  const stamp = Date.now();
+
+  return api('/auth/register', {
+    body: {
+      email: `dispatch-client-${stamp}@example.test`,
+      firstName: 'Dispatch',
+      lastName: 'Client',
+      password: 'password-1',
+      phone: `+7999${String(stamp).slice(-7)}`,
+      role: 'client',
     },
     method: 'POST',
   });
@@ -276,10 +302,11 @@ async function setDriverAvailability(adminToken, driverId, isOnline, location) {
   return response.driver;
 }
 
-async function createOrder(body) {
+async function createOrder(body, token) {
   const response = await api('/orders', {
     body,
     method: 'POST',
+    token,
   });
 
   return response.order;

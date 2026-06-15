@@ -80,7 +80,7 @@ try {
   );
 
   for (let index = 0; index < 5; index += 1) {
-    await completeClientOrder(invitedClient.user.id, index);
+    await completeClientOrder(invitedClient.session.token, admin.session.token, index);
   }
 
   const rewardedClientDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
@@ -109,7 +109,7 @@ try {
     role: 'driver',
     vehicleDocumentsReady: 'yes',
   });
-  const drivers = await api('/drivers');
+  const drivers = await api('/drivers', { token: admin.session.token });
   const driver = drivers.drivers.find((item) => item.userId === invitedDriver.user.id);
 
   assert(driver, 'Driver profile was not created from invited driver registration');
@@ -160,10 +160,11 @@ try {
     role: 'client',
     tariff: 'economy',
     total: 100,
-  });
+  }, invitedClient.session.token);
   await expectApiFailure(`/orders/${encodeURIComponent(blockedOrder.id)}/assign`, {
     body: { driverId: driver.id, status: 'accepted' },
     method: 'PATCH',
+    token: admin.session.token,
   });
 
   const compliantDriver = await api(`/drivers/${encodeURIComponent(driver.id)}/compliance`, {
@@ -184,7 +185,7 @@ try {
   );
 
   for (let index = 0; index < 10; index += 1) {
-    await completeDriverOrder(driver.id, index);
+    await completeDriverOrder(invitedClient.session.token, admin.session.token, driver.id, index);
   }
 
   const qualifiedDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
@@ -248,7 +249,7 @@ async function loginAdmin() {
   });
 }
 
-async function completeClientOrder(userId, index) {
+async function completeClientOrder(clientToken, adminToken, index) {
   const order = await createOrder({
     destination: `Client destination ${index}`,
     paymentMethod: 'cash',
@@ -256,17 +257,17 @@ async function completeClientOrder(userId, index) {
     role: 'client',
     tariff: 'economy',
     total: 100,
-    userId,
-  });
+  }, clientToken);
 
   await api(`/orders/${encodeURIComponent(order.id)}/status`, {
     body: { status: 'completed' },
     method: 'PATCH',
+    token: adminToken,
   });
   await delay(5);
 }
 
-async function completeDriverOrder(driverId, index) {
+async function completeDriverOrder(clientToken, adminToken, driverId, index) {
   const order = await createOrder({
     destination: `Driver destination ${index}`,
     paymentMethod: 'cash',
@@ -274,23 +275,26 @@ async function completeDriverOrder(driverId, index) {
     role: 'client',
     tariff: 'economy',
     total: 100,
-  });
+  }, clientToken);
 
   await api(`/orders/${encodeURIComponent(order.id)}/assign`, {
     body: { driverId, status: 'accepted' },
     method: 'PATCH',
+    token: adminToken,
   });
   await api(`/orders/${encodeURIComponent(order.id)}/status`, {
     body: { status: 'completed' },
     method: 'PATCH',
+    token: adminToken,
   });
   await delay(5);
 }
 
-async function createOrder(body) {
+async function createOrder(body, token) {
   const response = await api('/orders', {
     body,
     method: 'POST',
+    token,
   });
 
   return response.order;

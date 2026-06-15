@@ -26,8 +26,8 @@ export const styles = StyleSheet.create({
   },
   compactAcceptOrderButton: {
     flex: 1,
-    minHeight: 44,
-    paddingHorizontal: 8,
+    minHeight: 46,
+    paddingHorizontal: 12,
   },
   clientBottom: {
     alignItems: 'center',
@@ -37,10 +37,10 @@ export const styles = StyleSheet.create({
     paddingTop: 18,
   },
   compactOrderActions: {
+    alignItems: 'center',
     flexDirection: 'row',
-    flexShrink: 0,
-    gap: 6,
-    width: 160,
+    gap: 8,
+    marginTop: 2,
   },
   compactOrderBadge: {
     backgroundColor: '#F1F8F3',
@@ -56,19 +56,14 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
   },
-  compactOrderBodyRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
   compactOrderCard: {
     backgroundColor: '#FFFFFF',
     borderColor: 'rgba(0, 141, 73, 0.16)',
     borderRadius: 8,
     borderWidth: 1,
     elevation: 1,
-    gap: 0,
-    padding: 10,
+    gap: 8,
+    padding: 12,
     shadowColor: 'rgba(18, 56, 44, 0.16)',
     shadowOffset: { height: 5, width: 0 },
     shadowOpacity: 0.08,
@@ -78,16 +73,11 @@ export const styles = StyleSheet.create({
     borderColor: '#008D49',
     backgroundColor: '#F9FFFB',
   },
-  compactOrderDistance: {
-    color: '#006F3A',
-    fontSize: 13,
-    fontWeight: '900',
-    width: 56,
-  },
   compactOrderMeta: {
     color: '#557669',
     fontSize: 13,
     fontWeight: '600',
+    marginLeft: 22,
   },
   compactOrderCopy: {
     flex: 1,
@@ -103,11 +93,22 @@ export const styles = StyleSheet.create({
   },
   compactOrderRoute: {
     color: '#12382C',
-    flex: 1,
     fontSize: 15,
     fontWeight: '900',
     lineHeight: 19,
     minWidth: 0,
+  },
+  compactOrderRouteTo: {
+    color: '#12382C',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 18,
+    minWidth: 0,
+  },
+  compactOrderPayment: {
+    color: '#557669',
+    fontSize: 12,
+    fontWeight: '600',
   },
   compactOrderService: {
     backgroundColor: '#EAF6EF',
@@ -129,6 +130,13 @@ export const styles = StyleSheet.create({
     height: 8,
     width: 8,
   },
+  compactOrderRouteDotEnd: {
+    borderColor: '#008D49',
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 8,
+    width: 8,
+  },
   compactOrderRouteLine: {
     backgroundColor: 'rgba(0, 141, 73, 0.28)',
     borderRadius: 999,
@@ -137,12 +145,24 @@ export const styles = StyleSheet.create({
   },
   compactOrderRouteMark: {
     alignItems: 'center',
+    paddingTop: 5,
     width: 12,
+  },
+  compactOrderRouteRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  compactOrderTags: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: 6,
   },
   compactOrderTop: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
+    justifyContent: 'space-between',
   },
   clientBrand: {
     color: '#12382C',

@@ -47,25 +47,40 @@ export function DashboardScreen({ navigation, route }: Props) {
     role === 'park_admin'
       ? createFleetInviteCode(currentUser?.id || currentUser?.email || firstName || 'salavat')
       : undefined;
-  const availableCarsCount = drivers.filter(
-    (driver) =>
-      driver.status === 'approved' &&
-      driver.isOnline &&
-      driver.subscriptionStatus === 'active' &&
-      driver.canReceiveOrders,
-  ).length;
-  const currentDriver =
-    isDriverRole && currentUser
-      ? drivers.find((driver) => driver.userId === currentUser.id)
-      : undefined;
+  const availableCarsCount = useMemo(
+    () =>
+      drivers.reduce(
+        (count, driver) =>
+          count +
+          (driver.status === 'approved' &&
+          driver.isOnline &&
+          driver.subscriptionStatus === 'active' &&
+          driver.canReceiveOrders
+            ? 1
+            : 0),
+        0,
+      ),
+    [drivers],
+  );
+  const currentDriver = useMemo(
+    () =>
+      isDriverRole && currentUser
+        ? drivers.find((driver) => driver.userId === currentUser.id)
+        : undefined,
+    [currentUser, drivers, isDriverRole],
+  );
   const hasActiveAccess =
     currentDriver?.subscriptionStatus === 'active' ||
     (!isSelfEmployedDriver && Boolean(currentDriver?.canReceiveOrders)) ||
     driverSubscription.status === 'active';
   const canToggleLine = Boolean(currentDriver?.canReceiveOrders && hasActiveAccess);
-  const driverStats = currentDriver
-    ? createDriverStats(currentDriver, orders, driverSubscription, role)
-    : undefined;
+  const driverStats = useMemo(
+    () =>
+      currentDriver
+        ? createDriverStats(currentDriver, orders, driverSubscription, role)
+        : undefined,
+    [currentDriver, driverSubscription, orders, role],
+  );
   const driverFeedLockedReason =
     isDriverRole && !currentDriver?.canReceiveOrders ? formatDriverAccessStatus(currentDriver) : undefined;
   const driverFeedOrders = useMemo(

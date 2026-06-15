@@ -161,21 +161,91 @@ export function AdminPanelScreen({ navigation }: Props) {
     updateOrderServiceShareStatus,
     updateDriverReviewStatus,
   } = useAppState();
-  const approvedDrivers = drivers.filter((driver) => driver.canReceiveOrders);
-  const expiringPolicyUploads = drivers.flatMap((driver) =>
-    (['osago', 'osgop'] as DriverDocumentKind[])
-      .map((kind) => ({ driver, kind, upload: driver.documentUploads?.[kind] }))
-      .filter(({ upload }) => isExpiringPolicy(upload)),
+  const approvedDrivers = useMemo(
+    () => drivers.filter((driver) => driver.canReceiveOrders),
+    [drivers],
+  );
+  const expiringPolicyUploads = useMemo(
+    () =>
+      drivers.flatMap((driver) =>
+        (['osago', 'osgop'] as DriverDocumentKind[])
+          .map((kind) => ({ driver, kind, upload: driver.documentUploads?.[kind] }))
+          .filter(({ upload }) => isExpiringPolicy(upload)),
+      ),
+    [drivers],
   );
   const showDemoAdmin = isDemoModeEnabled();
-  const activePartnerProDrivers = drivers.filter((driver) => isPartnerProActive(driver));
-  const pendingPartnerProPayments = adminDriverPayments.filter(
-    (payment) => payment.billingMode === 'monthly' && payment.status === 'pending',
+  const activePartnerProDrivers = useMemo(
+    () => drivers.filter((driver) => isPartnerProActive(driver)),
+    [drivers],
   );
-  const activeAdminOrders = orders.filter((order) => !['completed', 'cancelled', 'canceled'].includes(order.status));
-  const completedAdminOrders = orders.filter((order) => order.status === 'completed');
-  const cancelledAdminOrders = orders.filter((order) => ['cancelled', 'canceled'].includes(order.status));
-  const deliveryAdminOrders = orders.filter((order) => order.serviceType === 'delivery');
+  const onlineDriversCount = useMemo(
+    () => drivers.reduce((count, driver) => count + (driver.isOnline ? 1 : 0), 0),
+    [drivers],
+  );
+  const pendingPartnerProPayments = useMemo(
+    () =>
+      adminDriverPayments.filter(
+        (payment) => payment.billingMode === 'monthly' && payment.status === 'pending',
+      ),
+    [adminDriverPayments],
+  );
+  const {
+    active: activeAdminOrders,
+    byDriver: ordersByDriver,
+    cancelled: cancelledAdminOrders,
+    client: clientAdminOrders,
+    completed: completedAdminOrders,
+    delivery: deliveryAdminOrders,
+    longest: longestAdminOrder,
+  } = useMemo(
+    () => {
+      const active: AppOrder[] = [];
+      const cancelled: AppOrder[] = [];
+      const client: AppOrder[] = [];
+      const completed: AppOrder[] = [];
+      const delivery: AppOrder[] = [];
+      const byDriver = new Map<string, AppOrder[]>();
+      let longest: AppOrder | undefined;
+
+      orders.forEach((order) => {
+        const status = String(order.status);
+
+        if (status === 'completed') {
+          completed.push(order);
+        }
+
+        if (status === 'cancelled' || status === 'canceled') {
+          cancelled.push(order);
+        }
+
+        if (status !== 'completed' && status !== 'cancelled' && status !== 'canceled') {
+          active.push(order);
+        }
+
+        if (order.serviceType === 'delivery') {
+          delivery.push(order);
+        }
+
+        if (order.role === 'client') {
+          client.push(order);
+        }
+
+        if (order.driver?.id) {
+          const driverOrders = byDriver.get(order.driver.id) ?? [];
+          driverOrders.push(order);
+          byDriver.set(order.driver.id, driverOrders);
+        }
+
+        if ((order.routeEstimate?.distanceKm ?? 0) > (longest?.routeEstimate?.distanceKm ?? 0)) {
+          longest = order;
+        }
+      });
+
+      return { active, byDriver, cancelled, client, completed, delivery, longest };
+    },
+    [orders],
+  );
   const dailyServiceShare = useMemo(
     () => serviceShareSummary ?? buildLocalServiceShareSummary(orders, serviceShareDate),
     [orders, serviceShareDate, serviceShareSummary],
@@ -183,7 +253,7 @@ export function AdminPanelScreen({ navigation }: Props) {
   const driverAnalytics = useMemo(
     () =>
       drivers.map((driver) => {
-        const driverOrders = orders.filter((order) => order.driver?.id === driver.id);
+        const driverOrders = ordersByDriver.get(driver.id) ?? [];
         const completedOrders = driverOrders.filter(isCompletedOrder);
         const earnings = completedOrders.reduce(
           (sum, order) => sum + (order.driverCollectedAmount ?? order.total ?? 0),
@@ -200,7 +270,7 @@ export function AdminPanelScreen({ navigation }: Props) {
           workHours,
         };
       }),
-    [drivers, orders],
+    [drivers, ordersByDriver],
   );
   const sortedDriverAnalytics = useMemo(
     () =>
@@ -218,17 +288,50 @@ export function AdminPanelScreen({ navigation }: Props) {
     [driverAnalytics, driverSort],
   );
   const clientAnalytics = useMemo(() => buildClientAnalytics(orders), [orders]);
-  const longestAdminOrder = useMemo(
-    () =>
-      orders.reduce<AppOrder | undefined>((longest, order) => {
-        const currentDistance = order.routeEstimate?.distanceKm ?? 0;
-        const longestDistance = longest?.routeEstimate?.distanceKm ?? 0;
-
-        return currentDistance > longestDistance ? order : longest;
-      }, undefined),
+  const totalClientSpend = useMemo(
+    () => clientAnalytics.reduce((sum, client) => sum + client.totalSpent, 0),
+    [clientAnalytics],
+  );
+  const pendingPartnerProOverview = useMemo(
+    () => pendingPartnerProPayments.slice(0, 8),
+    [pendingPartnerProPayments],
+  );
+  const pendingPartnerProList = useMemo(
+    () => pendingPartnerProPayments.slice(0, 12),
+    [pendingPartnerProPayments],
+  );
+  const dailyServiceShareDriversPreview = useMemo(
+    () => dailyServiceShare.drivers.slice(0, 6),
+    [dailyServiceShare],
+  );
+  const referralPreviewItems = useMemo(
+    () => adminReferralDashboard?.referrals.slice(0, 8) ?? [],
+    [adminReferralDashboard?.referrals],
+  );
+  const clientAnalyticsPreview = useMemo(
+    () => clientAnalytics.slice(0, 10),
+    [clientAnalytics],
+  );
+  const adminAddressesPreview = useMemo(
+    () => adminAddresses.slice(0, 6),
+    [adminAddresses],
+  );
+  const adminDriversPreview = useMemo(
+    () => drivers.slice(0, 6),
+    [drivers],
+  );
+  const supportThreadsPreview = useMemo(
+    () => supportThreads.slice(0, 8),
+    [supportThreads],
+  );
+  const adminOrdersPreview = useMemo(
+    () => orders.slice(0, 5),
     [orders],
   );
-  const totalClientSpend = clientAnalytics.reduce((sum, client) => sum + client.totalSpent, 0);
+  const approvedDriverAssignPreview = useMemo(
+    () => approvedDrivers.slice(0, 2),
+    [approvedDrivers],
+  );
 
   const loadAdminAddresses = useCallback(async () => {
     try {
@@ -702,7 +805,7 @@ export function AdminPanelScreen({ navigation }: Props) {
               {pendingPartnerProPayments.length ? (
                 <View style={styles.reviewBox}>
                   <Text style={styles.orderTitle}>Заявки на PRO</Text>
-                  {pendingPartnerProPayments.slice(0, 8).map((payment) => (
+                  {pendingPartnerProOverview.map((payment) => (
                     <View key={payment.id} style={styles.orderRow}>
                       <Text style={styles.orderText}>
                         {payment.driverName || payment.driverId} · {payment.amount} ₽ · ожидает оплаты/проверки
@@ -722,7 +825,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 </View>
               ) : null}
               {dailyServiceShare.drivers.length ? (
-                dailyServiceShare.drivers.slice(0, 6).map((driver) => (
+                dailyServiceShareDriversPreview.map((driver) => (
                   <View key={driver.driverId} style={styles.orderRow}>
                     <Text style={styles.orderTitle}>
                       {driver.driverName} · {driver.ordersCount} заказов
@@ -764,7 +867,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 Ручная оплата и активация на 30 дней остаются через админ-панель.
               </Text>
               {pendingPartnerProPayments.length ? (
-                pendingPartnerProPayments.slice(0, 12).map((payment) => (
+                pendingPartnerProList.map((payment) => (
                   <View key={payment.id} style={styles.orderRow}>
                     <Text numberOfLines={1} style={styles.orderTitle}>
                       {payment.driverName || payment.driverId} · {payment.amount} ₽
@@ -822,7 +925,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 <Text style={styles.secondaryButtonText}>Обновить рефералы</Text>
               </Pressable>
               {adminReferralDashboard?.referrals.length ? (
-                adminReferralDashboard.referrals.slice(0, 8).map((referral) => (
+                referralPreviewItems.map((referral) => (
                   <View key={referral.id} style={styles.orderRow}>
                     <Text numberOfLines={1} style={styles.orderTitle}>
                       {referral.inviterName} → {referral.inviteeName}
@@ -898,7 +1001,7 @@ export function AdminPanelScreen({ navigation }: Props) {
               <View style={styles.statsGridCompact}>
                 <PlanRow title="Всего" value={String(drivers.length)} />
                 <PlanRow title="Одобрены" value={String(approvedDrivers.length)} />
-                <PlanRow title="На линии" value={String(drivers.filter((driver) => driver.isOnline).length)} />
+                <PlanRow title="На линии" value={String(onlineDriversCount)} />
               </View>
               {expiringPolicyUploads.length ? (
                 <View style={styles.reviewBox}>
@@ -1085,11 +1188,11 @@ export function AdminPanelScreen({ navigation }: Props) {
               </View>
               <View style={styles.statsGridCompact}>
                 <PlanRow title="Всего" value={String(clientAnalytics.length)} />
-                <PlanRow title="Поездки" value={String(orders.filter((order) => order.role === 'client').length)} />
+                <PlanRow title="Поездки" value={String(clientAdminOrders.length)} />
                 <PlanRow title="Сумма" value={`${totalClientSpend} ₽`} />
               </View>
               {clientAnalytics.length ? (
-                clientAnalytics.slice(0, 10).map((client) => (
+                clientAnalyticsPreview.map((client) => (
                   <View key={client.key} style={styles.orderRow}>
                     <Text numberOfLines={1} style={styles.orderTitle}>{client.name}</Text>
                     <Text numberOfLines={1} style={styles.orderText}>
@@ -1201,7 +1304,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 </Pressable>
               </View>
               {addressNotice ? <Text numberOfLines={2} style={styles.sectionTextMuted}>{addressNotice}</Text> : null}
-              {adminAddresses.slice(0, 6).map((address) => (
+              {adminAddressesPreview.map((address) => (
                 <View key={address.id} style={styles.orderRow}>
                   <Text numberOfLines={1} style={styles.orderTitle}>
                     {address.title} · {address.category}
@@ -1242,7 +1345,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 <PlanRow title="Допущены" value={String(approvedDrivers.length)} />
                 <PlanRow title="Обращения" value={String(supportThreads.length)} />
               </View>
-              {drivers.slice(0, 6).map((driver) => (
+              {adminDriversPreview.map((driver) => (
                 <View key={driver.id} style={styles.orderRow}>
                   <Text numberOfLines={1} style={styles.orderTitle}>{driver.name}</Text>
                   <Text numberOfLines={1} style={styles.orderText}>
@@ -1331,7 +1434,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 Обращения пользователей не удалены из админки, но вынесены из основных вкладок.
               </Text>
               {supportThreads.length ? (
-                supportThreads.slice(0, 8).map((thread) => (
+                supportThreadsPreview.map((thread) => (
                   <View key={thread.id} style={styles.orderRow}>
                     <Text numberOfLines={1} style={styles.orderTitle}>{thread.title}</Text>
                     <Text numberOfLines={1} style={styles.orderText}>
@@ -1374,7 +1477,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 </View>
               ) : null}
               {orders.length > 0 ? (
-                orders.slice(0, 5).map((order) => (
+                adminOrdersPreview.map((order) => (
                   <View key={order.id} style={styles.orderRow}>
                     <Text numberOfLines={1} style={styles.orderTitle}>
                       {order.id} · {formatAdminOrderService(order)} · {order.total} ₽ · {order.status}
@@ -1415,7 +1518,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                     ) : null}
                     {!order.driver && approvedDrivers.length > 0 ? (
                       <View style={styles.rowActions}>
-                        {approvedDrivers.slice(0, 2).map((driver) => (
+                        {approvedDriverAssignPreview.map((driver) => (
                           <Pressable
                             accessibilityRole="button"
                             key={driver.id}
@@ -2148,9 +2251,14 @@ function DocumentUploadSummary({
   onOpenDocument?: (kind: DriverDocumentKind) => void;
   uploads?: Partial<Record<DriverDocumentKind, DriverDocumentUpload>>;
 }) {
-  const uploadedItems = (Object.keys(documentLabels) as DriverDocumentKind[])
-    .map((kind) => uploads?.[kind])
-    .filter(Boolean) as DriverDocumentUpload[];
+  const uploadedItems = useMemo(
+    () =>
+      (Object.keys(documentLabels) as DriverDocumentKind[])
+        .map((kind) => uploads?.[kind])
+        .filter(Boolean) as DriverDocumentUpload[],
+    [uploads],
+  );
+  const auditPreview = useMemo(() => audit?.slice(0, 3) ?? [], [audit]);
 
   if (!uploadedItems.length) {
     return <Text style={styles.orderText}>Фото документов еще не загружены водителем.</Text>;
@@ -2187,10 +2295,10 @@ function DocumentUploadSummary({
           ) : null}
         </View>
       ))}
-      {audit?.length ? (
+      {auditPreview.length ? (
         <View style={styles.auditBox}>
           <Text style={styles.documentUploadTitle}>Журнал проверки</Text>
-          {audit.slice(0, 3).map((entry) => (
+          {auditPreview.map((entry) => (
             <Text numberOfLines={1} key={entry.id} style={styles.documentMetaText}>
               {entry.action} · {entry.actor.name || entry.actor.role} · {entry.reason || entry.note || entry.status}
             </Text>

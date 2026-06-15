@@ -30,6 +30,7 @@ try {
   const health = await api('/health');
   assert(health.geo.routes === 'local-fallback', 'Health should expose local geo fallback');
   assert(health.messageServer.mode === 'websocket+sse+polling', 'Health should expose realtime message server mode');
+  const client = await registerClient();
 
   const addressSearch = await api('/geo/address-search?query=Янгантау&limit=5');
   assert(addressSearch.suggestions.length > 0, 'Address search should return suggestions');
@@ -67,13 +68,14 @@ try {
       title: 'Smoke support',
     },
     method: 'POST',
+    token: client.session.token,
   });
   assert(support.thread.messages.length >= 2, 'Support thread should include user and server messages');
 
-  const threads = await api('/support/threads?role=client');
+  const threads = await api('/support/threads?role=client', { token: client.session.token });
   assert(threads.threads.some((thread) => thread.id === support.thread.id), 'Support thread should be listed');
 
-  const snapshot = await api('/realtime/snapshot');
+  const snapshot = await api('/realtime/snapshot', { token: client.session.token });
   assert(snapshot.supportThreads.some((thread) => thread.id === support.thread.id), 'Realtime snapshot should include support threads');
   assert(snapshot.notifications.some((item) => item.kind === 'support-message'), 'Realtime snapshot should include support notification');
 
@@ -101,10 +103,27 @@ async function waitForBackend() {
   throw new Error('Backend did not start in time');
 }
 
+async function registerClient() {
+  const stamp = Date.now();
+
+  return api('/auth/register', {
+    body: {
+      email: `geo-client-${stamp}@example.test`,
+      firstName: 'Geo',
+      lastName: 'Client',
+      password: 'password-1',
+      phone: `+7977${String(stamp).slice(-7)}`,
+      role: 'client',
+    },
+    method: 'POST',
+  });
+}
+
 async function api(path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: options.method || 'GET',
     headers: {
+      ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
       accept: 'application/json',
       'content-type': 'application/json',
     },

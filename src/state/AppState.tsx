@@ -545,6 +545,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   useEffect(() => {
+    if (!currentUser) {
+      setRealtimeStatus('offline');
+      setRealtimeMessage('Войдите, чтобы подключить поток заказов.');
+      return undefined;
+    }
+
     setRealtimeStatus('connecting');
     const unsubscribe = subscribeRealtime({
       onError: (error) => {
@@ -579,7 +585,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     });
 
     return unsubscribe;
-  }, [applyRealtimeSnapshot]);
+  }, [applyRealtimeSnapshot, currentUser]);
 
   const refreshReferralDashboard = useCallback(
     async (userId = currentUser?.id) => {

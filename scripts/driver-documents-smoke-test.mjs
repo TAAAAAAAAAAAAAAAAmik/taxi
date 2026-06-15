@@ -50,7 +50,9 @@ try {
     },
     method: 'POST',
   });
-  const drivers = await api('/drivers');
+  const drivers = await api('/drivers', {
+    token: admin.session.token,
+  });
   const driver = drivers.drivers.find((item) => item.userId === registered.user.id);
 
   assert(driver, 'Driver profile should be created');

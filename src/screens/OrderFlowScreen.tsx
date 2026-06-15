@@ -191,16 +191,27 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     () => extraStops.map((stop) => stop.trim()).filter(Boolean),
     [extraStops],
   );
-  const optionsTotal = selectedOptionItems.reduce((sum, option) => sum + option.price, 0);
+  const optionsTotal = useMemo(
+    () => selectedOptionItems.reduce((sum, option) => sum + option.price, 0),
+    [selectedOptionItems],
+  );
   const canConfirm = Boolean(values.pickup?.trim()) && Boolean(values.destination?.trim());
   const usesRegionalAddressBook = !isDriverRole;
-  const availableCarsCount = drivers.filter(
-    (driver) =>
-      driver.status === 'approved' &&
-      driver.isOnline &&
-      driver.subscriptionStatus === 'active' &&
-      driver.canReceiveOrders,
-  ).length;
+  const availableCarsCount = useMemo(
+    () =>
+      drivers.reduce(
+        (count, driver) =>
+          count +
+          (driver.status === 'approved' &&
+          driver.isOnline &&
+          driver.subscriptionStatus === 'active' &&
+          driver.canReceiveOrders
+            ? 1
+            : 0),
+        0,
+      ),
+    [drivers],
+  );
   const availableCarsState =
     availableCarsCount === 0 ? 'none' : availableCarsCount <= 2 ? 'low' : 'ready';
   const currentDriver = useMemo(
@@ -245,15 +256,31 @@ export function OrderFlowScreen({ navigation, route }: Props) {
         : [],
     [currentDriver, driverCannotReceiveOrders, driverFeedSort, isDriverRole, nowMs, orders],
   );
-  const selectedFeedOrder =
-    availableDriverOrders.find((order) => order.id === selectedFeedOrderId) ?? availableDriverOrders[0];
+  const primaryDriverFeedOrders = useMemo(
+    () => availableDriverOrders.slice(0, 12),
+    [availableDriverOrders],
+  );
+  const compactDriverFeedOrders = useMemo(
+    () => availableDriverOrders.slice(0, 4),
+    [availableDriverOrders],
+  );
+  const selectedFeedOrder = useMemo(
+    () =>
+      availableDriverOrders.find((order) => order.id === selectedFeedOrderId) ?? availableDriverOrders[0],
+    [availableDriverOrders, selectedFeedOrderId],
+  );
   const selectedFeedOrderExclusiveSeconds = selectedFeedOrder
     ? getExclusiveOfferRemainingSeconds(selectedFeedOrder, currentDriver?.id, nowMs)
     : 0;
   const selectedFeedOrderIsExclusive = selectedFeedOrderExclusiveSeconds > 0;
-  const exclusiveDriverOrdersCount = availableDriverOrders.filter((order) =>
-    isOrderExclusiveForDriver(order, currentDriver?.id, nowMs),
-  ).length;
+  const exclusiveDriverOrdersCount = useMemo(
+    () =>
+      availableDriverOrders.reduce(
+        (count, order) => count + (isOrderExclusiveForDriver(order, currentDriver?.id, nowMs) ? 1 : 0),
+        0,
+      ),
+    [availableDriverOrders, currentDriver?.id, nowMs],
+  );
   const localRouteEstimate = useMemo(
     () =>
       buildRouteEstimate({
@@ -591,7 +618,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
     const order = {
       destination: values.destination.trim(),
-      id: `TX-${Date.now().toString().slice(-6)}`,
+      id: `CLIENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       options: selectedOptionLabels,
       optionsTotal,
       paymentMethod,
@@ -1502,20 +1529,22 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             </View>
 
             {availableDriverOrders.length > 0 ? (
-              availableDriverOrders.slice(0, 12).map((order) => (
+              primaryDriverFeedOrders.map((order) => (
                 <CompactOrderCard
                   active={order.id === selectedFeedOrder?.id}
                   disabled={isSubmitting}
                   distanceLabel={getDriverOrderDistanceLabel(order, currentDriver)}
+                  fromLabel={getDriverFeedAddressLabel(order)}
                   key={order.id}
                   onAccept={() => acceptDriverFeedOrder(order)}
                   onInfoPress={() => {
                     selectDriverFeedOrder(order.id);
                     setDetailsOrder(order);
                   }}
+                  paymentLabel={order.paymentMethod}
                   priceLabel={`${order.total} ₽`}
-                  routeLabel={getDriverFeedAddressLabel(order)}
                   serviceLabel={getServiceCopy(order.serviceType === 'delivery' ? 'delivery' : 'taxi').shortTitle}
+                  toLabel={order.destination}
                 />
               ))
             ) : realtimeStatus === 'connecting' && !driverCannotReceiveOrders ? (
@@ -1751,20 +1780,22 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                         <Route color="#008D49" size={17} strokeWidth={2.4} />
                       </Pressable>
                     </View>
-                    {availableDriverOrders.slice(0, 4).map((order) => (
+                    {compactDriverFeedOrders.map((order) => (
                       <CompactOrderCard
                         active={order.id === selectedFeedOrder?.id}
                         disabled={isSubmitting}
                         distanceLabel={getDriverOrderDistanceLabel(order, currentDriver)}
+                        fromLabel={getDriverFeedAddressLabel(order)}
                         key={order.id}
                         onAccept={() => acceptDriverFeedOrder(order)}
                         onInfoPress={() => {
                           selectDriverFeedOrder(order.id);
                           setDetailsOrder(order);
                         }}
+                        paymentLabel={order.paymentMethod}
                         priceLabel={`${order.total} ₽`}
-                        routeLabel={getDriverFeedAddressLabel(order)}
                         serviceLabel={getServiceCopy(order.serviceType === 'delivery' ? 'delivery' : 'taxi').shortTitle}
+                        toLabel={order.destination}
                       />
                     ))}
                     {selectedFeedOrderIsExclusive ? (
@@ -2391,22 +2422,26 @@ type CompactOrderCardProps = {
   active: boolean;
   disabled: boolean;
   distanceLabel: string;
+  fromLabel: string;
   onAccept: () => void;
   onInfoPress: () => void;
+  paymentLabel: string;
   priceLabel: string;
-  routeLabel: string;
   serviceLabel: string;
+  toLabel: string;
 };
 
 function CompactOrderCard({
   active,
   disabled,
   distanceLabel,
+  fromLabel,
   onAccept,
   onInfoPress,
+  paymentLabel,
   priceLabel,
-  routeLabel,
   serviceLabel,
+  toLabel,
 }: CompactOrderCardProps) {
   return (
     <View
@@ -2416,38 +2451,54 @@ function CompactOrderCard({
         active && styles.compactOrderCardActive,
       ]}
     >
-      <View style={styles.compactOrderBodyRow}>
+      <View style={styles.compactOrderTop}>
+        <View style={styles.compactOrderTags}>
+          <Text numberOfLines={1} style={styles.compactOrderService}>{serviceLabel}</Text>
+          {paymentLabel ? (
+            <Text numberOfLines={1} style={styles.compactOrderPayment}>{paymentLabel}</Text>
+          ) : null}
+        </View>
+        <Text numberOfLines={1} style={styles.compactOrderPrice}>{priceLabel}</Text>
+      </View>
+
+      <View style={styles.compactOrderRouteRow}>
         <View style={styles.compactOrderRouteMark}>
           <View style={styles.compactOrderRouteDot} />
           <View style={styles.compactOrderRouteLine} />
+          <View style={styles.compactOrderRouteDotEnd} />
         </View>
-        <Text numberOfLines={1} style={styles.compactOrderService}>{serviceLabel}</Text>
-        <Text numberOfLines={1} style={styles.compactOrderDistance}>{distanceLabel}</Text>
-        <Text numberOfLines={1} style={styles.compactOrderRoute}>{routeLabel}</Text>
-        <Text numberOfLines={1} style={styles.compactOrderPrice}>{priceLabel}</Text>
-        <View style={styles.compactOrderActions}>
-          <Pressable
-            accessibilityLabel="Подробнее о заказе"
-            accessibilityRole="button"
-            onPress={onInfoPress}
-            style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}
-          >
-            <Info color="#008D49" size={20} strokeWidth={2.4} />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={disabled}
-            onPress={onAccept}
-            style={({ pressed }) => [
-              styles.acceptOrderButton,
-              styles.compactAcceptOrderButton,
-              disabled && styles.disabledButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.acceptOrderButtonText}>Принять заказ</Text>
-          </Pressable>
+        <View style={styles.compactOrderCopy}>
+          <Text numberOfLines={1} style={styles.compactOrderRoute}>{fromLabel}</Text>
+          <Text numberOfLines={1} style={styles.compactOrderRouteTo}>{toLabel}</Text>
         </View>
+      </View>
+
+      {distanceLabel ? (
+        <Text numberOfLines={1} style={styles.compactOrderMeta}>{distanceLabel}</Text>
+      ) : null}
+
+      <View style={styles.compactOrderActions}>
+        <Pressable
+          accessibilityLabel="Подробнее о заказе"
+          accessibilityRole="button"
+          onPress={onInfoPress}
+          style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}
+        >
+          <Info color="#008D49" size={20} strokeWidth={2.4} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          disabled={disabled}
+          onPress={onAccept}
+          style={({ pressed }) => [
+            styles.acceptOrderButton,
+            styles.compactAcceptOrderButton,
+            disabled && styles.disabledButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.acceptOrderButtonText}>Принять заказ</Text>
+        </Pressable>
       </View>
     </View>
   );

@@ -23,6 +23,7 @@ const documentStoragePath = resolve(
 );
 const maxRequestBodyBytes = readNumberEnv('MVP_MAX_BODY_BYTES', 12_000_000);
 const adminPassword = process.env.MVP_ADMIN_PASSWORD || 'admin-demo-5000';
+const internalApiToken = String(process.env.MVP_INTERNAL_API_TOKEN || '').trim();
 const configuredLinksOrigin = normalizeLinksOrigin(
   process.env.MVP_LINKS_ORIGIN || process.env.EXPO_PUBLIC_LINKS_DOMAIN,
 );
@@ -1052,22 +1053,23 @@ function sendBinary(response, statusCode, payload, headers = {}) {
   response.end(payload);
 }
 
-function createRealtimeSnapshot(db) {
+function createRealtimeSnapshot(db, sessionContext) {
   return {
-    drivers: makeDriversResponse(db, null),
+    drivers: makeDriversResponse(db, sessionContext),
     generatedAt: new Date().toISOString(),
-    notifications: Array.isArray(db.notifications) ? db.notifications.slice(0, 50) : [],
-    orders: db.orders,
-    supportThreads: Array.isArray(db.supportThreads) ? db.supportThreads.slice(0, 50) : [],
+    notifications: makeNotificationsResponse(db, sessionContext),
+    orders: makeOrdersResponse(db, sessionContext),
+    supportThreads: makeSupportThreadsResponse(db, sessionContext),
   };
 }
 
-function openRealtimeStream(request, response, db) {
+function openRealtimeStream(request, response, db, sessionContext) {
   const clientId = randomUUID();
   const client = {
     heartbeat: undefined,
     id: clientId,
     response,
+    sessionContext,
   };
 
   response.writeHead(200, {
@@ -1082,7 +1084,7 @@ function openRealtimeStream(request, response, db) {
   realtimeClients.set(clientId, client);
   sendRealtimeEvent(client, 'snapshot', {
     clientId,
-    snapshot: createRealtimeSnapshot(db),
+    snapshot: createRealtimeSnapshot(db, sessionContext),
     type: 'snapshot',
   });
 
@@ -1145,23 +1147,45 @@ function sendRealtimeSocketEvent(socket, eventType, payload) {
   }
 }
 
+function makeRealtimeEventPayload(eventType, payload, db, sessionContext) {
+  const scopedPayload = { ...payload };
+
+  if (scopedPayload.order) {
+    scopedPayload.order = canReadOrder(db, sessionContext, scopedPayload.order)
+      ? makeOrderResponse(db, scopedPayload.order, sessionContext)
+      : undefined;
+  }
+
+  if (scopedPayload.driver) {
+    scopedPayload.driver = makeDriverResponse(db, scopedPayload.driver, sessionContext);
+  }
+
+  if (scopedPayload.notification && !canReadNotification(db, sessionContext, scopedPayload.notification)) {
+    scopedPayload.notification = undefined;
+  }
+
+  if (scopedPayload.thread && !canReadSupportThread(sessionContext, scopedPayload.thread)) {
+    scopedPayload.thread = undefined;
+  }
+
+  return {
+    ...scopedPayload,
+    snapshot: createRealtimeSnapshot(db, sessionContext),
+    type: eventType,
+  };
+}
+
 function broadcastRealtime(eventType, payload, db) {
   if (realtimeClients.size === 0 && realtimeSocketClients.size === 0) {
     return;
   }
 
-  const eventPayload = {
-    ...payload,
-    snapshot: createRealtimeSnapshot(db),
-    type: eventType,
-  };
-
   for (const client of realtimeClients.values()) {
-    sendRealtimeEvent(client, eventType, eventPayload);
+    sendRealtimeEvent(client, eventType, makeRealtimeEventPayload(eventType, payload, db, client.sessionContext));
   }
 
   for (const socket of realtimeSocketClients) {
-    sendRealtimeSocketEvent(socket, eventType, eventPayload);
+    sendRealtimeSocketEvent(socket, eventType, makeRealtimeEventPayload(eventType, payload, db, socket.sessionContext));
   }
 }
 
@@ -2274,18 +2298,26 @@ function listSupportThreads(db, filters = {}) {
     .map(normalizeSupportThread)
     .filter((thread) => !role || thread.role === role)
     .filter((thread) => !category || normalizeSearchText(thread.category) === category)
-    .filter((thread) => !userId || !thread.userId || thread.userId === userId)
+    .filter((thread) => !userId || thread.userId === userId)
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 }
 
 function appendSupportMessage(db, payload, sessionContext) {
   const now = new Date().toISOString();
-  const role = normalizeRole(payload.role);
+  const role = isAdminSession(sessionContext) && payload.role
+    ? normalizeRole(payload.role)
+    : getSessionRole(sessionContext);
   const category = String(payload.category || 'Общий вопрос').trim() || 'Общий вопрос';
   const title = String(payload.title || category).trim() || category;
   const text = requireString(payload.text, 'text');
-  const userId = String(payload.userId || sessionContext?.user?.id || '');
-  const threadId = String(payload.threadId || `${role}-${slugKey(category)}`);
+  const userId = isAdminSession(sessionContext)
+    ? String(payload.userId || sessionContext?.user?.id || '')
+    : String(sessionContext?.user?.id || '');
+  const threadId = String(
+    payload.threadId && isAdminSession(sessionContext)
+      ? payload.threadId
+      : `${role}-${userId || 'anonymous'}-${slugKey(category)}`,
+  );
   const currentThreads = Array.isArray(db.supportThreads) ? db.supportThreads.map(normalizeSupportThread) : [];
   const existing = currentThreads.find((thread) => thread.id === threadId);
   const actor = makeActorFromSession(sessionContext);
@@ -2406,7 +2438,8 @@ function makeOrder(payload) {
   );
 
   return {
-    id: `TX-${Date.now().toString().slice(-6)}`,
+    id: makeOrderId(),
+    clientRequestId: payload.clientRequestId ? String(payload.clientRequestId) : undefined,
     role,
     serviceType,
     pickup,
@@ -2460,6 +2493,10 @@ function makeOrder(payload) {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function makeOrderId() {
+  return `TX-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
 function createTripPin() {
@@ -4004,9 +4041,13 @@ function createSessionExpiry(createdAtValue) {
   return expiresAt.toISOString();
 }
 
-function getSessionContext(db, request) {
+function getSessionContext(db, request, options = {}) {
   const authHeader = String(request.headers.authorization || '');
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  const headerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+  const queryToken = options.allowQueryToken && options.url
+    ? String(options.url.searchParams.get('token') || '').trim()
+    : '';
+  const token = headerToken || queryToken;
 
   if (!token) {
     return null;
@@ -4290,8 +4331,253 @@ function isAdminSession(sessionContext) {
   return sessionContext?.user?.role === 'admin';
 }
 
+function getSessionRole(sessionContext) {
+  return sessionContext?.user?.role === 'admin' ? 'admin' : normalizeRole(sessionContext?.user?.role);
+}
+
+function getSessionDriverProfiles(db, sessionContext) {
+  if (!sessionContext) {
+    return [];
+  }
+
+  return db.drivers.filter((driver) => driver.userId === sessionContext.user.id);
+}
+
+function getSessionDriverIds(db, sessionContext) {
+  return new Set(getSessionDriverProfiles(db, sessionContext).map((driver) => String(driver.id)));
+}
+
+function canAccessPark(sessionContext, park) {
+  if (isAdminSession(sessionContext)) {
+    return true;
+  }
+
+  if (!sessionContext || !park) {
+    return false;
+  }
+
+  return (
+    getSessionRole(sessionContext) === 'park_admin' &&
+    (park.ownerUserId === sessionContext.user.id || park.id === sessionContext.user.parkId)
+  );
+}
+
 function canAccessDriver(sessionContext, driver) {
-  return isAdminSession(sessionContext) || (driver?.userId && driver.userId === sessionContext?.user?.id);
+  if (isAdminSession(sessionContext) || (driver?.userId && driver.userId === sessionContext?.user?.id)) {
+    return true;
+  }
+
+  return (
+    getSessionRole(sessionContext) === 'park_admin' &&
+    driver?.parkId &&
+    driver.parkId === sessionContext?.user?.parkId
+  );
+}
+
+function canReadDriver(sessionContext, driver) {
+  if (canAccessDriver(sessionContext, driver)) {
+    return true;
+  }
+
+  return Boolean(driver?.status === 'approved' && driver.canReceiveOrders);
+}
+
+function makeDriversResponse(db, sessionContext) {
+  return db.drivers
+    .map((driver) => {
+      const normalizedDriver = normalizeDriver(driver);
+      return canReadDriver(sessionContext, normalizedDriver)
+        ? makeDriverResponse(db, normalizedDriver, sessionContext)
+        : null;
+    })
+    .filter(Boolean);
+}
+
+function canReadOrder(db, sessionContext, order) {
+  if (isAdminSession(sessionContext)) {
+    return true;
+  }
+
+  if (!sessionContext || !order) {
+    return false;
+  }
+
+  const role = getSessionRole(sessionContext);
+
+  if (role === 'client') {
+    return Boolean(order.userId && order.userId === sessionContext.user.id);
+  }
+
+  if (isDriverLikeRole(role)) {
+    const driverIds = getSessionDriverIds(db, sessionContext);
+
+    if (order.driver?.id && driverIds.has(String(order.driver.id))) {
+      return true;
+    }
+
+    return (
+      order.role === 'client' &&
+      !order.driver &&
+      ['created', 'searching'].includes(order.status)
+    );
+  }
+
+  if (role === 'park_admin') {
+    return Boolean(order.parkId && order.parkId === sessionContext.user.parkId);
+  }
+
+  return false;
+}
+
+function makeOrderResponse(db, order, sessionContext) {
+  const responseOrder = { ...order };
+  const isOwnerClient = Boolean(order.userId && order.userId === sessionContext?.user?.id);
+  const driverIds = getSessionDriverIds(db, sessionContext);
+  const isAssignedDriver = Boolean(order.driver?.id && driverIds.has(String(order.driver.id)));
+
+  if (!isAdminSession(sessionContext) && !isOwnerClient) {
+    delete responseOrder.tripPin;
+  }
+
+  if (!isAdminSession(sessionContext) && !isOwnerClient && !isAssignedDriver) {
+    delete responseOrder.clientPhone;
+    delete responseOrder.recipientPhone;
+  }
+
+  return responseOrder;
+}
+
+function makeOrdersResponse(db, sessionContext) {
+  return db.orders
+    .filter((order) => canReadOrder(db, sessionContext, order))
+    .map((order) => makeOrderResponse(db, order, sessionContext));
+}
+
+function canReadNotification(db, sessionContext, notification) {
+  if (isAdminSession(sessionContext)) {
+    return true;
+  }
+
+  if (!sessionContext || !notification) {
+    return false;
+  }
+
+  const role = getSessionRole(sessionContext);
+
+  if (notification.userId && notification.userId === sessionContext.user.id) {
+    return true;
+  }
+
+  if (notification.driverId && getSessionDriverIds(db, sessionContext).has(String(notification.driverId))) {
+    return true;
+  }
+
+  if (notification.audience === 'client' && role === 'client') {
+    return true;
+  }
+
+  if (notification.audience === 'driver' && isDriverLikeRole(role)) {
+    return true;
+  }
+
+  if (notification.audience === 'park' && role === 'park_admin') {
+    return true;
+  }
+
+  if (notification.orderId) {
+    const order = db.orders.find((item) => item.id === notification.orderId);
+    return canReadOrder(db, sessionContext, order);
+  }
+
+  return notification.audience === 'all';
+}
+
+function makeNotificationsResponse(db, sessionContext) {
+  return (Array.isArray(db.notifications) ? db.notifications : [])
+    .filter((notification) => canReadNotification(db, sessionContext, notification))
+    .slice(0, 50);
+}
+
+function canReadSupportThread(sessionContext, thread) {
+  if (isAdminSession(sessionContext)) {
+    return true;
+  }
+
+  return Boolean(sessionContext && thread?.userId && thread.userId === sessionContext.user.id);
+}
+
+function makeSupportThreadsResponse(db, sessionContext, filters = {}) {
+  const userId = isAdminSession(sessionContext)
+    ? filters.userId
+    : sessionContext?.user?.id;
+
+  return listSupportThreads(db, {
+    ...filters,
+    userId,
+  })
+    .filter((thread) => canReadSupportThread(sessionContext, thread))
+    .slice(0, 50);
+}
+
+function getDriverForSession(db, sessionContext, requestedDriverId) {
+  if (!sessionContext) {
+    return null;
+  }
+
+  if (isAdminSession(sessionContext)) {
+    return db.drivers.find((driver) => driver.id === requestedDriverId) || null;
+  }
+
+  const role = getSessionRole(sessionContext);
+  const ownDrivers = getSessionDriverProfiles(db, sessionContext);
+
+  if (isDriverLikeRole(role)) {
+    return ownDrivers.find((driver) => !requestedDriverId || driver.id === requestedDriverId) || null;
+  }
+
+  if (role === 'park_admin') {
+    return db.drivers.find(
+      (driver) => driver.id === requestedDriverId && driver.parkId === sessionContext.user.parkId,
+    ) || null;
+  }
+
+  return null;
+}
+
+function canMutateOrder(sessionContext, db, order) {
+  if (isAdminSession(sessionContext)) {
+    return true;
+  }
+
+  if (!sessionContext || !order) {
+    return false;
+  }
+
+  const role = getSessionRole(sessionContext);
+
+  if (role === 'client') {
+    return Boolean(order.userId && order.userId === sessionContext.user.id);
+  }
+
+  if (isDriverLikeRole(role)) {
+    const driverIds = getSessionDriverIds(db, sessionContext);
+    return Boolean(order.driver?.id && driverIds.has(String(order.driver.id)));
+  }
+
+  if (role === 'park_admin') {
+    return Boolean(order.parkId && order.parkId === sessionContext.user.parkId);
+  }
+
+  return false;
+}
+
+function hasInternalAccess(request, url) {
+  const token =
+    String(request.headers['x-internal-token'] || '') ||
+    String(request.headers.authorization || '').replace(/^Bearer\s+/i, '') ||
+    String(url.searchParams.get('token') || '');
+
+  return Boolean(internalApiToken && token && safeEqual(token, internalApiToken));
 }
 
 function makeActorFromSession(sessionContext) {
@@ -6188,7 +6474,7 @@ function makeDriverResponse(db, driver, sessionContext) {
   const normalizedDriver = normalizeDriver(driver);
 
   if (!canAccessDriver(sessionContext, normalizedDriver)) {
-    const { documentAudit, documentReview, documentUploads, ...publicDriver } = normalizedDriver;
+    const { documentAudit, documentReview, documentUploads, phone, userId, ...publicDriver } = normalizedDriver;
     return publicDriver;
   }
 
@@ -6202,10 +6488,6 @@ function makeDriverResponse(db, driver, sessionContext) {
       ]),
     ),
   };
-}
-
-function makeDriversResponse(db, sessionContext) {
-  return db.drivers.map((driver) => makeDriverResponse(db, driver, sessionContext));
 }
 
 async function applyDriverDocumentUploads(db, driver, payload, actor) {
@@ -6606,25 +6888,48 @@ async function handleRequest(request, response) {
     const db = await readDb();
 
     if (request.method === 'GET' && url.pathname === '/realtime/snapshot') {
+      const sessionContext = getSessionContext(db, request);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
       const releasedOffers = await releaseExpiredExclusiveOffers(db);
       if (releasedOffers.length > 0) {
         await writeDb(db);
       }
-      sendJson(response, 200, createRealtimeSnapshot(db));
+      sendJson(response, 200, createRealtimeSnapshot(db, sessionContext));
       return;
     }
 
     if (request.method === 'GET' && url.pathname === '/realtime/stream') {
-      openRealtimeStream(request, response, db);
+      const sessionContext = getSessionContext(db, request, { allowQueryToken: true, url });
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
+      openRealtimeStream(request, response, db, sessionContext);
       return;
     }
 
     if (request.method === 'POST' && url.pathname === '/push-tokens') {
+      const sessionContext = getSessionContext(db, request);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
       const payload = await readBody(request);
       const token = normalizePushToken({
         ...payload,
         createdAt: new Date().toISOString(),
+        role: sessionContext.user.role,
         updatedAt: new Date().toISOString(),
+        userId: sessionContext.user.id,
       });
 
       if (!token) {
@@ -6895,10 +7200,16 @@ async function handleRequest(request, response) {
 
     if (request.method === 'GET' && url.pathname === '/support/threads') {
       const sessionContext = getSessionContext(db, request);
-      const threads = listSupportThreads(db, {
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
+      const threads = makeSupportThreadsResponse(db, sessionContext, {
         category: url.searchParams.get('category'),
         role: url.searchParams.get('role'),
-        userId: url.searchParams.get('userId') || sessionContext?.user?.id,
+        userId: url.searchParams.get('userId'),
       });
 
       sendJson(response, 200, { threads });
@@ -6907,6 +7218,12 @@ async function handleRequest(request, response) {
 
     if (request.method === 'POST' && url.pathname === '/support/messages') {
       const sessionContext = getSessionContext(db, request);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
       const payload = await readBody(request);
       const thread = appendSupportMessage(db, payload, sessionContext);
 
@@ -7584,6 +7901,13 @@ async function handleRequest(request, response) {
     }
 
     if (request.method === 'GET' && url.pathname === '/users') {
+      const sessionContext = getSessionContext(db, request);
+
+      if (!isAdminSession(sessionContext)) {
+        sendJson(response, sessionContext ? 403 : 401, { error: 'Admin access required' });
+        return;
+      }
+
       sendJson(response, 200, { users: db.users.map(publicUser) });
       return;
     }
@@ -8387,11 +8711,18 @@ async function handleRequest(request, response) {
     }
 
     if (request.method === 'GET' && url.pathname === '/orders') {
+      const sessionContext = getSessionContext(db, request);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
       const releasedOffers = await releaseExpiredExclusiveOffers(db);
       if (releasedOffers.length > 0) {
         await writeDb(db);
       }
-      sendJson(response, 200, { orders: db.orders });
+      sendJson(response, 200, { orders: makeOrdersResponse(db, sessionContext) });
       return;
     }
 
@@ -8415,49 +8746,90 @@ async function handleRequest(request, response) {
     }
 
     if (request.method === 'POST' && url.pathname === '/orders') {
-      const payload = await readBody(request);
-      const order = applyBonusToOrder(db, makeOrder(payload), payload);
-      const exclusiveOffer = applyExclusiveOffer(db, order);
-      db.orders.unshift(order);
-      const notification = notifyOrderChange(
-        db,
-        order,
-        exclusiveOffer ? 'Заказ предложен ближайшему водителю' : 'Новый заказ в ленте',
-        `${formatOrderRoute(order)} · ${order.total} ₽`,
-        'order_created',
-      );
-      if (exclusiveOffer?.driver) {
-        const driverNotification = addRealtimeNotification(db, {
-          audience: 'driver',
-          body: `${order.pickup} → ${order.destination} · ${order.total} ₽`,
-          driverId: exclusiveOffer.driver.id,
-          kind: 'dispatch_exclusive_offer',
-          orderId: order.id,
-          title: 'Заказ рядом с вами',
-        });
-        await sendPushToDriver(db, exclusiveOffer.driver.id, driverNotification, {
-          actionCategory: 'driver_order_offer',
-          distanceKm: order.exclusiveDistanceKm || '',
-          expiresInSeconds: order.exclusiveOfferSeconds || dispatchExclusiveOfferSeconds,
-          offerId: `${order.id}:${exclusiveOffer.driver.id}`,
-          orderId: order.id,
-          status: 'exclusive_offer',
-        });
-        scheduleExclusiveOfferRelease(db, order.id);
-      } else {
-        await sendPushToDrivers(db, getAvailableDriverIds(db), notification, {
-          actionCategory: 'driver_order_offer',
-          orderId: order.id,
-          status: 'open_feed',
-        });
+      const sessionContext = getSessionContext(db, request);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
       }
-      await sendPushToAdmins(db, notification, {
-        orderId: order.id,
-        status: order.dispatchStatus || order.status,
+
+      const payload = await readBody(request);
+      const actorRole = isAdminSession(sessionContext) && payload.role
+        ? normalizeRole(payload.role)
+        : getSessionRole(sessionContext);
+      const clientRequestId = String(payload.clientRequestId || payload.id || '').trim();
+      const orderPayload = {
+        ...payload,
+        clientName: payload.clientName || [sessionContext.user.firstName, sessionContext.user.lastName].filter(Boolean).join(' '),
+        clientPhone: sessionContext.user.phone || payload.clientPhone,
+        clientRequestId,
+        parkId: sessionContext.user.parkId || payload.parkId,
+        role: actorRole,
+        userId: sessionContext.user.id,
+      };
+
+      const outcome = await mutateDb(async (db) => {
+        const existingOrder = clientRequestId
+          ? db.orders.find(
+              (item) => item.clientRequestId === clientRequestId && item.userId === sessionContext.user.id,
+            )
+          : undefined;
+
+        if (existingOrder) {
+          return {
+            status: 200,
+            body: { order: makeOrderResponse(db, existingOrder, sessionContext) },
+          };
+        }
+
+        const order = applyBonusToOrder(db, makeOrder(orderPayload), orderPayload);
+        const exclusiveOffer = applyExclusiveOffer(db, order);
+        db.orders.unshift(order);
+        const notification = notifyOrderChange(
+          db,
+          order,
+          exclusiveOffer ? 'Заказ предложен ближайшему водителю' : 'Новый заказ в ленте',
+          `${formatOrderRoute(order)} · ${order.total} ₽`,
+          'order_created',
+        );
+        if (exclusiveOffer?.driver) {
+          const driverNotification = addRealtimeNotification(db, {
+            audience: 'driver',
+            body: `${order.pickup} → ${order.destination} · ${order.total} ₽`,
+            driverId: exclusiveOffer.driver.id,
+            kind: 'dispatch_exclusive_offer',
+            orderId: order.id,
+            title: 'Заказ рядом с вами',
+          });
+          await sendPushToDriver(db, exclusiveOffer.driver.id, driverNotification, {
+            actionCategory: 'driver_order_offer',
+            distanceKm: order.exclusiveDistanceKm || '',
+            expiresInSeconds: order.exclusiveOfferSeconds || dispatchExclusiveOfferSeconds,
+            offerId: `${order.id}:${exclusiveOffer.driver.id}`,
+            orderId: order.id,
+            status: 'exclusive_offer',
+          });
+          scheduleExclusiveOfferRelease(db, order.id);
+        } else {
+          await sendPushToDrivers(db, getAvailableDriverIds(db), notification, {
+            actionCategory: 'driver_order_offer',
+            orderId: order.id,
+            status: 'open_feed',
+          });
+        }
+        await sendPushToAdmins(db, notification, {
+          orderId: order.id,
+          status: order.dispatchStatus || order.status,
+        });
+        broadcastRealtime('order_created', { notification, order }, db);
+
+        return {
+          status: 201,
+          body: { order: makeOrderResponse(db, order, sessionContext) },
+        };
       });
-      await writeDb(db);
-      broadcastRealtime('order_created', { notification, order }, db);
-      sendJson(response, 201, { order });
+
+      sendJson(response, outcome.status, outcome.body);
       return;
     }
 
@@ -8467,22 +8839,37 @@ async function handleRequest(request, response) {
       // (settlement) и реферальные/маркетинговые начисления идут на свежем состоянии
       // под замком, чтобы не затирать параллельное назначение/оплату того же заказа.
       const outcome = await mutateDb(async (db) => {
+        const sessionContext = getSessionContext(db, request);
         const order = db.orders.find((item) => item.id === pathParts[1]);
+
+        if (!sessionContext) {
+          return { status: 401, body: { error: 'Authentication required' } };
+        }
 
         if (!order) {
           return { status: 404, body: { error: 'Order not found' } };
         }
 
+        if (!canMutateOrder(sessionContext, db, order)) {
+          return { status: 403, body: { error: 'Order access denied' } };
+        }
+
         const nextStatus = String(payload.status || order.status);
 
         if (!isKnownOrderStatus(nextStatus)) {
-          return { status: 400, body: { error: `Unknown order status: ${nextStatus}`, order } };
+          return {
+            status: 400,
+            body: { error: `Unknown order status: ${nextStatus}`, order: makeOrderResponse(db, order, sessionContext) },
+          };
         }
 
         if (!isAllowedOrderStatusTransition(order.status, nextStatus)) {
           return {
             status: 422,
-            body: { error: `Illegal status transition ${order.status} -> ${nextStatus}`, order },
+            body: {
+              error: `Illegal status transition ${order.status} -> ${nextStatus}`,
+              order: makeOrderResponse(db, order, sessionContext),
+            },
           };
         }
 
@@ -8492,7 +8879,10 @@ async function handleRequest(request, response) {
           !order.safetyPinVerifiedAt &&
           !isValidTripPin(order, payload.pinCode || payload.tripPin)
         ) {
-          return { status: 403, body: { error: 'Trip PIN does not match', order } };
+          return {
+            status: 403,
+            body: { error: 'Trip PIN does not match', order: makeOrderResponse(db, order, sessionContext) },
+          };
         }
 
         order.status = nextStatus;
@@ -8547,7 +8937,7 @@ async function handleRequest(request, response) {
         });
         broadcastRealtime('order_status', { notification, order }, db);
 
-        return { status: 200, body: { order } };
+        return { status: 200, body: { order: makeOrderResponse(db, order, sessionContext) } };
       });
 
       sendJson(response, outcome.status, outcome.body);
@@ -8561,24 +8951,42 @@ async function handleRequest(request, response) {
       // Отклонение эксклюзивного оффера — под замком, чтобы не пересечься с принятием
       // того же заказа другим водителем и не вернуть заказ в общий фид внахлёст.
       const outcome = await mutateDb(async (db) => {
+        const sessionContext = getSessionContext(db, request);
         const order = db.orders.find((item) => item.id === pathParts[1]);
+        const sessionDriver = getDriverForSession(db, sessionContext, driverId);
+
+        if (!sessionContext) {
+          return { status: 401, body: { error: 'Authentication required' } };
+        }
 
         if (!order) {
           return { status: 404, body: { error: 'Order not found' } };
+        }
+
+        if (!isAdminSession(sessionContext) && !sessionDriver) {
+          return { status: 403, body: { error: 'Driver access required' } };
         }
 
         if (action !== 'decline') {
           return { status: 400, body: { error: 'Unsupported offer action' } };
         }
 
-        if (!isExclusiveOfferActive(order) || String(order.exclusiveDriverId || '') !== driverId) {
-          return { status: 409, body: { error: 'Exclusive offer is not active for this driver', order } };
+        const actorDriverId = isAdminSession(sessionContext) ? driverId : sessionDriver.id;
+
+        if (!isExclusiveOfferActive(order) || String(order.exclusiveDriverId || '') !== String(actorDriverId)) {
+          return {
+            status: 409,
+            body: {
+              error: 'Exclusive offer is not active for this driver',
+              order: makeOrderResponse(db, order, sessionContext),
+            },
+          };
         }
 
         releaseExclusiveOffer(order, 'declined');
         await publishOrderOpenFeed(db, order);
 
-        return { status: 200, body: { order } };
+        return { status: 200, body: { order: makeOrderResponse(db, order, sessionContext) } };
       });
 
       sendJson(response, outcome.status, outcome.body);
@@ -8590,8 +8998,13 @@ async function handleRequest(request, response) {
       // Обновление оплаты — через сериализованную критическую секцию, чтобы оплата и
       // смена статуса того же заказа не затирали друг друга при одновременных запросах.
       const outcome = await mutateDb(async (db) => {
+        const sessionContext = getSessionContext(db, request);
         const order = db.orders.find((item) => item.id === pathParts[1]);
         const paymentStatus = normalizePaymentStatus(payload.paymentStatus || payload.status, '');
+
+        if (!isAdminSession(sessionContext)) {
+          return { status: sessionContext ? 403 : 401, body: { error: 'Admin access required' } };
+        }
 
         if (!order) {
           return { status: 404, body: { error: 'Order not found' } };
@@ -8617,7 +9030,7 @@ async function handleRequest(request, response) {
         );
         broadcastRealtime('order_payment', { notification, order }, db);
 
-        return { status: 200, body: { order } };
+        return { status: 200, body: { order: makeOrderResponse(db, order, sessionContext) } };
       });
 
       sendJson(response, outcome.status, outcome.body);
@@ -8690,13 +9103,18 @@ async function handleRequest(request, response) {
         return {
           status: 200,
           body: {
-            order,
+            order: makeOrderResponse(db, order, sessionContext),
             summary: makeServiceShareSummary(db, order.serviceShareBatchDate),
           },
         };
       });
 
       sendJson(response, outcome.status, outcome.body);
+      return;
+    }
+
+    if (pathParts[0] === 'internal' && !hasInternalAccess(request, url)) {
+      sendJson(response, 401, { error: 'Internal API token required' });
       return;
     }
 
@@ -8799,11 +9217,17 @@ async function handleRequest(request, response) {
     }
 
     if (pathParts[0] === 'parks' && pathParts[1]) {
+      const sessionContext = getSessionContext(db, request);
       const parkId = pathParts[1];
       const park = db.parks.find((item) => item.id === parkId);
 
       if (!park) {
         sendJson(response, 404, { error: 'Park not found' });
+        return;
+      }
+
+      if (!canAccessPark(sessionContext, park)) {
+        sendJson(response, sessionContext ? 403 : 401, { error: 'Park access denied' });
         return;
       }
 
@@ -8894,7 +9318,11 @@ async function handleRequest(request, response) {
       }
 
       if (request.method === 'GET' && pathParts[2] === 'orders') {
-        sendJson(response, 200, { orders: db.orders.filter((order) => order.parkId === parkId) });
+        sendJson(response, 200, {
+          orders: db.orders
+            .filter((order) => order.parkId === parkId)
+            .map((order) => makeOrderResponse(db, order, sessionContext)),
+        });
         return;
       }
 
@@ -8960,8 +9388,13 @@ async function handleRequest(request, response) {
       // доступности и присвоение водителя выполняются на свежем состоянии под замком,
       // поэтому два водителя не могут одновременно «принять» один и тот же заказ.
       const outcome = await mutateDb(async (db) => {
+        const sessionContext = getSessionContext(db, request);
         const order = db.orders.find((item) => item.id === pathParts[1]);
-        const driver = db.drivers.find((item) => item.id === payload.driverId);
+        const driver = getDriverForSession(db, sessionContext, String(payload.driverId || ''));
+
+        if (!sessionContext) {
+          return { status: 401, body: { error: 'Authentication required' } };
+        }
 
         if (!order) {
           return { status: 404, body: { error: 'Order not found' } };
@@ -8976,7 +9409,7 @@ async function handleRequest(request, response) {
         if (!driver.canReceiveOrders) {
           return {
             status: 403,
-            body: { driver, error: 'Driver is not allowed to receive orders yet' },
+            body: { driver: makeDriverResponse(db, driver, sessionContext), error: 'Driver is not allowed to receive orders yet' },
           };
         }
 
@@ -8985,18 +9418,18 @@ async function handleRequest(request, response) {
           // тап) — не конфликт, а no-op. Возвращаем текущий заказ и НЕ трогаем статус,
           // чтобы не откатить уже продвинувшийся заказ (arrived/started) обратно в accepted.
           if (String(order.driver.id) === String(driver.id)) {
-            return { status: 200, body: { order } };
+            return { status: 200, body: { order: makeOrderResponse(db, order, sessionContext) } };
           }
           return {
             status: 409,
-            body: { error: 'Order is already accepted by another driver', order },
+            body: { error: 'Order is already accepted by another driver', order: makeOrderResponse(db, order, sessionContext) },
           };
         }
 
         if (isExclusiveOfferActive(order) && String(order.exclusiveDriverId) !== String(driver.id)) {
           return {
             status: 409,
-            body: { error: 'Order is temporarily offered to another driver', order },
+            body: { error: 'Order is temporarily offered to another driver', order: makeOrderResponse(db, order, sessionContext) },
           };
         }
 
@@ -9007,7 +9440,7 @@ async function handleRequest(request, response) {
         if (!['created', 'searching'].includes(order.status)) {
           return {
             status: 409,
-            body: { error: 'Order is not open for dispatch', order },
+            body: { error: 'Order is not open for dispatch', order: makeOrderResponse(db, order, sessionContext) },
           };
         }
 
@@ -9067,7 +9500,7 @@ async function handleRequest(request, response) {
         });
         broadcastRealtime('order_assigned', { notification, order }, db);
 
-        return { status: 200, body: { order } };
+        return { status: 200, body: { order: makeOrderResponse(db, order, sessionContext) } };
       });
 
       sendJson(response, outcome.status, outcome.body);
@@ -9088,22 +9521,41 @@ const server = createServer((request, response) => {
 
 const realtimeWebSocketServer = new WebSocketServer({ path: '/realtime/ws', server });
 
-realtimeWebSocketServer.on('connection', async (socket) => {
-  realtimeSocketClients.add(socket);
-
-  socket.on('close', () => {
-    realtimeSocketClients.delete(socket);
-  });
-
-  socket.on('error', () => {
-    realtimeSocketClients.delete(socket);
-  });
-
+realtimeWebSocketServer.on('connection', async (socket, request) => {
   try {
     const db = await readDb();
+    const url = new URL(request.url || '/realtime/ws', `http://${request.headers.host || 'localhost'}`);
+    const sessionContext = getSessionContext(db, request, { allowQueryToken: true, url });
+
+    if (!sessionContext) {
+      sendRealtimeSocketEvent(socket, 'error', {
+        error: 'Authentication required',
+        snapshot: {
+          drivers: [],
+          generatedAt: new Date().toISOString(),
+          notifications: [],
+          orders: [],
+          supportThreads: [],
+        },
+      });
+      socket.close();
+      return;
+    }
+
+    socket.sessionContext = sessionContext;
+    realtimeSocketClients.add(socket);
+
+    socket.on('close', () => {
+      realtimeSocketClients.delete(socket);
+    });
+
+    socket.on('error', () => {
+      realtimeSocketClients.delete(socket);
+    });
+
     sendRealtimeSocketEvent(socket, 'snapshot', {
       clientId: randomUUID(),
-      snapshot: createRealtimeSnapshot(db),
+      snapshot: createRealtimeSnapshot(db, sessionContext),
     });
   } catch (error) {
     sendRealtimeSocketEvent(socket, 'error', {
@@ -9116,6 +9568,7 @@ realtimeWebSocketServer.on('connection', async (socket) => {
         supportThreads: [],
       },
     });
+    socket.close();
   }
 });
 

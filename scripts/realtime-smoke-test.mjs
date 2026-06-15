@@ -28,11 +28,12 @@ try {
 
   await waitForBackend();
 
-  const stream = await openRealtimeStream();
+  const admin = await loginAdmin();
+  const client = await registerClient();
+  const stream = await openRealtimeStream(admin.session.token);
   stopStream = stream.stop;
   await stream.waitFor((event) => event.event === 'snapshot', 'initial realtime snapshot');
 
-  const admin = await loginAdmin();
   const driver = await createReadyDriver(admin.session.token, 'Realtime Driver', '+79005550000', 'R505TT102');
   await stream.waitFor(
     (event) => event.event === 'driver_compliance' && event.payload.driver?.id === driver.id,
@@ -48,7 +49,7 @@ try {
     role: 'client',
     tariff: 'economy',
     total: 530,
-  });
+  }, client.session.token);
   const createdEvent = await stream.waitFor(
     (event) => event.event === 'order_created' && event.payload.order?.id === order.id,
     'order_created event',
@@ -66,6 +67,7 @@ try {
   await api(`/orders/${encodeURIComponent(order.id)}/assign`, {
     body: { driverId: driver.id },
     method: 'PATCH',
+    token: admin.session.token,
   });
   const assignedEvent = await stream.waitFor(
     (event) => event.event === 'order_assigned' && event.payload.order?.driver?.id === driver.id,
@@ -76,6 +78,7 @@ try {
   await api(`/orders/${encodeURIComponent(order.id)}/status`, {
     body: { status: 'completed' },
     method: 'PATCH',
+    token: admin.session.token,
   });
   const completedEvent = await stream.waitFor(
     (event) => event.event === 'order_status' && event.payload.order?.status === 'completed',
@@ -94,7 +97,7 @@ try {
   );
   assert(availabilityEvent.payload.driver.isOnline === false, 'Driver availability event should carry offline state');
 
-  const snapshot = await api('/realtime/snapshot');
+  const snapshot = await api('/realtime/snapshot', { token: admin.session.token });
   const snapshotOrder = snapshot.orders.find((item) => item.id === order.id);
 
   assert(snapshotOrder?.status === 'completed', 'Snapshot endpoint should expose latest completed order');
@@ -113,9 +116,9 @@ try {
   await rm(dbPath, { force: true });
 }
 
-async function openRealtimeStream() {
+async function openRealtimeStream(token) {
   const controller = new AbortController();
-  const response = await fetch(`${baseUrl}/realtime/stream`, {
+  const response = await fetch(`${baseUrl}/realtime/stream?token=${encodeURIComponent(token)}`, {
     headers: { accept: 'text/event-stream' },
     signal: controller.signal,
   });
@@ -237,6 +240,22 @@ async function loginAdmin() {
   });
 }
 
+async function registerClient() {
+  const stamp = Date.now();
+
+  return api('/auth/register', {
+    body: {
+      email: `realtime-client-${stamp}@example.test`,
+      firstName: 'Realtime',
+      lastName: 'Client',
+      password: 'password-1',
+      phone: `+7988${String(stamp).slice(-7)}`,
+      role: 'client',
+    },
+    method: 'POST',
+  });
+}
+
 async function createReadyDriver(adminToken, name, phone, plate) {
   const created = await api('/drivers', {
     body: {
@@ -268,10 +287,11 @@ async function createReadyDriver(adminToken, name, phone, plate) {
   return compliant.driver;
 }
 
-async function createOrder(body) {
+async function createOrder(body, token) {
   const response = await api('/orders', {
     body,
     method: 'POST',
+    token,
   });
 
   return response.order;
