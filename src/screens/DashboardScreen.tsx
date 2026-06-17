@@ -246,7 +246,6 @@ export function DashboardScreen({ navigation, route }: Props) {
           updateDriverAvailability(currentDriver.id, nextIsOnline, location);
         }}
         onOpenOrderFlow={() => navigation.navigate('OrderFlow', { firstName, role })}
-        onOpenDeliveryFlow={() => navigation.navigate('OrderFlow', { firstName, role, serviceType: 'delivery' })}
         onOrderHome={() => {
           if (!savedHomeAddress?.address) {
             navigation.navigate('SavedPlace', { firstName, role });

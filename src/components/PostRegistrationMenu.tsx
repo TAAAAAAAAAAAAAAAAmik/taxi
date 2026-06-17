@@ -21,7 +21,6 @@ import {
   LucideProps,
   MapPinned,
   Menu as MenuIcon,
-  Package,
   Route,
   ShieldCheck,
   Star,
@@ -75,7 +74,6 @@ type PostRegistrationMenuProps = {
   onToggleDriverLine?: () => void;
   onToggleSimpleMode?: () => void;
   onOpenOrderFlow: () => void;
-  onOpenDeliveryFlow?: () => void;
   onOrderHome?: () => void;
   onOpenDriverDocuments: () => void;
   onOpenFleetDriverRegistration?: () => void;
@@ -171,7 +169,6 @@ export function PostRegistrationMenu({
   onToggleSimpleMode,
   onOpenOrderHistory,
   onOpenDriverDocuments,
-  onOpenDeliveryFlow,
   onOpenFleetDriverRegistration,
   onOpenOrderFlow,
   onOrderHome,
@@ -365,7 +362,6 @@ export function PostRegistrationMenu({
                 availableCarsCount={availableCarsCount}
                 displayName={displayName}
                 onDeleteAccount={onDeleteAccount}
-                onOpenDeliveryFlow={onOpenDeliveryFlow ?? onOpenOrderFlow}
                 onOpenOrderFlow={onOpenOrderFlow}
                 onOpenOrderHistory={onOpenOrderHistory}
                 onOpenSavedPlace={onOpenSavedPlace}
@@ -432,7 +428,6 @@ type ClientPageViewProps = {
   orderSummary?: ClientOrderSummary;
   savedHomeAddressLabel?: string;
   onDeleteAccount: () => void;
-  onOpenDeliveryFlow: () => void;
   onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
   onOpenSavedPlace: () => void;
@@ -445,7 +440,6 @@ function ClientPageView({
   availableCarsCount,
   displayName,
   onDeleteAccount,
-  onOpenDeliveryFlow,
   onOpenOrderFlow,
   onOpenOrderHistory,
   onOpenSavedPlace,
@@ -484,8 +478,8 @@ function ClientPageView({
     <ClientHomePage
       availableCarsCount={availableCarsCount}
       displayName={displayName}
-      onOpenDeliveryFlow={onOpenDeliveryFlow}
       onOpenOrderFlow={onOpenOrderFlow}
+      onOpenOrderHistory={onOpenOrderHistory}
       onOpenSupportChat={onOpenSupportChat}
       onOrderHome={onOrderHome}
       orderSummary={orderSummary}
@@ -497,8 +491,8 @@ function ClientPageView({
 function ClientHomePage({
   availableCarsCount,
   displayName,
-  onOpenDeliveryFlow,
   onOpenOrderFlow,
+  onOpenOrderHistory,
   onOpenSupportChat,
   onOrderHome,
   orderSummary,
@@ -508,8 +502,8 @@ function ClientHomePage({
   displayName: string;
   orderSummary?: ClientOrderSummary;
   savedHomeAddressLabel?: string;
-  onOpenDeliveryFlow: () => void;
   onOpenOrderFlow: () => void;
+  onOpenOrderHistory: () => void;
   onOpenSupportChat: () => void;
   onOrderHome: () => void;
 }) {
@@ -539,19 +533,18 @@ function ClientHomePage({
       <View style={styles.clientHomeActionRow}>
         <Pressable
           accessibilityRole="button"
-          onPress={onOpenDeliveryFlow}
+          onPress={onOpenOrderHistory}
           style={({ pressed }) => [
             styles.clientHomeActionButton,
-            styles.clientDeliveryActionButton,
             pressed && styles.pressed,
           ]}
         >
           <View style={styles.clientDeliveryActionTop}>
-            <Package color="#008D49" size={24} strokeWidth={2.5} />
-            <Text style={styles.clientDeliveryBadge}>быстро</Text>
+            <Route color="#008D49" size={24} strokeWidth={2.5} />
+            <Text style={styles.clientDeliveryBadge}>такси</Text>
           </View>
-          <Text style={styles.clientHomeActionTitle}>Доставка</Text>
-          <Text numberOfLines={2} style={styles.clientHomeActionText}>Документы, пакет, цветы</Text>
+          <Text style={styles.clientHomeActionTitle}>История</Text>
+          <Text numberOfLines={2} style={styles.clientHomeActionText}>Последние поездки</Text>
         </Pressable>
 
         <Pressable
