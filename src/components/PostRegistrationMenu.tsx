@@ -516,19 +516,20 @@ function ClientHomePage({
         </Text>
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={onOpenOrderFlow}
-        style={({ pressed }) => [styles.clientMainOrderButton, pressed && styles.pressed]}
-      >
-        <View style={styles.clientMainOrderIcon}>
-          <MapPinned color="#F4FAF6" size={28} strokeWidth={2.6} />
-        </View>
-        <View style={styles.clientMainOrderCopy}>
-          <Text style={styles.clientMainOrderTitle}>Заказать такси</Text>
-          <Text style={styles.clientMainOrderText}>По адресу</Text>
-        </View>
-      </Pressable>
+      <View style={styles.clientServiceRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Заказать такси Эконом"
+          onPress={onOpenOrderFlow}
+          style={({ pressed }) => [styles.clientServiceTile, pressed && styles.pressed]}
+        >
+          <View style={styles.clientMainOrderIcon}>
+            <MapPinned color="#F4FAF6" size={26} strokeWidth={2.6} />
+          </View>
+          <Text style={styles.clientServiceTitle}>Такси Эконом</Text>
+          <Text numberOfLines={1} style={styles.clientServiceText}>Поездка по адресу</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.clientHomeActionRow}>
         <Pressable
