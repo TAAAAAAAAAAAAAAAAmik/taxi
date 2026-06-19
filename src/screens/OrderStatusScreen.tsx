@@ -138,6 +138,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const reducedMotion = useReducedMotionPreference();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const etaFlickerAnim = useRef(new Animated.Value(1)).current;
+  const tripChatTransition = useRef(new Animated.Value(0)).current;
   const [etaUpdatedAt, setEtaUpdatedAt] = useState(() => new Date());
   const etaMinutes = useMemo(
     () =>
@@ -179,6 +180,21 @@ export function OrderStatusScreen({ navigation, route }: Props) {
       }),
     ).start();
   }, [pulseAnim, reducedMotion]);
+
+  useEffect(() => {
+    if (!tripChatOpen) {
+      tripChatTransition.setValue(0);
+      return;
+    }
+
+    tripChatTransition.setValue(0);
+    Animated.timing(tripChatTransition, {
+      duration: reducedMotion ? 0 : 300,
+      easing: Easing.out(Easing.cubic),
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  }, [reducedMotion, tripChatOpen, tripChatTransition]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -329,6 +345,24 @@ export function OrderStatusScreen({ navigation, route }: Props) {
       reason: existingReview?.facets.join(', ') || reviewFacets.join(', ') || 'Хорошая поездка',
     });
     setFavoriteAdded(true);
+  };
+
+  const tripChatAnimatedStyle = {
+    opacity: tripChatTransition,
+    transform: [
+      {
+        translateY: tripChatTransition.interpolate({
+          inputRange: [0, 1],
+          outputRange: [28, 0],
+        }),
+      },
+      {
+        scale: tripChatTransition.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.96, 1],
+        }),
+      },
+    ],
   };
 
   return (
@@ -809,7 +843,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                 </View>
               ) : null}
               {tripChatOpen ? (
-                <View style={styles.tripChatPanel}>
+                <Animated.View style={[styles.tripChatPanel, tripChatAnimatedStyle]}>
                   <View style={styles.tripChatHeader}>
                     <Text style={styles.contactTitle}>Чат поездки</Text>
                     <Pressable
@@ -850,7 +884,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                       <Text style={styles.tripChatSendText}>OK</Text>
                     </Pressable>
                   </View>
-                </View>
+                </Animated.View>
               ) : null}
             </View>
 

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   CreditCard,
   ExternalLink,
@@ -30,13 +32,13 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     driverSubscription,
     payDriverSubscription,
     refundDriverSubscriptionPayment,
-    serverMessage,
     syncDriverSubscriptionPayment,
   } = useAppState();
   const [selectedMode, setSelectedMode] = useState<DriverBillingMode>('monthly');
   const [busy, setBusy] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<DriverPaymentSettings | undefined>();
   const [paymentNotice, setPaymentNotice] = useState('');
+  const [showPayments, setShowPayments] = useState(false);
   const [refundBusyId, setRefundBusyId] = useState<string | undefined>();
   const [syncBusyId, setSyncBusyId] = useState<string | undefined>();
   const selectedPlan = driverAccessPlans[selectedMode];
@@ -49,21 +51,15 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     (payment) => payment.status === 'pending' && payment.confirmationUrl,
   );
   const lastRefundablePayment = paidPayments.find((payment) => payment.amount > 0);
-  const hasActiveDriverAccess = isActive && ['monthly', 'commission'].includes(driverSubscription.billingMode);
+  const hasPaymentActivity =
+    driverPayments.length > 0 || Boolean(pendingProviderPayment || lastRefundablePayment);
+  const hasActiveDriverAccess = isActive && ['monthly', 'daily'].includes(driverSubscription.billingMode);
   const isSelectedCurrentMode = hasActiveDriverAccess && selectedMode === driverSubscription.billingMode;
   const isTrialChoice = context === 'trial-ended' || driverSubscription.status === 'expired';
-  const primaryButtonLabel = isTrialChoice
-    ? selectedMode === 'monthly'
-      ? 'Подключить PRO'
-      : 'Работать по комиссии'
-    : busy
-    ? 'Проводим операцию'
+  const primaryButtonLabel = busy
+    ? 'Подождите...'
     : isSelectedCurrentMode
     ? 'Перейти к заказам'
-    : hasActiveDriverAccess
-    ? selectedMode === 'monthly'
-      ? 'Подключить за 3 990 ₽'
-      : 'Работать по комиссии'
     : selectedPlan.primaryAction;
 
   useEffect(() => {
@@ -85,7 +81,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     setBusy(true);
     await payDriverSubscription(selectedMode);
     setBusy(false);
-    if (selectedMode === 'commission') {
+    if (selectedMode === 'daily') {
       navigation.navigate('Dashboard', { firstName, role });
       return;
     }
@@ -99,14 +95,16 @@ export function SubscriptionScreen({ navigation, route }: Props) {
 
   const refundPayment = async (paymentId: string) => {
     setRefundBusyId(paymentId);
-    await refundDriverSubscriptionPayment(paymentId, 'Отмена ручной операции из экрана расчетов');
+    await refundDriverSubscriptionPayment(paymentId, 'Отмена платежа доступа');
     setRefundBusyId(undefined);
+    setPaymentNotice('Платеж отменен.');
   };
 
   const checkPayment = async (paymentId: string) => {
     setSyncBusyId(paymentId);
     await syncDriverSubscriptionPayment(paymentId);
     setSyncBusyId(undefined);
+    setPaymentNotice('Статус оплаты обновлен.');
   };
 
   return (
@@ -126,75 +124,63 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             <WalletCards color="#008D49" size={30} strokeWidth={2.4} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>Тариф и расчеты</Text>
-            <Text style={styles.subtitle}>PRO убирает комиссию. Без подписки действует дневная шкала 7% / 5% / 3%.</Text>
+            <Text style={styles.title}>Доступ к заказам</Text>
+            <Text style={styles.subtitle}>100 ₽ за день или Партнёр PRO на месяц.</Text>
             <Text style={styles.metaLine}>{firstName?.trim() || 'Водитель-партнер'}</Text>
           </View>
         </View>
 
         {isTrialChoice ? (
           <View style={styles.trialChoiceCard}>
-            <Text style={styles.trialChoiceTitle}>Тестовый период завершен. Выберите формат работы.</Text>
+            <Text style={styles.trialChoiceTitle}>Доступ закончился.</Text>
             <Text style={styles.trialChoiceText}>
-              Вы можете продолжить работу по комиссии 7% / 5% / 3% или отправить заявку на Партнер PRO за 3 990 ₽ в месяц.
+              Выберите день или PRO. Процентов с заказов нет.
             </Text>
           </View>
         ) : null}
 
         <View style={styles.statusGrid}>
           <StatusCard
-            label="Статус"
+            label="Статус доступа"
             value={formatAccessStatus(driverSubscription.status)}
             helper={
               driverSubscription.expiresAt
                 ? `Доступ до ${formatDate(driverSubscription.expiresAt)}`
-                : `Доля сервиса с поездок: ${driverSubscription.ordersCommission}%`
+                : 'Выберите дневной или месячный доступ'
             }
           />
-          <StatusCard
-            label="Тариф"
-            value={driverAccessPlans[driverSubscription.billingMode].name}
-            helper={formatPlanCost(driverSubscription.billingMode)}
-          />
-          <StatusCard label="Сверки" value={String(driverPayments.length)} helper="Ручные операции" />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Выберите формат работы</Text>
+          <Text style={styles.sectionTitle}>Тариф</Text>
           <View style={styles.planGrid}>
             <PlanChoice
+              active={selectedMode === 'daily'}
+              onPress={() => setSelectedMode('daily')}
+              title={driverAccessPlans.daily.name}
+              headline={driverAccessPlans.daily.headline}
+              text="24 часа доступа"
+            />
+            <PlanChoice
               active={selectedMode === 'monthly'}
-              icon="card"
               onPress={() => setSelectedMode('monthly')}
               title={driverAccessPlans.monthly.name}
               headline={driverAccessPlans.monthly.headline}
-              text={driverAccessPlans.monthly.description}
-              benefits={driverAccessPlans.monthly.benefits}
-            />
-            <PlanChoice
-              active={selectedMode === 'commission'}
-              icon="commission"
-              onPress={() => setSelectedMode('commission')}
-              title={driverAccessPlans.commission.name}
-              headline={driverAccessPlans.commission.headline}
-              text={driverAccessPlans.commission.description}
-              benefits={driverAccessPlans.commission.benefits}
+              text="30 дней доступа"
             />
           </View>
 
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>Выбрано: {selectedPlan.shortName}</Text>
-            <Text style={styles.summaryText}>{selectedPlan.description}</Text>
             <Text style={styles.summaryText}>
               {selectedMode === 'monthly'
-                ? 'Для подключения тарифа “Партнёр PRO” переведите 3 990 ₽ на карту владельца проекта. После оплаты отправьте чек администратору. Подписка будет активирована после проверки.'
-                : 'В конце дня водитель переводит комиссию владельцу проекта, администратор отмечает расчет как оплаченный.'}
+                ? '2 490 ₽ за 30 дней. Доступ включается после проверки оплаты.'
+                : '100 ₽ за 24 часа. Доступ включается после проверки оплаты.'}
             </Text>
             {selectedMode === 'monthly' && paymentSettings?.cardMask ? (
               <Text style={styles.summaryText}>Карта: {paymentSettings.cardMask}</Text>
             ) : null}
             {paymentNotice ? <Text style={styles.noticeText}>{paymentNotice}</Text> : null}
-            <Text style={styles.summaryText}>{serverMessage}</Text>
           </View>
 
           <Pressable
@@ -211,72 +197,85 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             <Text style={styles.primaryButtonText}>{primaryButtonLabel}</Text>
             <Text style={styles.hiddenButtonLabel}>
               {busy
-                ? 'Проводим операцию'
+                ? 'Подождите...'
                 : isSelectedCurrentMode
                 ? 'Перейти к заказам'
-                : hasActiveDriverAccess
-                ? selectedMode === 'monthly'
-                  ? 'Подключить за 3 990 ₽'
-                  : 'Работать по комиссии'
                 : selectedPlan.primaryAction}
             </Text>
           </Pressable>
 
-          {pendingProviderPayment ? (
-            <View style={styles.providerActions}>
-              <Pressable
-                accessibilityRole="link"
-                onPress={() => {
-                  void Linking.openURL(pendingProviderPayment.confirmationUrl || '');
-                }}
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-              >
-                <ExternalLink color="#008D49" size={17} strokeWidth={2.4} />
-                <Text style={styles.providerButtonText}>Открыть внешнюю операцию</Text>
-              </Pressable>
+          {hasPaymentActivity ? (
+            <View style={styles.paymentPanel}>
               <Pressable
                 accessibilityRole="button"
-                disabled={syncBusyId === pendingProviderPayment.id}
-                onPress={() => checkPayment(pendingProviderPayment.id)}
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  syncBusyId === pendingProviderPayment.id && styles.disabledButton,
-                  pressed && styles.pressed,
-                ]}
+                accessibilityState={{ expanded: showPayments }}
+                onPress={() => setShowPayments((current) => !current)}
+                style={({ pressed }) => [styles.paymentsToggle, pressed && styles.pressed]}
               >
-                <RefreshCw color="#008D49" size={17} strokeWidth={2.4} />
-                <Text style={styles.providerButtonText}>
-                  {syncBusyId === pendingProviderPayment.id ? 'Проверяем операцию' : 'Проверить операцию'}
+                <ReceiptText color="#008D49" size={18} strokeWidth={2.4} />
+                <Text style={styles.paymentsToggleText}>
+                  Платежи доступа{driverPayments.length ? ` · ${driverPayments.length}` : ''}
                 </Text>
+                {showPayments ? (
+                  <ChevronUp color="#008D49" size={18} strokeWidth={2.4} />
+                ) : (
+                  <ChevronDown color="#008D49" size={18} strokeWidth={2.4} />
+                )}
               </Pressable>
+
+              {showPayments ? (
+                <View style={styles.paymentDetails}>
+                  {pendingProviderPayment ? (
+                    <View style={styles.providerActions}>
+                      <Pressable
+                        accessibilityRole="link"
+                        onPress={() => {
+                          void Linking.openURL(pendingProviderPayment.confirmationUrl || '');
+                        }}
+                        style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                      >
+                        <ExternalLink color="#008D49" size={17} strokeWidth={2.4} />
+                        <Text style={styles.providerButtonText}>Открыть оплату</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={syncBusyId === pendingProviderPayment.id}
+                        onPress={() => checkPayment(pendingProviderPayment.id)}
+                        style={({ pressed }) => [
+                          styles.secondaryButton,
+                          syncBusyId === pendingProviderPayment.id && styles.disabledButton,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <RefreshCw color="#008D49" size={17} strokeWidth={2.4} />
+                        <Text style={styles.providerButtonText}>
+                          {syncBusyId === pendingProviderPayment.id ? 'Проверяем оплату' : 'Проверить оплату'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+
+                  {lastRefundablePayment ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={refundBusyId === lastRefundablePayment.id}
+                      onPress={() => refundPayment(lastRefundablePayment.id)}
+                      style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                    >
+                      <RotateCcw color="#C17A70" size={17} strokeWidth={2.4} />
+                      <Text style={styles.refundButtonText}>
+                        {refundBusyId === lastRefundablePayment.id ? 'Отменяем платеж' : 'Отменить последний платеж'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {driverPayments.map((payment) => (
+                    <PaymentRow key={payment.id} payment={payment} />
+                  ))}
+                </View>
+              ) : null}
             </View>
           ) : null}
-
-          {lastRefundablePayment ? (
-            <Pressable
-              accessibilityRole="button"
-              disabled={refundBusyId === lastRefundablePayment.id}
-              onPress={() => refundPayment(lastRefundablePayment.id)}
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-            >
-              <RotateCcw color="#C17A70" size={17} strokeWidth={2.4} />
-              <Text style={styles.refundButtonText}>
-                {refundBusyId === lastRefundablePayment.id ? 'Отменяем операцию' : 'Отменить последнюю операцию'}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <ReceiptText color="#008D49" size={20} strokeWidth={2.4} />
-            <Text style={styles.sectionTitle}>История ручных сверок</Text>
-          </View>
-          {driverPayments.length > 0 ? (
-            driverPayments.map((payment) => <PaymentRow key={payment.id} payment={payment} />)
-          ) : (
-            <Text style={styles.emptyText}>Сверок пока нет. После первых поездок здесь появится сумма к дневному переводу.</Text>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -285,17 +284,13 @@ export function SubscriptionScreen({ navigation, route }: Props) {
 
 type PlanChoiceProps = {
   active: boolean;
-  benefits: string[];
-  icon: 'card' | 'commission';
   title: string;
   headline: string;
   text: string;
   onPress: () => void;
 };
 
-function PlanChoice({ active, benefits, headline, icon, onPress, text, title }: PlanChoiceProps) {
-  const Icon = icon === 'commission' ? ReceiptText : CreditCard;
-
+function PlanChoice({ active, headline, onPress, text, title }: PlanChoiceProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -304,18 +299,11 @@ function PlanChoice({ active, benefits, headline, icon, onPress, text, title }: 
       style={({ pressed }) => [styles.planChoice, active && styles.planChoiceActive, pressed && styles.pressed]}
     >
       <View style={styles.planTop}>
-        <Icon color={active ? '#F4FAF6' : '#008D49'} size={20} strokeWidth={2.4} />
+        <CreditCard color={active ? '#F4FAF6' : '#008D49'} size={20} strokeWidth={2.4} />
         <Text style={[styles.planTitle, active && styles.planTextActive]}>{title}</Text>
       </View>
       <Text style={[styles.planHeadline, active && styles.planTextActive]}>{headline}</Text>
       <Text style={[styles.planText, active && styles.planTextActive]}>{text}</Text>
-      <View style={styles.benefitList}>
-        {benefits.map((benefit) => (
-          <Text key={benefit} style={[styles.planText, active && styles.planTextActive]}>
-            — {benefit}
-          </Text>
-        ))}
-      </View>
     </Pressable>
   );
 }
@@ -395,15 +383,6 @@ function formatPaymentStatus(status: DriverSubscriptionPayment['status']) {
   return labels[status];
 }
 
-function formatPlanCost(mode: DriverBillingMode) {
-  const plan = driverAccessPlans[mode];
-  if (plan.monthlyPrice > 0) {
-    return `${plan.monthlyPrice.toLocaleString('ru-RU')} ₽/мес, ${plan.commissionPercent}% к переводу`;
-  }
-
-  return '0 ₽/мес, комиссия 7% / 5% / 3%';
-}
-
 function formatMoney(value: number) {
   return `${value.toLocaleString('ru-RU')} ₽`;
 }
@@ -435,7 +414,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   backButtonText: { color: '#008D49', fontSize: 14, fontWeight: '900' },
-  benefitList: { gap: 3, marginTop: 2 },
   card: {
     backgroundColor: '#FFFFFF',
     borderColor: '#008D49',
@@ -445,7 +423,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   disabledButton: { opacity: 0.64 },
-  emptyText: { color: '#557669', fontSize: 14, lineHeight: 20 },
   hero: {
     alignItems: 'flex-start',
     backgroundColor: '#FFFFFF',
@@ -470,6 +447,7 @@ const styles = StyleSheet.create({
   noticeText: { color: '#008D49', fontSize: 13, fontWeight: '900', lineHeight: 19 },
   page: { backgroundColor: '#F4FAF6', gap: 16, minHeight: '100%', padding: 16 },
   paymentCopy: { flex: 1, gap: 4, minWidth: 0 },
+  paymentDetails: { gap: 10 },
   paymentIcon: {
     alignItems: 'center',
     backgroundColor: '#E8F3EF',
@@ -487,8 +465,23 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12,
   },
+  paymentPanel: {
+    backgroundColor: '#F7FBF8',
+    borderColor: '#E8F3EF',
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 10,
+  },
   paymentText: { color: '#557669', fontSize: 12, lineHeight: 17 },
   paymentTitle: { color: '#12382C', fontSize: 14, fontWeight: '900' },
+  paymentsToggle: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 44,
+  },
+  paymentsToggleText: { color: '#12382C', flex: 1, fontSize: 14, fontWeight: '900' },
   planChoice: {
     backgroundColor: '#E8F3EF',
     borderColor: '#008D49',
@@ -503,7 +496,7 @@ const styles = StyleSheet.create({
   planGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   planHeadline: { color: '#008D49', fontSize: 16, fontWeight: '900' },
   planText: { color: '#557669', fontSize: 13, lineHeight: 19 },
-  planTextActive: { color: '#12382C' },
+  planTextActive: { color: '#F4FAF6' },
   planTitle: { color: '#12382C', flex: 1, fontSize: 15, fontWeight: '900' },
   planTop: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   pressed: {
@@ -538,7 +531,6 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 16,
   },
-  sectionHeader: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   sectionTitle: { color: '#12382C', fontSize: 18, fontWeight: '900' },
   statusCard: {
     backgroundColor: '#FFFFFF',

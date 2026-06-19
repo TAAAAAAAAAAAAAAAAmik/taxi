@@ -186,7 +186,11 @@ function getScreenAnimation(routeName: keyof RootStackParamList) {
     return 'fade' as const;
   }
 
-  if (['OrderStatus', 'SupportChat', 'SavedPlace'].includes(routeName)) {
+  if (routeName === 'SupportChat') {
+    return 'slide_from_bottom' as const;
+  }
+
+  if (['OrderStatus', 'SavedPlace'].includes(routeName)) {
     return 'slide_from_right' as const;
   }
 

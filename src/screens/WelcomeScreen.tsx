@@ -1,404 +1,654 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowRight, Car, LogIn, MapPin, UserPlus, UserRound } from 'lucide-react-native';
+import type { ComponentType } from 'react';
+import { useMemo, useState } from 'react';
+import {
+  ArrowRight,
+  BadgePercent,
+  ChevronRight,
+  Clock,
+  Globe,
+  Home,
+  type LucideProps,
+  MapPin,
+  MessageCircle,
+  Moon,
+  Navigation,
+  Route as RouteIcon,
+  Settings,
+  ShieldCheck,
+  Sun,
+  User,
+} from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 
 import { BashkortostanEmblem } from '../components/BashkortostanEmblem';
-import { driverAccessPlans } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
+import { WelcomeScreenVariant } from './WelcomeScreenVariant';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
+type ThemeName = keyof typeof themes;
+type Theme = (typeof themes)[ThemeName];
+type IconType = ComponentType<LucideProps>;
+type Feature = { Icon: IconType; label: string; sub: string };
 
-export function WelcomeScreen({ navigation }: Props) {
-  const proPrice = driverAccessPlans.monthly.monthlyPrice.toLocaleString('ru-RU');
+const themes = {
+  light: {
+    bg: '#F6F8F5',
+    border: 'rgba(18, 56, 44, 0.10)',
+    brand: '#008D49',
+    brandSoft: 'rgba(0, 141, 73, 0.10)',
+    muted: '#58776A',
+    onBrand: '#FFFFFF',
+    surface: '#FFFFFF',
+    surfaceAlt: '#EAF1ED',
+    text: '#12382C',
+  },
+  dark: {
+    bg: '#0E1A15',
+    border: 'rgba(255, 255, 255, 0.08)',
+    brand: '#1FA85B',
+    brandSoft: 'rgba(31, 168, 91, 0.16)',
+    muted: '#9DB5AA',
+    onBrand: '#FFFFFF',
+    surface: '#16241E',
+    surfaceAlt: '#1E3128',
+    text: '#EAF3EE',
+  },
+} as const;
+
+function alpha(hex: string, a: number) {
+  const v = hex.replace('#', '');
+  const r = parseInt(v.slice(0, 2), 16);
+  const g = parseInt(v.slice(2, 4), 16);
+  const b = parseInt(v.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+export function WelcomeScreen({ navigation, route }: Props) {
+  const [variant, setVariant] = useState<'claude' | 'codex'>('claude');
+  const [themeName, setThemeName] = useState<ThemeName>('light');
+  const theme = themes[themeName];
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const ThemeIcon = themeName === 'light' ? Moon : Sun;
+
+  const passengerFeatures: Feature[] = [
+    { Icon: Clock, label: 'Быстро', sub: 'Подача за 3 мин' },
+    { Icon: BadgePercent, label: 'Выгодно', sub: 'Честные цены' },
+  ];
+  const driverFeatures: Feature[] = [
+    { Icon: MapPin, label: 'Больше заказов', sub: 'Рядом с вами' },
+    { Icon: ShieldCheck, label: 'Удобно', sub: 'Простой интерфейс' },
+  ];
+  const navItems = [
+    { Icon: Home, active: true, label: 'Главная', onPress: undefined },
+    { Icon: RouteIcon, active: false, label: 'Поездки', onPress: () => navigation.navigate('Login') },
+    { Icon: MessageCircle, active: false, label: 'Сообщения', onPress: () => navigation.navigate('Login') },
+    { Icon: Settings, active: false, label: 'Настройки', onPress: () => navigation.navigate('Login') },
+    { Icon: User, active: false, label: 'Профиль', onPress: () => navigation.navigate('Login') },
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.page}>
-        <View style={styles.topBar}>
-          <View style={styles.brandRow}>
-            <View style={styles.brandMark}>
-              <Car color="#FFFFFF" size={24} strokeWidth={2.5} />
-            </View>
-            <View style={styles.brandCopy}>
-              <Text style={styles.appName}>Kinetix</Text>
-              <Text numberOfLines={1} style={styles.appMeta}>
-                Салаватский район · Башкортостан
-              </Text>
-            </View>
-          </View>
+      <View style={abStyles.bar}>
+        {(['claude', 'codex'] as const).map((value) => (
           <Pressable
-            accessibilityLabel="Скрытый вход администратора"
             accessibilityRole="button"
-            onLongPress={() => navigation.navigate('AdminPanel')}
-            style={({ pressed }) => [styles.hiddenAdminTrigger, pressed && styles.pressed]}
+            key={value}
+            onPress={() => setVariant(value)}
+            style={[abStyles.seg, variant === value && abStyles.segActive]}
           >
-            <BashkortostanEmblem size={72} />
-          </Pressable>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => navigation.navigate('Registration', { role: 'client' })}
-          style={({ pressed }) => [styles.destinationCard, pressed && styles.pressed]}
-        >
-          <View style={styles.pinWrap}>
-            <MapPin color="#008D49" size={24} strokeWidth={2.5} />
-          </View>
-          <View style={styles.destinationCopy}>
-            <Text style={styles.destinationLabel}>Куда едем?</Text>
-            <Text numberOfLines={1} style={styles.destinationHint}>
-              Поездка или работа водителем
+            <Text style={[abStyles.segText, variant === value && abStyles.segTextActive]}>
+              {value === 'claude' ? 'Claude' : 'Codex'}
             </Text>
-          </View>
-          <ArrowRight color="#12382C" size={22} strokeWidth={2.4} />
-        </Pressable>
-
-        <View style={styles.roleChoice}>
-          <Text style={styles.sectionTitle}>Выберите роль</Text>
-          <View style={styles.roleGrid}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('Registration', { role: 'client' })}
-              style={({ pressed }) => [styles.roleCard, pressed && styles.pressed]}
-            >
-              <View style={styles.roleIcon}>
-                <UserRound color="#008D49" size={22} strokeWidth={2.5} />
-              </View>
-              <View style={styles.roleCopy}>
-                <Text style={styles.roleTitle}>Клиент</Text>
-                <Text numberOfLines={2} style={styles.roleText}>
-                  Заказать поездку, смотреть активный заказ и историю.
-                </Text>
-              </View>
-              <ArrowRight color="#12382C" size={20} strokeWidth={2.4} />
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('Registration', { role: 'self_employed_driver' })}
-              style={({ pressed }) => [styles.roleCard, pressed && styles.pressed]}
-            >
-              <View style={styles.roleIcon}>
-                <Car color="#008D49" size={22} strokeWidth={2.5} />
-              </View>
-              <View style={styles.roleCopy}>
-                <Text style={styles.roleTitle}>Водитель</Text>
-                <Text numberOfLines={2} style={styles.roleText}>
-                  Принимать заказы, видеть доход, тариф и рефералов.
-                </Text>
-              </View>
-              <ArrowRight color="#12382C" size={20} strokeWidth={2.4} />
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.navigate('Registration', { role: 'client' })}
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-          >
-            <UserPlus color="#FFFFFF" size={20} strokeWidth={2.5} />
-            <Text style={styles.primaryButtonText}>Регистрация</Text>
           </Pressable>
+        ))}
+      </View>
+
+      {variant === 'codex' ? (
+        <WelcomeScreenVariant navigation={navigation} route={route} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+          <View style={styles.headerCard}>
+            <Text style={styles.logo}>Kinetix</Text>
+            <Pressable
+              accessibilityLabel="Скрытый вход администратора"
+              accessibilityRole="button"
+              onLongPress={() => navigation.navigate('AdminPanel')}
+              style={({ pressed }) => [styles.emblemButton, pressed && styles.pressed]}
+            >
+              <BashkortostanEmblem size={48} />
+            </Pressable>
+          </View>
+
+          <RoleCard
+            badge="Онлайн"
+            dark={false}
+            features={passengerFeatures}
+            onPress={() => navigation.navigate('Registration', { role: 'client' })}
+            styles={styles}
+            subtitle="Заказать поездку"
+            theme={theme}
+            title="Пассажир"
+          />
+
+          <RoleCard
+            badge="На линии"
+            dark
+            features={driverFeatures}
+            onPress={() => navigation.navigate('Registration', { role: 'self_employed_driver' })}
+            styles={styles}
+            subtitle="Принимать заказы"
+            theme={theme}
+            title="Водитель"
+          />
+
+          <View style={styles.controlRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('Dashboard', { firstName: 'Гость', role: 'client' })}
+              style={({ pressed }) => [styles.guestButton, pressed && styles.pressed]}
+            >
+              <User color={theme.text} size={18} strokeWidth={2.3} />
+              <Text style={styles.guestText}>Продолжить как Гость</Text>
+            </Pressable>
+
+            <View style={styles.langChip}>
+              <Globe color={theme.text} size={15} strokeWidth={2.3} />
+              <Text style={styles.langText}>RU</Text>
+            </View>
+
+            <Pressable
+              accessibilityLabel={themeName === 'light' ? 'Тёмная тема' : 'Светлая тема'}
+              accessibilityRole="button"
+              onPress={() => setThemeName((current) => (current === 'light' ? 'dark' : 'light'))}
+              style={({ pressed }) => [styles.themeButton, pressed && styles.pressed]}
+            >
+              <ThemeIcon color={theme.text} size={20} strokeWidth={2.3} />
+            </Pressable>
+          </View>
 
           <Pressable
             accessibilityRole="button"
             onPress={() => navigation.navigate('Login')}
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
           >
-            <LogIn color="#008D49" size={20} strokeWidth={2.4} />
-            <Text style={styles.secondaryButtonText}>Войти</Text>
+            <View style={styles.primaryIcon}>
+              <ShieldCheck color={theme.onBrand} size={20} strokeWidth={2.3} />
+            </View>
+            <View style={styles.primaryCopy}>
+              <Text style={styles.primaryTitle}>Войти / Регистрация</Text>
+              <Text style={styles.primarySub}>Безопасный доступ к сервису</Text>
+            </View>
+            <ChevronRight color={theme.onBrand} size={22} strokeWidth={2.5} />
           </Pressable>
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.navigate('AdminPanel')}
-            style={styles.hiddenButton}
-          >
-            <LogIn color="#006BB6" size={20} strokeWidth={2.4} />
-            <Text style={styles.secondaryButtonText}>Админ</Text>
-          </Pressable>
-        </View>
+          <View style={styles.bottomBar}>
+            {navItems.map((item) => {
+              const ItemIcon = item.Icon;
 
-        <View style={styles.hero}>
-          <Text style={styles.title}>Такси для Малояза и района</Text>
-          <Text numberOfLines={3} style={styles.subtitle}>
-            Пассажир заказывает поездку. Водитель получает оплату напрямую и выбирает комиссию или PRO за {proPrice} ₽.
-          </Text>
-        </View>
-
-        <View style={styles.infoGrid}>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Пассажиру</Text>
-            <Text numberOfLines={2} style={styles.infoText}>
-              Главная кнопка вызова, адреса района и поддержка без лишних экранов.
-            </Text>
+              return (
+                <Pressable
+                  accessibilityLabel={item.label}
+                  accessibilityRole="button"
+                  key={item.label}
+                  onPress={item.onPress}
+                  style={({ pressed }) => [
+                    styles.navItem,
+                    item.active && styles.navItemActive,
+                    pressed && !item.active && styles.pressed,
+                  ]}
+                >
+                  <ItemIcon color={item.active ? theme.brand : theme.muted} size={20} strokeWidth={2.3} />
+                  <Text style={[styles.navLabel, item.active && styles.navLabelActive]}>{item.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Водителю</Text>
-            <Text numberOfLines={2} style={styles.infoText}>
-              7 дней без комиссии, затем комиссия 7/5/3% или Партнёр PRO.
-            </Text>
-          </View>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Району</Text>
-            <Text numberOfLines={2} style={styles.infoText}>
-              Малояз и ближайшие населенные пункты.
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  actions: {
+type RoleCardProps = {
+  badge: string;
+  dark: boolean;
+  features: Feature[];
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+  subtitle: string;
+  theme: Theme;
+  title: string;
+};
+
+function RoleCard({ badge, dark, features, onPress, styles, subtitle, theme, title }: RoleCardProps) {
+  const onText = dark ? theme.onBrand : theme.text;
+  const subText = dark ? alpha(theme.onBrand, 0.78) : theme.muted;
+  const chipBg = dark ? alpha(theme.onBrand, 0.16) : theme.surfaceAlt;
+  const iconColor = dark ? theme.onBrand : theme.brand;
+  const routeColor = theme.brand;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.roleCard, dark && styles.roleCardDark, pressed && styles.pressed]}
+    >
+      <View style={styles.roleBody}>
+        <Text style={[styles.roleTitle, { color: onText }]}>{title}</Text>
+        <Text style={[styles.roleSubtitle, { color: subText }]}>{subtitle}</Text>
+
+        <View style={styles.featureList}>
+          {features.map((feature) => {
+            const FeatureIcon = feature.Icon;
+
+            return (
+              <View key={feature.label} style={styles.featureRow}>
+                <View style={[styles.featureIcon, { backgroundColor: chipBg }]}>
+                  <FeatureIcon color={iconColor} size={16} strokeWidth={2.3} />
+                </View>
+                <View style={styles.featureCopy}>
+                  <Text style={[styles.featureLabel, { color: onText }]}>{feature.label}</Text>
+                  <Text numberOfLines={1} style={[styles.featureSub, { color: subText }]}>
+                    {feature.sub}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={[styles.roleArrow, dark && styles.roleArrowDark]}>
+          <ArrowRight color={dark ? theme.brand : theme.onBrand} size={22} strokeWidth={2.6} />
+        </View>
+      </View>
+
+      <View style={styles.roleScene}>
+        <View style={[styles.skyA, { backgroundColor: alpha(routeColor, 0.1) }]} />
+        <View style={[styles.skyB, { backgroundColor: alpha(routeColor, 0.14) }]} />
+        <View style={[styles.skyC, { backgroundColor: alpha(routeColor, 0.08) }]} />
+        <View style={[styles.sceneRoute, { backgroundColor: alpha(routeColor, 0.5) }]} />
+        <View style={[styles.scenePin, { backgroundColor: chipBg }]}>
+          {dark ? (
+            <Navigation color={routeColor} size={15} strokeWidth={2.4} />
+          ) : (
+            <MapPin color={routeColor} size={15} strokeWidth={2.4} />
+          )}
+        </View>
+        <View style={styles.sceneCar}>
+          <CarArt dark={dark} theme={theme} />
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: chipBg }]}>
+          <View style={[styles.statusDot, { backgroundColor: theme.brand }]} />
+          <Text style={[styles.statusText, { color: onText }]}>{badge}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function CarArt({ dark, theme }: { dark: boolean; theme: Theme }) {
+  const body = dark ? '#0B5C33' : '#FFFFFF';
+  const bodyStroke = dark ? alpha(theme.onBrand, 0.45) : alpha(theme.text, 0.18);
+  const cabin = dark ? '#0E6B3B' : '#F1F5F3';
+  const glass = dark ? alpha(theme.onBrand, 0.34) : '#CFE0EA';
+  const tire = dark ? '#08160F' : '#262F2A';
+  const rim = dark ? alpha(theme.onBrand, 0.85) : '#C9D2CE';
+  const accent = theme.brand;
+  const head = dark ? '#EAF3EE' : '#FBE6A6';
+  const tail = '#E24B4A';
+  const shadow = dark ? 'rgba(0,0,0,0.32)' : 'rgba(18,56,44,0.16)';
+
+  return (
+    <Svg width={130} height={74} viewBox="0 0 200 112">
+      <Ellipse cx={100} cy={101} rx={82} ry={7} fill={shadow} />
+      <Path
+        d="M62,60 L74,36 Q76,32 81,32 L121,32 Q126,32 128,36 L140,60 Z"
+        fill={cabin}
+        stroke={bodyStroke}
+        strokeWidth={2}
+      />
+      <Rect x={80} y={40} width={24} height={17} rx={4} fill={glass} />
+      <Rect x={108} y={40} width={24} height={17} rx={4} fill={glass} />
+      <Rect x={22} y={56} width={156} height={32} rx={15} fill={body} stroke={bodyStroke} strokeWidth={2} />
+      <Rect x={30} y={78} width={140} height={4} rx={2} fill={accent} opacity={0.85} />
+      <Rect x={166} y={64} width={10} height={7} rx={3} fill={head} />
+      <Rect x={24} y={64} width={9} height={7} rx={3} fill={tail} />
+      <Circle cx={60} cy={88} r={17} fill={tire} />
+      <Circle cx={60} cy={88} r={9} fill={rim} />
+      <Circle cx={60} cy={88} r={3} fill={accent} />
+      <Circle cx={142} cy={88} r={17} fill={tire} />
+      <Circle cx={142} cy={88} r={9} fill={rim} />
+      <Circle cx={142} cy={88} r={3} fill={accent} />
+    </Svg>
+  );
+}
+
+const abStyles = StyleSheet.create({
+  bar: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(18, 56, 44, 0.06)',
+    borderRadius: 12,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 9,
+    gap: 4,
+    marginTop: 8,
+    padding: 4,
   },
-  appMeta: {
-    color: '#557669',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  appName: {
-    color: '#12382C',
-    fontSize: 21,
-    fontWeight: '900',
-  },
-  brandCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  brandMark: {
+  seg: {
     alignItems: 'center',
-    backgroundColor: '#008D49',
-    borderRadius: 8,
-    height: 48,
+    borderRadius: 9,
     justifyContent: 'center',
-    width: 48,
-  },
-  brandRow: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: 12,
-    minWidth: 0,
-  },
-  destinationCard: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(18, 56, 44, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    elevation: 1,
-    flexDirection: 'row',
-    gap: 12,
-    minHeight: 78,
+    minWidth: 96,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    shadowColor: 'rgba(18, 56, 44, 0.14)',
-    shadowOffset: { height: 6, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
+    paddingVertical: 7,
   },
-  destinationCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  destinationHint: {
-    color: '#557669',
-    fontSize: 14,
-    marginTop: 4,
-  },
-  destinationLabel: {
-    color: '#12382C',
-    fontSize: 25,
-    fontWeight: '900',
-  },
-  hero: {
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(18, 56, 44, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    elevation: 1,
-    gap: 10,
-    padding: 16,
-    shadowColor: 'rgba(18, 56, 44, 0.14)',
-    shadowOffset: { height: 8, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-  },
-  hiddenAdminTrigger: {
-    borderRadius: 8,
-  },
-  hiddenButton: {
-    display: 'none',
-  },
-  infoCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(18, 56, 44, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    gap: 6,
-    minHeight: 92,
-    minWidth: 165,
-    padding: 14,
-  },
-  infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  infoText: {
-    color: '#557669',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  infoTitle: {
-    color: '#12382C',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  page: {
-    backgroundColor: '#F6F8F5',
-    gap: 14,
-    minHeight: '100%',
-    padding: 14,
-  },
-  pinWrap: {
-    alignItems: 'center',
-    backgroundColor: '#DDF1E7',
-    borderRadius: 8,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  pressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  primaryButton: {
-    alignItems: 'center',
+  segActive: {
     backgroundColor: '#008D49',
-    borderRadius: 8,
-    elevation: 2,
-    flexDirection: 'row',
-    flexGrow: 1,
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 52,
-    minWidth: 176,
-    paddingHorizontal: 16,
-    shadowColor: 'rgba(0, 111, 58, 0.24)',
-    shadowOffset: { height: 7, width: 0 },
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
   },
-  primaryButtonText: {
+  segText: {
+    color: '#12382C',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  segTextActive: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  roleCard: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(18, 56, 44, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    elevation: 1,
-    flexDirection: 'row',
-    flex: 1,
-    gap: 12,
-    minHeight: 92,
-    minWidth: 220,
-    padding: 14,
-    shadowColor: 'rgba(18, 56, 44, 0.14)',
-    shadowOffset: { height: 6, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-  },
-  roleChoice: {
-    gap: 10,
-  },
-  roleCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  roleGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  roleIcon: {
-    alignItems: 'center',
-    backgroundColor: '#DDF1E7',
-    borderRadius: 8,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  roleText: {
-    color: '#557669',
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  roleTitle: {
-    color: '#12382C',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  safeArea: {
-    backgroundColor: '#F6F8F5',
-    flex: 1,
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(18, 56, 44, 0.12)',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    flexGrow: 1,
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 52,
-    minWidth: 128,
-    paddingHorizontal: 14,
-  },
-  secondaryButtonText: {
-    color: '#12382C',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  sectionTitle: {
-    color: '#12382C',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  subtitle: {
-    color: '#557669',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  title: {
-    color: '#12382C',
-    fontSize: 27,
-    fontWeight: '900',
-    lineHeight: 32,
-  },
-  topBar: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-    padding: 12,
   },
 });
+
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    bottomBar: {
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderColor: theme.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 2,
+      paddingHorizontal: 6,
+      paddingVertical: 6,
+    },
+    controlRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    emblemButton: {
+      alignItems: 'center',
+      backgroundColor: theme.surfaceAlt,
+      borderColor: theme.border,
+      borderRadius: 14,
+      borderWidth: 1,
+      height: 52,
+      justifyContent: 'center',
+      width: 52,
+    },
+    featureCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    featureIcon: {
+      alignItems: 'center',
+      borderRadius: 11,
+      height: 34,
+      justifyContent: 'center',
+      width: 34,
+    },
+    featureLabel: {
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    featureList: {
+      gap: 10,
+      marginTop: 12,
+    },
+    featureRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 10,
+    },
+    featureSub: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 1,
+    },
+    guestButton: {
+      alignItems: 'center',
+      borderColor: theme.border,
+      borderRadius: 14,
+      borderWidth: 1,
+      flex: 1,
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'center',
+      minHeight: 50,
+      paddingHorizontal: 12,
+    },
+    guestText: {
+      color: theme.text,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    headerCard: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingHorizontal: 4,
+    },
+    langChip: {
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderColor: theme.border,
+      borderRadius: 14,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 6,
+      height: 50,
+      paddingHorizontal: 12,
+    },
+    langText: {
+      color: theme.text,
+      fontSize: 13,
+      fontWeight: '900',
+    },
+    logo: {
+      color: theme.text,
+      fontSize: 28,
+      fontWeight: '900',
+    },
+    navItem: {
+      alignItems: 'center',
+      borderRadius: 14,
+      flex: 1,
+      gap: 3,
+      justifyContent: 'center',
+      minHeight: 52,
+      paddingHorizontal: 2,
+    },
+    navItemActive: {
+      backgroundColor: theme.brandSoft,
+    },
+    navLabel: {
+      color: theme.muted,
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    navLabelActive: {
+      color: theme.brand,
+    },
+    page: {
+      backgroundColor: theme.bg,
+      flexGrow: 1,
+      gap: 14,
+      paddingBottom: 18,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+    },
+    pressed: {
+      opacity: 0.92,
+      transform: [{ scale: 0.98 }],
+    },
+    primaryButton: {
+      alignItems: 'center',
+      backgroundColor: theme.brand,
+      borderRadius: 18,
+      flexDirection: 'row',
+      gap: 12,
+      minHeight: 64,
+      paddingHorizontal: 16,
+    },
+    primaryCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    primaryIcon: {
+      alignItems: 'center',
+      backgroundColor: alpha('#FFFFFF', 0.18),
+      borderRadius: 12,
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
+    },
+    primarySub: {
+      color: alpha('#FFFFFF', 0.82),
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 2,
+    },
+    primaryTitle: {
+      color: theme.onBrand,
+      fontSize: 17,
+      fontWeight: '900',
+    },
+    roleArrow: {
+      alignItems: 'center',
+      backgroundColor: theme.brand,
+      borderRadius: 26,
+      height: 52,
+      justifyContent: 'center',
+      marginTop: 16,
+      width: 52,
+    },
+    roleArrowDark: {
+      backgroundColor: theme.onBrand,
+    },
+    roleBody: {
+      flex: 1,
+      minWidth: 0,
+      padding: 18,
+    },
+    roleCard: {
+      backgroundColor: theme.surface,
+      borderColor: theme.border,
+      borderRadius: 22,
+      borderWidth: 1,
+      flexDirection: 'row',
+      minHeight: 210,
+      overflow: 'hidden',
+    },
+    roleCardDark: {
+      backgroundColor: theme.brand,
+      borderColor: theme.brand,
+    },
+    roleScene: {
+      paddingVertical: 16,
+      position: 'relative',
+      width: 132,
+    },
+    roleSubtitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      marginTop: 4,
+    },
+    roleTitle: {
+      fontSize: 24,
+      fontWeight: '900',
+    },
+    safeArea: {
+      backgroundColor: theme.bg,
+      flex: 1,
+    },
+    sceneCar: {
+      alignItems: 'center',
+      bottom: 28,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+    },
+    scenePin: {
+      alignItems: 'center',
+      borderRadius: 13,
+      height: 28,
+      justifyContent: 'center',
+      position: 'absolute',
+      right: 14,
+      top: 22,
+      width: 28,
+    },
+    sceneRoute: {
+      borderRadius: 2,
+      height: 3,
+      position: 'absolute',
+      right: 26,
+      top: 64,
+      transform: [{ rotate: '24deg' }],
+      width: 70,
+    },
+    skyA: {
+      borderRadius: 3,
+      bottom: 70,
+      height: 44,
+      position: 'absolute',
+      right: 86,
+      width: 16,
+    },
+    skyB: {
+      borderRadius: 3,
+      bottom: 70,
+      height: 64,
+      position: 'absolute',
+      right: 64,
+      width: 18,
+    },
+    skyC: {
+      borderRadius: 3,
+      bottom: 70,
+      height: 34,
+      position: 'absolute',
+      right: 44,
+      width: 14,
+    },
+    statusBadge: {
+      alignItems: 'center',
+      borderRadius: 999,
+      bottom: 14,
+      flexDirection: 'row',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      position: 'absolute',
+      right: 10,
+    },
+    statusDot: {
+      borderRadius: 999,
+      height: 7,
+      width: 7,
+    },
+    statusText: {
+      fontSize: 11,
+      fontWeight: '800',
+    },
+    themeButton: {
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderColor: theme.border,
+      borderRadius: 14,
+      borderWidth: 1,
+      height: 50,
+      justifyContent: 'center',
+      width: 50,
+    },
+  });
+}

@@ -1,0 +1,21 @@
+{
+  "repoDir": "C:\\Users\\TamikFutboler\\Desktop\\Такси\\taxi-partner-app",
+  "baseBranch": "codex/mvp-backend-auth",
+  "githubOwner": "TAAAAAAAAAAAAAAAAmik",
+  "githubRepo": "taxi",
+
+  "paused": false,
+  "dryRun": false,
+
+  "autoMerge": true,
+  "mergeMethod": "squash",
+  "requireTypecheck": true,
+  "requireCodexReview": true,
+
+  "claudeModel": "",
+  "codexModel": "",
+
+  "logDir": "project-brain/ai-council",
+  "callTimeoutMs": 1800000,
+  "implementTimeoutMs": 3600000
+}

@@ -761,7 +761,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                 <Text style={styles.sectionTitle}>Расчеты с водителем</Text>
               </View>
               <PlanRow title={driverAccessPlans.monthly.name} value={driverAccessPlans.monthly.headline} />
-              <PlanRow title={driverAccessPlans.commission.name} value={driverAccessPlans.commission.headline} />
+              <PlanRow title={driverAccessPlans.daily.name} value={driverAccessPlans.daily.headline} />
               <View style={styles.inlineForm}>
                 <TextInput
                   onChangeText={setServiceShareDate}
@@ -831,7 +831,7 @@ export function AdminPanelScreen({ navigation }: Props) {
                       {driver.driverName} · {driver.ordersCount} заказов
                     </Text>
                     <Text style={styles.orderText}>
-                      Оборот {driver.totalCollectedAmount} ₽ · комиссия {driver.totalServiceShareAmount} ₽ ·{' '}
+                      Оборот {driver.totalCollectedAmount} ₽ · доля сервиса {driver.totalServiceShareAmount} ₽ ·{' '}
                       {driver.currentCommissionPercent ?? 0}%
                     </Text>
                     <Text style={styles.orderText}>
@@ -1036,16 +1036,17 @@ export function AdminPanelScreen({ navigation }: Props) {
                     Рейтинг {rating ? rating.toFixed(2) : '-'} · заработок {earnings} ₽ · часы {formatWorkHours(workHours)} · заказы {ordersCount}/{completedCount}
                   </Text>
                   <Text numberOfLines={1} style={styles.orderText}>
-                    Тариф: {driver.subscriptionPlan === 'partner_pro' ? 'Партнёр PRO' : 'Комиссия 7% / 5% / 3%'} · статус:{' '}
+                    Тариф: {driver.subscriptionPlan === 'partner_pro' ? 'Партнёр PRO' : 'Дневной доступ'} · статус:{' '}
                     {driver.subscriptionStatus}
                     {driver.subscriptionExpiresAt || driver.accessExpiresAt
                       ? ` до ${formatDate(driver.subscriptionExpiresAt ?? driver.accessExpiresAt)}`
                       : ''}.
                   </Text>
                   <Text numberOfLines={1} style={styles.orderText}>
-                    Тест: {driver.commissionTrialStartedAt ? formatDate(driver.commissionTrialStartedAt) : 'не начат'} →{' '}
-                    {driver.commissionTrialEndsAt ? formatDate(driver.commissionTrialEndsAt) : 'нет даты'} · режим:{' '}
-                    {driver.workMode || (driver.subscriptionPlan === 'partner_pro' ? 'partner_pro' : 'commission')}
+                    Доступ: {driver.workMode || (driver.subscriptionPlan === 'partner_pro' ? 'partner_pro' : 'daily')}
+                    {driver.subscriptionExpiresAt || driver.accessExpiresAt
+                      ? ` до ${formatDate(driver.subscriptionExpiresAt ?? driver.accessExpiresAt)}`
+                      : ''}
                   </Text>
                   <View style={styles.complianceGrid}>
                     <CompliancePill label="Документы" value={driver.documentsStatus} readyValue="approved" />
@@ -1144,10 +1145,10 @@ export function AdminPanelScreen({ navigation }: Props) {
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      onPress={() => updateDriverAccess(driver.id, 'commission', 'active')}
+                      onPress={() => updateDriverAccess(driver.id, 'daily', 'active')}
                       style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}
                     >
-                      <Text style={styles.smallButtonText}>Режим комиссии</Text>
+                      <Text style={styles.smallButtonText}>Дневной доступ</Text>
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"

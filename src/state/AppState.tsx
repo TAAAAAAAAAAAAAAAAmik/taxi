@@ -5,7 +5,6 @@ import {
   DriverBillingMode,
   DriverSubscriptionPayment,
   driverAccessPlans,
-  getDriverDailyCommissionPercent,
 } from '../data/subscription';
 import { OrderStatusSummary } from '../navigation/types';
 import {
@@ -80,9 +79,7 @@ export type DriverSubscription = {
   billingMode: DriverBillingMode;
   planName: string;
   monthlyPrice: number;
-  ordersCommission: number;
   expiresAt?: string;
-  commissionFreeUntil?: string;
 };
 
 export type ApiConnectionState = 'checking' | 'connected' | 'offline';
@@ -203,7 +200,7 @@ export type DriverProfile = OrderParticipant & {
   createdAt?: string;
   userId?: string;
   updatedAt?: string;
-  workMode?: 'trial' | 'commission' | 'partner_pro';
+  workMode?: 'daily' | 'partner_pro' | 'trial';
 };
 
 export type TripReceipt = {
@@ -441,7 +438,6 @@ function createDriverAccessState(billingMode: DriverBillingMode, status: DriverS
     billingMode,
     expiresAt: expiresAt?.toISOString(),
     monthlyPrice: plan.monthlyPrice,
-    ordersCommission: plan.commissionPercent,
     planName: plan.name,
     status,
   };
@@ -464,7 +460,7 @@ function formatRealtimeErrorMessage(error: Error) {
   return message || 'Статус сверяется каждые 5 секунд.';
 }
 
-const initialDriverSubscription: DriverSubscription = createDriverAccessState('commission', 'inactive');
+const initialDriverSubscription: DriverSubscription = createDriverAccessState('daily', 'inactive');
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<AppOrder[]>([]);
@@ -664,7 +660,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const payDriverSubscription = useCallback(
-    async (billingMode: DriverBillingMode = 'commission') => {
+    async (billingMode: DriverBillingMode = 'daily') => {
       const nextSubscription = createDriverAccessState(
         billingMode,
         billingMode === 'monthly' ? 'inactive' : 'active',
@@ -684,7 +680,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setServerMessage(
           billingMode === 'monthly'
             ? 'Заявка на подключение тарифа отправлена. Администратор свяжется с вами для оплаты и активации.'
-            : 'Режим комиссии отмечен локально. Backend не привязан к текущему водителю.',
+            : 'Дневной доступ открыт локально на 24 часа. Backend не привязан к текущему водителю.',
         );
         return;
       }
@@ -702,7 +698,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             ? 'Заявка на подключение тарифа отправлена. Администратор свяжется с вами для оплаты и активации.'
             : pendingPayment
               ? 'Backend создал внешнюю операцию. Для пилота используйте ручную сверку.'
-              : 'Режим комиссии сохранен на backend.',
+              : 'Дневной доступ открыт на backend.',
         );
       } catch (error) {
         setDriverSubscription(nextSubscription);
@@ -716,7 +712,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             ? 'Заявка на подключение тарифа сохранена локально. Администратор свяжется с вами для оплаты и активации.'
             : error instanceof Error
               ? error.message
-              : 'Backend не отвечает. Режим комиссии отмечен только локально.',
+              : 'Backend не отвечает. Дневной доступ отмечен только локально.',
         );
       }
     },
@@ -771,7 +767,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppStateValue>(
     () => ({
       adminReferralDashboard,
-      activateDriverSubscription: (billingMode = 'commission') => {
+      activateDriverSubscription: (billingMode = 'daily') => {
         void payDriverSubscription(billingMode);
       },
       addOrder: async (order, role, clientName) => {
@@ -1204,10 +1200,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 return driver;
               }
 
+              const plan = driverAccessPlans[billingMode];
               const expiresAt = new Date();
-              expiresAt.setDate(expiresAt.getDate() + 30);
+              expiresAt.setDate(expiresAt.getDate() + (plan.accessDays ?? 1));
               const subscriptionExpiresAt =
-                subscriptionStatus === 'active' && billingMode === 'monthly'
+                subscriptionStatus === 'active'
                   ? expiresAt.toISOString()
                   : undefined;
               const nextDriver = {
@@ -1631,7 +1628,7 @@ const defaultDriver: OrderParticipant = {
 const initialDrivers: DriverProfile[] = [
   {
     ...defaultDriver,
-    billingMode: 'commission',
+    billingMode: 'daily',
     canReceiveOrders: true,
     contractStatus: 'signed',
     documentsStatus: 'approved',
@@ -1655,10 +1652,8 @@ function createDriverSubscriptionFromProfile(driver: DriverProfile): DriverSubsc
 
   return {
     billingMode,
-    commissionFreeUntil: driver.commissionTrialEndsAt,
     expiresAt,
     monthlyPrice: plan.monthlyPrice,
-    ordersCommission: plan.commissionPercent,
     planName: plan.name,
     status: hasExpired ? 'expired' : driver.subscriptionStatus,
   };
@@ -1669,6 +1664,30 @@ function getDriverSubscriptionExpiresAt(driver: {
   subscriptionExpiresAt?: string;
 }) {
   return driver.subscriptionExpiresAt ?? driver.accessExpiresAt;
+}
+
+function hasActiveDriverAccess(driver: {
+  accessExpiresAt?: string;
+  billingMode?: DriverBillingMode;
+  subscriptionExpiresAt?: string;
+  subscriptionStatus?: DriverSubscription['status'];
+}) {
+  if (!driver || driver.subscriptionStatus !== 'active') {
+    return false;
+  }
+
+  const billingMode = normalizeBillingMode(driver.billingMode);
+  if (billingMode !== 'daily' && billingMode !== 'monthly') {
+    return false;
+  }
+
+  const expiresAt = getDriverSubscriptionExpiresAt(driver);
+  if (!expiresAt) {
+    return true;
+  }
+
+  const timestamp = Date.parse(expiresAt);
+  return Number.isFinite(timestamp) && timestamp > Date.now();
 }
 
 function isActivePartnerProDriver(driver?: {
@@ -1691,7 +1710,7 @@ function getEffectiveDriverBillingMode(driver?: {
   subscriptionExpiresAt?: string;
   subscriptionStatus?: DriverSubscription['status'];
 }) {
-  return isActivePartnerProDriver(driver) ? 'monthly' : 'commission';
+  return isActivePartnerProDriver(driver) ? 'monthly' : 'daily';
 }
 
 function createLocalDriverPayment(
@@ -1716,11 +1735,11 @@ function createLocalDriverPayment(
     driverName: driver?.name,
     id,
     paidAt: isPendingManualPro ? undefined : now,
-    paymentMethod: isPendingManualPro ? 'Ручной перевод на карту' : 'Ручная сверка',
+    paymentMethod: 'Ручной перевод на карту',
     planName: plan.name,
     provider: {
       mode: 'manual',
-      name: isPendingManualPro ? 'manual-card-transfer' : 'manual-settlement',
+      name: 'manual-card-transfer',
     },
     providerPaymentStatus: isPendingManualPro ? 'awaiting_manual_transfer' : undefined,
     receipt: isPendingManualPro
@@ -1745,7 +1764,7 @@ function createLocalDriverPayment(
 function hasCompletedDriverCompliance(driver: DriverProfile) {
   return (
     driver.status === 'approved' &&
-    driver.subscriptionStatus === 'active' &&
+    hasActiveDriverAccess(driver) &&
     driver.documentsStatus === 'approved' &&
     driver.contractStatus === 'signed' &&
     driver.vehiclePermitStatus === 'approved' &&
@@ -1887,18 +1906,11 @@ function applyDriverCollectedSettlement(order: AppOrder): AppOrder {
   const billingMode = order.driver
     ? getEffectiveDriverBillingMode(order.driver)
     : normalizeBillingMode(order.driverBillingMode);
-  const isParkOrder = order.fulfilledByRole === 'park_driver' || isParkDriverRole(order.role);
   const driverCollectedAmount = Number(order.total || 0);
-  const serviceShareRate = isParkOrder ? 0 : driverAccessPlans[billingMode].commissionPercent;
-  const serviceShareAmount = Math.round((driverCollectedAmount * serviceShareRate) / 100);
-  const driverNetAmount = Math.max(0, driverCollectedAmount - serviceShareAmount);
-  const existingStatus = order.serviceShareStatus;
-  const serviceShareStatus: DriverServiceShareStatus =
-    serviceShareAmount > 0
-      ? existingStatus === 'confirmed' || existingStatus === 'reported_transferred'
-        ? existingStatus
-        : 'pending_transfer'
-      : 'not_applicable';
+  const serviceShareRate = 0;
+  const serviceShareAmount = 0;
+  const driverNetAmount = driverCollectedAmount;
+  const serviceShareStatus: DriverServiceShareStatus = 'not_applicable';
 
   return {
     ...order,
@@ -1933,14 +1945,9 @@ function recalculateLocalDriverDailyServiceShare(orders: AppOrder[], driverId: s
     }
 
     const dailyIndex = completedOrders.findIndex((item) => item.id === order.id);
-    const billingMode = order.driver ? getEffectiveDriverBillingMode(order.driver) : 'commission';
-    const trialActive = billingMode !== 'monthly' && isLocalDriverTrialActive(order, dailyIndex + 1);
-    const serviceShareRate =
-      order.fulfilledByRole === 'park_driver' || billingMode === 'monthly' || trialActive
-        ? 0
-        : getDriverDailyCommissionPercent(dailyIndex + 1);
+    const billingMode = order.driver ? getEffectiveDriverBillingMode(order.driver) : 'daily';
 
-    return applyLocalOrderSettlement(order, billingMode, serviceShareRate, dailyIndex + 1, trialActive);
+    return applyLocalOrderSettlement(order, billingMode, 0, dailyIndex + 1);
   });
 }
 
@@ -1986,20 +1993,6 @@ function getLocalSettlementTimestamp(order: AppOrder) {
   return Date.parse(order.completedAt || order.updatedAt || order.createdAt || '') || 0;
 }
 
-function isLocalDriverTrialActive(order: AppOrder, completedTodayIndex: number) {
-  const driver = order.driver;
-  const trialEndsAt = Date.parse(driver?.commissionTrialEndsAt || '');
-  const orderTimestamp = getLocalSettlementTimestamp(order) || Date.now();
-  const freeOrderLimit = driver?.commissionTrialOrderLimit ?? 20;
-
-  return (
-    Boolean(driver?.commissionTrialStartedAt || driver?.commissionTrialEndsAt) &&
-    Number.isFinite(trialEndsAt) &&
-    orderTimestamp <= trialEndsAt &&
-    completedTodayIndex <= freeOrderLimit
-  );
-}
-
 function updateLocalServiceShareStatus(
   order: AppOrder,
   status: DriverServiceShareStatus,
@@ -2029,8 +2022,8 @@ function updateLocalServiceShareStatus(
   };
 }
 
-function normalizeBillingMode(value?: DriverBillingMode): DriverBillingMode {
-  return value === 'monthly' ? 'monthly' : 'commission';
+function normalizeBillingMode(value?: string): DriverBillingMode {
+  return value === 'monthly' ? 'monthly' : 'daily';
 }
 
 function getInitialPaymentStatus(paymentMethod: string, total: number): PaymentStatus {

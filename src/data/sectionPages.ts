@@ -413,19 +413,19 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
     },
     subscription: {
       title: 'Тариф и расчеты',
-      subtitle: 'PRO без комиссии или обычный режим с дневной шкалой 7% / 5% / 3%.',
+      subtitle: 'Дневной доступ за 100 ₽ или Партнёр PRO за 2 490 ₽.',
       icon: 'wallet',
       statusTitle: 'Доступ к заказам открывается после допуска',
       statusText:
-        'После тестового периода водитель выбирает: работать по комиссии или подключить Партнёр PRO.',
+        'После проверки водитель выбирает дневной доступ или подключает Партнёр PRO.',
       primaryAction: 'Подключить тариф',
       primaryTarget: 'subscription',
       secondaryAction: 'Посмотреть ленту',
       secondaryTarget: 'order',
       metrics: [
-        { label: 'Партнёр PRO', value: '3 990 ₽', helper: '0% комиссии' },
-        { label: 'Без подписки', value: '7/5/3%', helper: 'Комиссия снижается за день' },
-        { label: 'Тест', value: '7 дней', helper: 'Или первые 20 заказов' },
+        { label: 'Партнёр PRO', value: '2 490 ₽', helper: '30 дней доступа' },
+        { label: 'Дневной доступ', value: '100 ₽', helper: '24 часа на линии' },
+        { label: 'Проценты', value: 'Нет', helper: 'С заказов ничего не удерживается' },
       ],
       quickActions: [
         {
@@ -461,10 +461,10 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
         },
         {
           id: 'pay',
-          title: 'Дневная сверка',
-          subtitle: `Клиент платит водителю напрямую, сервис считает ${driverAccessPlans.commission.commissionPercent}% к вечернему переводу.`,
-          value: `${driverAccessPlans.commission.commissionPercent}%`,
-          status: 'Расчет',
+          title: 'Дневной доступ',
+          subtitle: 'Клиент платит водителю напрямую, сервис не считает процент с поездки.',
+          value: '100 ₽',
+          status: 'Доступ',
         },
         {
           id: 'traffic',
@@ -474,7 +474,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
           status: 'Работа',
         },
       ],
-      note: 'Расчеты и допуск работают отдельно: водитель сначала проходит проверку документов, затем получает заказы и закрывает дневную сверку.',
+      note: 'Расчеты и допуск работают отдельно: водитель сначала проходит проверку документов, затем оплачивает день или месяц доступа.',
     },
     orders: {
       title: 'Лента заказов',
@@ -517,8 +517,8 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
         {
           id: 'access',
             title: 'Модель расчетов',
-            subtitle: `${driverAccessPlans.commission.commissionPercent}% с поездки к дневному переводу сервису.`,
-            value: `${driverAccessPlans.commission.commissionPercent}%`,
+            subtitle: 'Дневной доступ 100 ₽ или Партнёр PRO 2 490 ₽/мес.',
+            value: 'День/PRO',
           status: 'Нужно',
         },
         {
@@ -965,7 +965,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
     },
     finance: {
       title: 'Финансы',
-      subtitle: 'Выплаты, комиссии, акты, отчеты и банковские реквизиты.',
+      subtitle: 'Выплаты, доступ, акты, отчеты и банковские реквизиты.',
       icon: 'wallet',
       statusTitle: 'Финансы не активированы',
       statusText: 'Расчеты станут доступны после проверки организации и договора.',
@@ -974,7 +974,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
       metrics: [
         { label: 'Баланс', value: '0 ₽', helper: 'Нет поездок' },
         { label: 'К выплате', value: '0 ₽', helper: 'Нет начислений' },
-        { label: 'Комиссия', value: '-', helper: 'По договору' },
+        { label: 'Удержания', value: 'Нет', helper: 'По договору' },
       ],
       quickActions: [
         {
@@ -1297,15 +1297,15 @@ sectionPages.driver.settlementHistory = {
   subtitle: 'Дневные сверки, статусы оплаты, суммы к переводу и подтверждения администратора.',
   icon: 'wallet',
   statusTitle: 'История появится после поездок',
-  statusText: 'Расчеты 7% / 5% / 3%, trial и Партнер PRO не меняются, меняется только путь в меню.',
+  statusText: 'История оплат доступа и заработка находится отдельно от ленты заказов.',
   primaryAction: 'Открыть тариф',
   primaryTarget: 'subscription',
   secondaryAction: 'История заказов',
   secondaryTarget: 'history',
   metrics: [
     { label: 'Сегодня', value: '0 ₽', helper: 'Нет начислений' },
-    { label: 'Статус', value: 'Открыто', helper: 'Дневная сверка' },
-    { label: 'Комиссия', value: '7/5/3%', helper: 'По числу заказов за день' },
+    { label: 'Статус', value: 'Открыто', helper: 'Доступ к линии' },
+    { label: 'Проценты', value: 'Нет', helper: 'С заказов ничего не удерживается' },
   ],
   listTitle: 'Сверки и оплаты',
   rows: [
@@ -1337,7 +1337,7 @@ sectionPages.driver.settlementHistory = {
 sectionPages.fleet.finance = {
   ...sectionPages.fleet.finance,
   title: 'Расчеты',
-  subtitle: 'Дневные расчеты, суммы к оплате, история оплат, комиссии и отчеты таксопарка.',
+  subtitle: 'Дневные расчеты, история оплат, доступ и отчеты таксопарка.',
   listTitle: 'История оплат',
 };
 
@@ -1420,7 +1420,7 @@ sectionPages.fleet.referrals = {
 sectionPages.fleet.reports = {
   ...sectionPages.fleet.finance,
   title: 'Отчеты',
-  subtitle: 'Операционные и финансовые сводки по водителям, заказам, оплатам и комиссиям.',
+  subtitle: 'Операционные и финансовые сводки по водителям, заказам и оплатам.',
   icon: 'file',
   statusTitle: 'Отчеты собраны отдельно',
   statusText: 'Финансы остаются основной вкладкой, а расширенные выгрузки находятся в меню.',
@@ -1502,7 +1502,7 @@ sectionPages.park_driver = {
     metrics: [
       { label: 'B2B-доступ', value: 'Ручной', helper: 'Активирует администратор' },
       { label: 'Статус', value: 'Активен', helper: 'После допуска парком' },
-        { label: 'Комиссия', value: '0%', helper: 'По договору парка' },
+        { label: 'Удержания', value: 'Нет', helper: 'Доступ через парк' },
     ],
     quickActions: [
       {
@@ -1540,7 +1540,7 @@ sectionPages.park_driver = {
     secondaryTarget: 'documents',
     metrics: [
       { label: 'Оплата', value: 'Парк', helper: 'Водитель не платит собственный доступ' },
-        { label: 'Комиссия', value: '0%', helper: 'По договору парка' },
+        { label: 'Удержания', value: 'Нет', helper: 'Доступ через парк' },
       { label: 'Допуск', value: 'Проверка', helper: 'Документы и статус парка' },
     ],
     quickActions: [

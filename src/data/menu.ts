@@ -160,16 +160,16 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
   },
   driver: {
     title: 'Меню водителя',
-    subtitle: 'Расчеты, заказы, документы, сверка дня и профиль водителя-партнера.',
-    statusTitle: 'Доступ к заказам и сверка',
-    statusText: 'Клиент платит водителю напрямую, сервис считает 7% к вечернему переводу.',
-    primaryAction: 'Открыть расчеты',
+    subtitle: 'Доступ к линии, заказы, документы и профиль водителя-партнера.',
+    statusTitle: 'Доступ к заказам',
+    statusText: 'Клиент платит водителю напрямую, сервис не удерживает процент с поездок.',
+    primaryAction: 'Открыть тариф',
     secondaryAction: 'Посмотреть заказы',
     menuItems: [
       {
         id: 'subscription',
-        title: 'Расчеты',
-        subtitle: '0 ₽/мес, 7% к переводу',
+        title: 'Тариф',
+        subtitle: 'День 100 ₽ или PRO 2 490 ₽',
         icon: 'wallet',
         badge: 'Главное',
       },
@@ -227,15 +227,15 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
       },
       {
         id: 'subscription',
-        title: 'Расчеты',
-        subtitle: 'Доля сервиса по завершенным поездкам.',
+        title: 'Тариф',
+        subtitle: 'Оплата доступа к линии.',
         icon: 'wallet',
         target: 'subscription',
       },
       {
         id: 'bank-details',
-        title: 'Перевод доли',
-        subtitle: 'Сумма к вечерней сверке.',
+        title: 'Оплата доступа',
+        subtitle: 'Дневной пасс или месяц PRO.',
         icon: 'wallet',
       },
       {
@@ -247,9 +247,9 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
     ],
     metrics: [
       {
-        label: 'Доля сервиса',
-        value: '7%',
-        helper: 'К переводу за день',
+        label: 'Доступ',
+        value: '100 ₽',
+        helper: 'На 24 часа',
       },
       {
         label: 'Собрано',
@@ -292,7 +292,7 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
       {
         id: 'finance',
         title: 'Финансы',
-        subtitle: 'Выплаты, комиссии, акты',
+        subtitle: 'Выплаты, доступ, акты',
         icon: 'wallet',
       },
       {
@@ -419,13 +419,13 @@ roleMenuConfig.driver = {
     {
       id: 'payouts',
       title: 'Доход',
-      subtitle: 'Дневной заработок и комиссия к оплате',
+      subtitle: 'Дневной заработок и доступ к линии',
       icon: 'wallet',
     },
     {
       id: 'subscription',
       title: 'Тариф',
-      subtitle: 'Trial, комиссия 7/5/3% и Партнер PRO',
+      subtitle: 'День 100 ₽ или Партнер PRO',
       icon: 'credit-card',
     },
     {
@@ -520,7 +520,7 @@ roleMenuConfig.park_driver = {
   metrics: [
     { label: 'Таксопарк', value: 'Привязан', helper: 'Доступ через парк' },
     { label: 'Документы', value: 'Проверка', helper: 'Нужна валидация' },
-    { label: 'Комиссия', value: '0%', helper: 'По договору парка' },
+    { label: 'Удержания', value: 'Нет', helper: 'Доступ через парк' },
   ],
 };
 
@@ -639,7 +639,7 @@ roleMenuConfig.driver = {
     {
       id: 'payouts',
       title: 'Доход',
-      subtitle: 'День, комиссия и сумма к оплате',
+      subtitle: 'День, заработок и доступ к линии',
       icon: 'wallet',
     },
     {
@@ -653,7 +653,7 @@ roleMenuConfig.driver = {
     {
       id: 'subscription',
       title: 'Тариф',
-      subtitle: 'Trial, 7/5/3% и Партнер PRO',
+      subtitle: 'День 100 ₽ и Партнер PRO',
       icon: 'credit-card',
       target: 'subscription',
     },

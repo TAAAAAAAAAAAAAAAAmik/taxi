@@ -1,8 +1,9 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, Clock3, Heart, ReceiptText, Route, Star, Wallet } from 'lucide-react-native';
+import { ArrowLeft, Heart, ReceiptText, Star, Wallet } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { TripCard, type TripCardServiceType } from '../components/TripCard';
 import { isDriverLikeRole, roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { AppOrder, PaymentStatus, useAppState } from '../state/AppState';
@@ -15,7 +16,7 @@ const statusLabels: Record<string, string> = {
   arriving: 'Подача',
   assigned: 'Назначен',
   closed: 'Закрыт',
-  completed: 'Завершен',
+  completed: 'Завершён',
   created: 'Создан',
   in_progress: 'В поездке',
   searching: 'Поиск',
@@ -250,29 +251,19 @@ function OrderCard({
     order.serviceShareStatus === 'pending_transfer';
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <TripCard
+      dateTimeLabel={formatTripDateTime(order.createdAt)}
+      destination={order.destination}
+      driverLabel={formatTripParticipantLine(order, isDriverRole)}
       onPress={onPress}
-      style={({ pressed }) => [styles.orderCard, pressed && styles.pressed]}
+      pickup={order.pickup}
+      priceLabel={`${order.total} ₽`}
+      serviceType={getTripServiceType(order)}
+      statusLabel={statusLabels[order.status] ?? order.status}
+      title={formatRouteTitle(order)}
+      tone={isCompleted ? 'done' : 'active'}
     >
-      <View style={styles.orderHeader}>
-        <Text style={styles.orderId}>{order.id} · {formatOrderService(order)}</Text>
-        <Text style={styles.status}>{statusLabels[order.status] ?? order.status}</Text>
-      </View>
-      <View style={styles.routeRow}>
-        <Route color="#008D49" size={18} strokeWidth={2.4} />
-        <View style={styles.routeCopy}>
-          <Text style={styles.routeText}>{order.pickup}</Text>
-          <Text style={styles.routeText}>{order.destination}</Text>
-        </View>
-      </View>
-      <View style={styles.orderFooter}>
-        <View style={styles.footerItem}>
-          <Clock3 color="#557669" size={16} strokeWidth={2.4} />
-          <Text style={styles.footerText}>{new Date(order.createdAt).toLocaleDateString('ru-RU')}</Text>
-        </View>
-        <Text style={styles.total}>{order.total} ₽</Text>
-      </View>
+      <Text style={styles.orderMetaLine}>{order.id} · {formatOrderService(order)}</Text>
       <Text style={styles.paymentLine}>
         {paymentStatusLabels[order.paymentStatus ?? 'pending']} · {order.paymentMethod}
       </Text>
@@ -376,7 +367,7 @@ function OrderCard({
           ) : null}
         </View>
       ) : null}
-    </Pressable>
+    </TripCard>
   );
 }
 
@@ -402,6 +393,43 @@ function formatServiceShareStatus(status: AppOrder['serviceShareStatus']) {
 
 function formatOrderService(order: AppOrder) {
   return order.serviceType === 'delivery' ? 'Доставка' : 'Такси';
+}
+
+function getTripServiceType(order: AppOrder): TripCardServiceType {
+  return order.serviceType === 'delivery' ? 'delivery' : 'taxi';
+}
+
+function formatRouteTitle(order: AppOrder) {
+  return `${order.pickup} → ${order.destination}`;
+}
+
+function formatTripDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+  });
+}
+
+function formatTripParticipantLine(order: AppOrder, isDriverRole: boolean) {
+  if (isDriverRole) {
+    return `Клиент: ${order.clientName?.trim() || 'клиент'}`;
+  }
+
+  if (order.driver?.name) {
+    return `Водитель: ${order.driver.name}`;
+  }
+
+  return ['created', 'searching'].includes(order.status)
+    ? 'Водитель: ищем'
+    : 'Водитель: не назначен';
 }
 
 function formatDeliveryPackageType(value?: string) {
@@ -636,6 +664,11 @@ const styles = StyleSheet.create({
     color: '#12382C',
     fontSize: 16,
     fontWeight: '900',
+  },
+  orderMetaLine: {
+    color: '#557669',
+    fontSize: 12,
+    fontWeight: '800',
   },
   paymentLine: {
     color: '#008D49',

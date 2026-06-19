@@ -1,4 +1,4 @@
-export type DriverBillingMode = 'monthly' | 'commission';
+export type DriverBillingMode = 'monthly' | 'daily';
 export type SubscriptionOwnerType = 'self_employed_driver';
 
 export type DriverSubscriptionPaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
@@ -11,31 +11,11 @@ export type DriverPaymentProvider = {
   shopId?: string;
 };
 
-export const driverCommissionPercent = 7;
-export const driverServiceSharePercent = driverCommissionPercent;
-export const driverPartnerProPrice = 3990;
+export const driverPartnerProPrice = 2490;
 export const driverPartnerProPlanId = 'partner_pro';
-export const driverDailyCommissionTiers = [
-  { fromOrder: 1, toOrder: 15, percent: 7 },
-  { fromOrder: 16, toOrder: 20, percent: 5 },
-  { fromOrder: 21, percent: 3 },
-];
-
-export function getDriverDailyCommissionPercent(orderNumber: number) {
-  if (orderNumber >= 21) {
-    return 3;
-  }
-
-  if (orderNumber >= 16) {
-    return 5;
-  }
-
-  return 7;
-}
-
-export function getNextDriverDailyCommissionPercent(completedToday: number) {
-  return getDriverDailyCommissionPercent(completedToday + 1);
-}
+export const driverDailyPrice = 100;
+export const driverDailyPlanId = 'daily_line';
+export const driverDailyAccessDays = 1;
 
 export type MonthlySubscriptionPlan = {
   accessDays: number;
@@ -109,7 +89,6 @@ export const driverAccessPlans: Record<
     shortName: string;
     accessDays?: number;
     monthlyPrice: number;
-    commissionPercent: number;
     currency: '₽';
     headline: string;
     description: string;
@@ -121,82 +100,79 @@ export const driverAccessPlans: Record<
 > = {
   monthly: {
     accessDays: 30,
-    commissionPercent: 0,
     currency: '₽',
     description:
       'Один платеж в месяц — и все заказы полностью ваши. Без процентов с поездок. Без скрытых удержаний.',
     benefits: [
-      'Заказы без комиссии',
+      'Заказы без удержаний',
       'Вся сумма поездки остается водителю',
       'Фиксированная оплата на месяц',
       'Без скрытых удержаний',
       'Чем больше поездок — тем выгоднее тариф',
     ],
-    headline: '3 990 ₽ / месяц',
+    headline: '2 490 ₽ / месяц',
     id: 'monthly',
     monthlyPrice: monthlySubscriptionPlans.self_employed_driver.amount,
     name: 'Партнёр PRO',
-    primaryAction: 'Подключить за 3 990 ₽',
+    primaryAction: 'Подключить за 2 490 ₽',
     salesCopy: 'Фиксированная подписка: платформа не забирает процент с заказов.',
     shortName: 'Партнёр PRO',
     subscriptionPlan: driverPartnerProPlanId,
   },
-  commission: {
-    commissionPercent: driverCommissionPercent,
+  daily: {
+    accessDays: driverDailyAccessDays,
     currency: '₽',
     description:
-      'Клиент платит водителю напрямую. Комиссия снижается по мере роста заказов за день.',
+      'Доступ к заказам на 24 часа. Платите только в дни, когда выходите на линию.',
     benefits: [
-      'Без ежемесячного платежа',
-      '1–15 заказов в день: 7%',
-      '16–20 заказов в день: 5%',
-      '21-й заказ и дальше: 3%',
-      'Дневная сверка с администратором',
+      'Доступ на 24 часа',
+      'Платите только за рабочие дни',
+      'Заказы без процентов',
+      'Вся сумма поездки остаётся водителю',
     ],
-    headline: '0 ₽/мес, комиссия 7% / 5% / 3%',
-    id: 'commission',
-    monthlyPrice: 0,
-    name: 'Доля сервиса с поездки',
-    primaryAction: 'Подключить ручную сверку',
-    salesCopy: 'Стартовая модель для редких поездок и пилотной проверки.',
-    shortName: 'Доля сервиса',
-    subscriptionPlan: 'commission',
+    headline: '100 ₽ / день',
+    id: 'daily',
+    monthlyPrice: driverDailyPrice,
+    name: 'Дневной доступ',
+    primaryAction: 'Открыть линию за 100 ₽',
+    salesCopy: 'Гибкий вход: платите в день, без процентов и без месячного обязательства.',
+    shortName: 'День',
+    subscriptionPlan: driverDailyPlanId,
   },
 };
 
-export const driverSubscriptionPlan = driverAccessPlans.commission;
+export const driverSubscriptionPlan = driverAccessPlans.daily;
 
 export const driverSubscriptionBenefits = [
-  'Партнёр PRO: 3 990 ₽ в месяц и 0% комиссии с заказов.',
-  'Вся сумма поездки остается водителю.',
-  'Без подписки работает обычная модель: 7% / 5% / 3% за день.',
-  'Администратор может активировать подписку вручную.',
+  'Дневной доступ: 100 ₽ за 24 часа на линии.',
+  'Партнёр PRO: 2 490 ₽ в месяц.',
+  'Никаких процентов с заказов — вся сумма поездки остаётся водителю.',
+  'Администратор может активировать доступ вручную.',
 ];
 
 export const driverSubscriptionRules = [
   'Доступ к заказам открывается только после проверки документов.',
   'Сервис не становится работодателем водителя.',
   'Заказы распределяются по спросу, рейтингу, географии и доступности.',
-  'Доля сервиса начисляется только в режиме комиссии: 7% / 5% / 3% за день.',
-  'При активном тарифе Партнёр PRO комиссия с заказа равна 0%.',
-  'В конце рабочего дня водитель переводит начисленную долю сервиса и администратор подтверждает сверку.',
+  'Оплата за поездку идёт водителю напрямую — сервис не берёт процент с заказов.',
+  'Доступ к линии открывается дневным пассом (100 ₽) или подпиской Партнёр PRO (2 490 ₽/мес).',
   'Возвраты, безопасность и спорные поездки остаются под правилами сервиса.',
 ];
 
 export const driverSubscriptionEconomics = [
   {
-    label: 'Доля сервиса',
-    value: `${driverCommissionPercent}%`,
-    helper: 'Водитель переводит ее в конце рабочего дня',
+    label: 'Доступ на линию',
+    value: '100 ₽ / день',
+    helper: 'Или 2 490 ₽ в месяц по подписке Партнёр PRO',
+  },
+  {
+    label: 'Процент с заказа',
+    value: 'Нет',
+    helper: 'Сервис не берёт процент — вся сумма поездки остаётся водителю',
   },
   {
     label: 'Онлайн-оплата',
     value: 'Нет',
     helper: 'Клиент рассчитывается напрямую с водителем',
-  },
-  {
-    label: 'Главная задача',
-    value: 'Трафик',
-    helper: 'Сервис должен приводить клиентов и держать плотность заказов.',
   },
 ];

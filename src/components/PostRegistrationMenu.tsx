@@ -14,6 +14,7 @@ import {
   Bell,
   BriefcaseBusiness,
   Car,
+  Clock,
   CreditCard,
   FileText,
   Headphones,
@@ -21,9 +22,14 @@ import {
   LucideProps,
   MapPinned,
   Menu as MenuIcon,
+  Package,
+  Phone,
+  RefreshCw,
   Route,
+  Settings,
   ShieldCheck,
   Star,
+  User,
   UsersRound,
   Wallet,
   X,
@@ -45,7 +51,9 @@ import {
 } from '../data/menu';
 import { SectionPage, SectionRow, sectionPages } from '../data/sectionPages';
 import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
+import { kinetixColors, kinetixIconography } from '../theme/kinetixTokens';
 import { styles } from './PostRegistrationMenu.styles';
+import { TripCard, type TripCardServiceType } from './TripCard';
 
 type PostRegistrationMenuProps = {
   role: AccountRole;
@@ -73,8 +81,8 @@ type PostRegistrationMenuProps = {
   onLogout: () => void;
   onToggleDriverLine?: () => void;
   onToggleSimpleMode?: () => void;
+  onOpenDelivery: () => void;
   onOpenOrderFlow: () => void;
-  onOrderHome?: () => void;
   onOpenDriverDocuments: () => void;
   onOpenFleetDriverRegistration?: () => void;
   onOpenOrderHistory: () => void;
@@ -85,6 +93,19 @@ type PostRegistrationMenuProps = {
   onAcceptDriverOrder?: (orderId: string) => void | Promise<void>;
 };
 
+export type ClientOrderSummaryTrip = {
+  createdAt?: string;
+  destination: string;
+  driverLabel: string;
+  id: string;
+  pickup: string;
+  priceLabel?: string;
+  routeLabel: string;
+  routeTitle?: string;
+  serviceType?: TripCardServiceType;
+  statusLabel: string;
+};
+
 export type ClientOrderSummary = {
   activeCount: number;
   completedCount: number;
@@ -92,13 +113,8 @@ export type ClientOrderSummary = {
   lastOrderStatus: string;
   totalCount: number;
   totalSpent: number;
-  activeOrder?: {
-    id: string;
-    routeLabel: string;
-    statusLabel: string;
-    priceLabel: string;
-    driverLabel: string;
-  };
+  activeOrder?: ClientOrderSummaryTrip;
+  lastOrder?: ClientOrderSummaryTrip;
 };
 
 export type DriverFeedPreviewOrder = {
@@ -117,7 +133,6 @@ export type DriverStatsSummary = {
   monthOrders: number;
   gross: number;
   grossToday: number;
-  commissionFreeUntil?: string;
   driverNet: number;
   serviceShare: number;
   serviceShareRate: number;
@@ -125,10 +140,7 @@ export type DriverStatsSummary = {
   settlementStatus: 'confirmed' | 'not_applicable' | 'pending_transfer' | 'reported_transferred';
   subscriptionExpiresAt?: string;
   subscriptionCost: number;
-  billingMode: 'monthly' | 'commission';
-  trialActive?: boolean;
-  trialDaysLeft?: number;
-  trialOrdersLeft?: number;
+  billingMode: 'monthly' | 'daily';
 };
 
 const iconMap: Record<MenuIconName, ComponentType<LucideProps>> = {
@@ -170,8 +182,8 @@ export function PostRegistrationMenu({
   onOpenOrderHistory,
   onOpenDriverDocuments,
   onOpenFleetDriverRegistration,
+  onOpenDelivery,
   onOpenOrderFlow,
-  onOrderHome,
   onOpenReferral,
   onOpenSavedPlace,
   onOpenSubscription,
@@ -192,16 +204,38 @@ export function PostRegistrationMenu({
   const pageTransition = useRef(new Animated.Value(1)).current;
 
   const drawerItems = config.drawerItems ?? [];
-  const activeItem = useMemo(
-    () =>
+  const activeItem = useMemo(() => {
+    const menuItem =
       config.menuItems.find((item) => item.id === activeItemId) ??
-      drawerItems.find((item) => item.id === activeItemId) ??
-      config.menuItems[0],
-    [activeItemId, config.menuItems, drawerItems],
-  );
+      drawerItems.find((item) => item.id === activeItemId);
+
+    if (menuItem) {
+      return menuItem;
+    }
+
+    const page = pages[activeItemId];
+
+    if (page) {
+      return {
+        id: activeItemId,
+        icon: page.icon,
+        subtitle: page.subtitle,
+        title: page.title,
+      };
+    }
+
+    return config.menuItems[0];
+  }, [activeItemId, config.menuItems, drawerItems, pages]);
   const activePage = useMemo(
     () => pages[activeItem.id] ?? pages[config.menuItems[0].id],
     [activeItem.id, config.menuItems, pages],
+  );
+  const bottomMenuItems = useMemo(
+    () =>
+      isClientRole
+        ? config.menuItems.filter((item) => ['home', 'rides', 'profile'].includes(item.id))
+        : config.menuItems,
+    [config.menuItems, isClientRole],
   );
   const displayName = firstName?.trim() || 'Пользователь';
 
@@ -300,30 +334,38 @@ export function PostRegistrationMenu({
       setDrawerOpen(false);
     }
   };
+  const handleClientSettingsPress = () => {
+    setActiveItemId('settings');
+    setDrawerOpen(false);
+  };
 
   return (
     <View style={styles.shell}>
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityLabel="Открыть меню"
-            accessibilityRole="button"
-            onPress={() => setDrawerOpen(true)}
-            style={({ pressed }) => [styles.menuToggle, pressed && styles.pressed]}
-          >
-            <MenuIcon color="#008D49" size={24} strokeWidth={2.5} />
-          </Pressable>
-          <View style={styles.brandCopy}>
-            <Text style={styles.appName}>Такси Салават</Text>
-            <Text style={styles.appMeta}>
-              {roleCopy[role]?.title ?? roleCopy.client.title} · {activePage.title}
-            </Text>
-            <Text style={styles.liveText}>
-              {formatRealtimeStatus(realtimeStatus)}
-              {realtimeUpdatedAt ? ` · ${new Date(realtimeUpdatedAt).toLocaleTimeString('ru-RU')}` : ''}
-            </Text>
+        {isClientRole ? (
+          <ClientTopBar displayName={displayName} onOpenSettings={handleClientSettingsPress} />
+        ) : (
+          <View style={styles.topBar}>
+            <Pressable
+              accessibilityLabel="Открыть меню"
+              accessibilityRole="button"
+              onPress={() => setDrawerOpen(true)}
+              style={({ pressed }) => [styles.menuToggle, pressed && styles.pressed]}
+            >
+              <MenuIcon color="#008D49" size={24} strokeWidth={2.5} />
+            </Pressable>
+            <View style={styles.brandCopy}>
+              <Text style={styles.appName}>Такси Салават</Text>
+              <Text style={styles.appMeta}>
+                {roleCopy[role]?.title ?? roleCopy.client.title} · {activePage.title}
+              </Text>
+              <Text style={styles.liveText}>
+                {formatRealtimeStatus(realtimeStatus)}
+                {realtimeUpdatedAt ? ` · ${new Date(realtimeUpdatedAt).toLocaleTimeString('ru-RU')}` : ''}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {realtimeMessage && !isClientRole ? (
           <View style={styles.livePanel}>
@@ -362,11 +404,11 @@ export function PostRegistrationMenu({
                 availableCarsCount={availableCarsCount}
                 displayName={displayName}
                 onDeleteAccount={onDeleteAccount}
+                onOpenDelivery={onOpenDelivery}
                 onOpenOrderFlow={onOpenOrderFlow}
                 onOpenOrderHistory={onOpenOrderHistory}
                 onOpenSavedPlace={onOpenSavedPlace}
                 onOpenSupportChat={onOpenSupportChat}
-                onOrderHome={onOrderHome ?? onOpenSavedPlace}
                 orderSummary={clientOrderSummary}
                 savedHomeAddressLabel={savedHomeAddressLabel}
               />
@@ -384,10 +426,11 @@ export function PostRegistrationMenu({
               <SectionPageView
                 activeItemId={activeItem.id}
                 appTitle={config.title}
+                displayName={displayName}
                 driverFeedBusyId={driverFeedBusyId}
                 driverFeedLockedReason={driverFeedLockedReason}
                 driverFeedOrders={driverFeedOrders}
-                driverStats={activeItem.id === 'payouts' ? driverStats : undefined}
+                driverStats={activeItem.id === 'payouts' || activeItem.id === 'profile' ? driverStats : undefined}
                 onAcceptDriverOrder={onAcceptDriverOrder}
                 onActionTarget={handleActionTarget}
                 page={activePage}
@@ -397,15 +440,22 @@ export function PostRegistrationMenu({
         </View>
       </ScrollView>
 
-      <View style={styles.bottomTabs}>
-        {config.menuItems.map((item) => (
-          <BottomTabButton
-            active={item.id === activeItem.id}
-            item={item}
-            key={item.id}
-            onPress={() => handleMenuItemPress(item)}
-          />
-        ))}
+      <View style={[styles.bottomTabs, isClientRole && styles.clientBottomTabs]}>
+        {bottomMenuItems.map((item) => {
+          const active =
+            item.id === activeItem.id ||
+            (isClientRole && activeItem.id === 'settings' && item.id === 'profile');
+
+          return (
+            <BottomTabButton
+              active={active}
+              clientMode={isClientRole}
+              item={item}
+              key={item.id}
+              onPress={() => handleMenuItemPress(item)}
+            />
+          );
+        })}
       </View>
 
       <SideDrawer
@@ -421,6 +471,52 @@ export function PostRegistrationMenu({
   );
 }
 
+function ClientTopBar({
+  displayName,
+  onOpenSettings,
+}: {
+  displayName: string;
+  onOpenSettings: () => void;
+}) {
+  const initials = getInitials(displayName);
+
+  return (
+    <View style={styles.clientTopBar}>
+      <View style={styles.clientHeaderLeft}>
+        <View style={styles.clientHeaderAvatar}>
+          <Text style={styles.clientHeaderAvatarText}>{initials}</Text>
+        </View>
+        <View style={styles.clientHeaderCopy}>
+          <Text style={styles.clientHeaderGreeting}>Здравствуйте,</Text>
+          <View style={styles.clientHeaderStatusPill}>
+            <Clock color={kinetixColors.amber} size={13} strokeWidth={2.4} />
+            <Text style={styles.clientHeaderStatusText}>Онлайн</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.clientHeaderActions}>
+        <Pressable
+          accessibilityLabel="Уведомления"
+          accessibilityRole="button"
+          onPress={() => undefined}
+          style={({ pressed }) => [styles.clientHeaderIconButton, pressed && styles.pressed]}
+        >
+          <Bell color={kinetixColors.textSecondary} size={22} strokeWidth={2.25} />
+        </Pressable>
+        <Pressable
+          accessibilityLabel="Открыть настройки"
+          accessibilityRole="button"
+          onPress={onOpenSettings}
+          style={({ pressed }) => [styles.clientHeaderIconButton, pressed && styles.pressed]}
+        >
+          <Settings color={kinetixColors.textSecondary} size={22} strokeWidth={2.25} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 type ClientPageViewProps = {
   activeItemId: string;
   availableCarsCount: number;
@@ -428,11 +524,11 @@ type ClientPageViewProps = {
   orderSummary?: ClientOrderSummary;
   savedHomeAddressLabel?: string;
   onDeleteAccount: () => void;
+  onOpenDelivery: () => void;
   onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
   onOpenSavedPlace: () => void;
   onOpenSupportChat: () => void;
-  onOrderHome: () => void;
 };
 
 function ClientPageView({
@@ -440,11 +536,11 @@ function ClientPageView({
   availableCarsCount,
   displayName,
   onDeleteAccount,
+  onOpenDelivery,
   onOpenOrderFlow,
   onOpenOrderHistory,
   onOpenSavedPlace,
   onOpenSupportChat,
-  onOrderHome,
   orderSummary,
   savedHomeAddressLabel,
 }: ClientPageViewProps) {
@@ -478,12 +574,9 @@ function ClientPageView({
     <ClientHomePage
       availableCarsCount={availableCarsCount}
       displayName={displayName}
+      onOpenDelivery={onOpenDelivery}
       onOpenOrderFlow={onOpenOrderFlow}
-      onOpenOrderHistory={onOpenOrderHistory}
-      onOpenSupportChat={onOpenSupportChat}
-      onOrderHome={onOrderHome}
       orderSummary={orderSummary}
-      savedHomeAddressLabel={savedHomeAddressLabel}
     />
   );
 }
@@ -491,83 +584,50 @@ function ClientPageView({
 function ClientHomePage({
   availableCarsCount,
   displayName,
+  onOpenDelivery,
   onOpenOrderFlow,
-  onOpenOrderHistory,
-  onOpenSupportChat,
-  onOrderHome,
   orderSummary,
-  savedHomeAddressLabel,
 }: {
   availableCarsCount: number;
   displayName: string;
   orderSummary?: ClientOrderSummary;
-  savedHomeAddressLabel?: string;
+  onOpenDelivery: () => void;
   onOpenOrderFlow: () => void;
-  onOpenOrderHistory: () => void;
-  onOpenSupportChat: () => void;
-  onOrderHome: () => void;
 }) {
   return (
     <View style={styles.clientFocusPage}>
       <View style={styles.clientWelcomePanel}>
-        <Text style={styles.clientWelcomeTitle}>Здравствуйте, {displayName}</Text>
+        <Text style={styles.clientWelcomeTitle}>Здравствуйте, {displayName}!</Text>
         <Text numberOfLines={2} style={styles.clientWelcomeText}>
-          Закажите поездку, поезжайте домой или напишите поддержке.
+          Нужна поездка или доставка в Салавате?
         </Text>
       </View>
 
       <View style={styles.clientServiceRow}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Заказать такси Эконом"
+          accessibilityLabel="Заказать такси"
           onPress={onOpenOrderFlow}
           style={({ pressed }) => [styles.clientServiceTile, pressed && styles.pressed]}
         >
           <View style={styles.clientMainOrderIcon}>
             <MapPinned color="#F4FAF6" size={26} strokeWidth={2.6} />
           </View>
-          <Text style={styles.clientServiceTitle}>Такси Эконом</Text>
+          <Text style={styles.clientServiceTitle}>Такси</Text>
           <Text numberOfLines={1} style={styles.clientServiceText}>Поездка по адресу</Text>
         </Pressable>
-      </View>
 
-      <View style={styles.clientHomeActionRow}>
         <Pressable
           accessibilityRole="button"
-          onPress={onOpenOrderHistory}
-          style={({ pressed }) => [
-            styles.clientHomeActionButton,
-            pressed && styles.pressed,
-          ]}
+          accessibilityLabel="Заказать доставку"
+          onPress={onOpenDelivery}
+          style={({ pressed }) => [styles.clientServiceTile, pressed && styles.pressed]}
         >
-          <View style={styles.clientDeliveryActionTop}>
-            <Route color="#008D49" size={24} strokeWidth={2.5} />
-            <Text style={styles.clientDeliveryBadge}>такси</Text>
+          <View style={styles.clientMainOrderIcon}>
+            <Package color="#F4FAF6" size={26} strokeWidth={2.6} />
           </View>
-          <Text style={styles.clientHomeActionTitle}>История</Text>
-          <Text numberOfLines={2} style={styles.clientHomeActionText}>Последние поездки</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOrderHome}
-          style={({ pressed }) => [styles.clientHomeActionButton, pressed && styles.pressed]}
-        >
-          <Home color="#008D49" size={24} strokeWidth={2.5} />
-          <Text style={styles.clientHomeActionTitle}>Домой</Text>
-          <Text numberOfLines={2} style={styles.clientHomeActionText}>
-            {savedHomeAddressLabel ? savedHomeAddressLabel : 'Добавить дом'}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOpenSupportChat}
-          style={({ pressed }) => [styles.clientHomeActionButton, pressed && styles.pressed]}
-        >
-          <Headphones color="#008D49" size={24} strokeWidth={2.5} />
-          <Text style={styles.clientHomeActionTitle}>Поддержка</Text>
-          <Text numberOfLines={2} style={styles.clientHomeActionText}>Чат с оператором</Text>
+          <Text style={styles.clientServiceTitle}>Доставка</Text>
+          <Text numberOfLines={1} style={styles.clientServiceText}>Привезём и передадим</Text>
         </Pressable>
       </View>
 
@@ -591,6 +651,7 @@ function ClientOrdersPage({
   orderSummary?: ClientOrderSummary;
   onOpenOrderHistory: () => void;
 }) {
+  const [statsOpen, setStatsOpen] = useState(false);
   const summary = orderSummary ?? {
     activeCount: 0,
     completedCount: 0,
@@ -599,59 +660,118 @@ function ClientOrdersPage({
     totalCount: 0,
     totalSpent: 0,
   };
+  const tripItems: Array<{
+    dateTimeLabel: string;
+    destination: string;
+    driverLabel: string;
+    id: string;
+    pickup: string;
+    price?: string;
+    serviceType: TripCardServiceType;
+    status: string;
+    title: string;
+    tone: 'active' | 'done';
+  }> = [];
+
+  if (summary.activeOrder) {
+    tripItems.push({
+      dateTimeLabel: formatTripDateTime(summary.activeOrder.createdAt),
+      destination: summary.activeOrder.destination,
+      driverLabel: formatTripDriverLine(summary.activeOrder.driverLabel),
+      id: summary.activeOrder.id,
+      pickup: summary.activeOrder.pickup,
+      price: summary.activeOrder.priceLabel,
+      serviceType: summary.activeOrder.serviceType ?? 'taxi',
+      status: summary.activeOrder.statusLabel,
+      title: summary.activeOrder.routeTitle ?? summary.activeOrder.routeLabel,
+      tone: 'active',
+    });
+  }
+
+  if (summary.lastOrder && summary.lastOrder.id !== summary.activeOrder?.id) {
+    tripItems.push({
+      dateTimeLabel: formatTripDateTime(summary.lastOrder.createdAt),
+      destination: summary.lastOrder.destination,
+      driverLabel: formatTripDriverLine(summary.lastOrder.driverLabel),
+      id: summary.lastOrder.id,
+      pickup: summary.lastOrder.pickup,
+      price: summary.lastOrder.priceLabel,
+      serviceType: summary.lastOrder.serviceType ?? 'taxi',
+      status: summary.lastOrder.statusLabel,
+      title: summary.lastOrder.routeTitle ?? summary.lastOrder.routeLabel,
+      tone: 'done',
+    });
+  }
 
   return (
     <View style={styles.clientFocusPage}>
       <View style={styles.clientSectionHeader}>
-        <Text style={styles.clientSectionTitle}>Заказы</Text>
-        <Text numberOfLines={2} style={styles.clientSectionText}>
-          Здесь только статистика и история. Новый заказ находится на Главной.
-        </Text>
+        <Text style={styles.clientSectionTitle}>Мои поездки</Text>
+        <Text numberOfLines={1} style={styles.clientSectionText}>Активные и завершённые маршруты.</Text>
       </View>
 
-      <View style={styles.clientStatsGrid}>
-        <ClientStatPill label="Всего" value={String(summary.totalCount)} />
-        <ClientStatPill label="Активные" value={String(summary.activeCount)} />
-        <ClientStatPill label="Завершено" value={String(summary.completedCount)} />
-        <ClientStatPill label="Сумма" value={`${summary.totalSpent} ₽`} />
-      </View>
-
-      {summary.activeOrder ? (
-        <View style={styles.clientActiveOrderCard}>
-          <Text style={styles.clientActiveOrderLabel}>Активный заказ</Text>
-          <Text numberOfLines={1} style={styles.clientActiveOrderTitle}>{summary.activeOrder.routeLabel}</Text>
-          <Text style={styles.clientActiveOrderText}>
-            {summary.activeOrder.statusLabel} · {summary.activeOrder.priceLabel} · {summary.activeOrder.driverLabel}
-          </Text>
+      {tripItems.length ? (
+        <View style={styles.clientTripsList}>
+          {tripItems.map((item) => (
+            <TripCard
+              dateTimeLabel={item.dateTimeLabel}
+              destination={item.destination}
+              driverLabel={item.driverLabel}
+              key={item.id}
+              pickup={item.pickup}
+              priceLabel={item.price}
+              serviceType={item.serviceType}
+              statusLabel={item.status}
+              title={item.title}
+              tone={item.tone}
+            />
+          ))}
         </View>
       ) : (
         <KinetixEmptyState
-          description="Когда поездка появится, статус будет здесь."
+          description="После первого заказа здесь появится маршрут."
           icon={<MapPinned color="#008D49" size={20} strokeWidth={2.4} />}
-          title="Активного заказа нет"
+          title="Поездок пока нет"
         />
       )}
 
+      <View style={styles.clientHistoryActions}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenOrderHistory}
+          style={({ pressed }) => [styles.clientHistoryMiniButton, pressed && styles.pressed]}
+        >
+          <Route color="#008D49" size={15} strokeWidth={2.5} />
+          <Text style={styles.clientHistoryMiniButtonText}>История</Text>
+        </Pressable>
+        <ClientHistoryActionChip title="Отзыв" />
+        <ClientHistoryActionChip title="Жалоба" />
+        <ClientHistoryActionChip title="Повтор" />
+      </View>
+
       <Pressable
         accessibilityRole="button"
-        onPress={onOpenOrderHistory}
-        style={({ pressed }) => [styles.clientHistoryButton, pressed && styles.pressed]}
+        accessibilityState={{ expanded: statsOpen }}
+        onPress={() => setStatsOpen((current) => !current)}
+        style={({ pressed }) => [styles.clientStatsToggle, statsOpen && styles.clientStatsToggleActive, pressed && styles.pressed]}
       >
-        <Route color="#F4FAF6" size={20} strokeWidth={2.5} />
-        <Text style={styles.clientHistoryButtonText}>История поездок</Text>
+        <FileText color={statsOpen ? '#F4FAF6' : '#008D49'} size={17} strokeWidth={2.4} />
+        <Text style={[styles.clientStatsToggleText, statsOpen && styles.clientStatsToggleTextActive]}>
+          Статистика
+        </Text>
+        <Text style={[styles.clientStatsToggleValue, statsOpen && styles.clientStatsToggleTextActive]}>
+          {summary.totalCount}
+        </Text>
       </Pressable>
 
-      <View style={styles.clientHistoryActions}>
-        <ClientHistoryActionChip title="Оставить отзыв" />
-        <ClientHistoryActionChip title="Жалоба" />
-        <ClientHistoryActionChip title="Повтор маршрута" />
-      </View>
-
-      <View style={styles.clientLastOrderBox}>
-        <Text style={styles.clientLastOrderTitle}>Последняя поездка</Text>
-        <Text numberOfLines={2} style={styles.clientLastOrderText}>{summary.lastOrderLabel}</Text>
-        <Text style={styles.clientLastOrderStatus}>{summary.lastOrderStatus}</Text>
-      </View>
+      {statsOpen ? (
+        <View style={styles.clientStatsGrid}>
+          <ClientStatPill label="Всего" value={String(summary.totalCount)} />
+          <ClientStatPill label="Активные" value={String(summary.activeCount)} />
+          <ClientStatPill label="Завершено" value={String(summary.completedCount)} />
+          <ClientStatPill label="Сумма" value={`${summary.totalSpent} ₽`} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -679,40 +799,58 @@ function ClientAccountPage({
     setActivePanel(initialPanel);
   }, [initialPanel]);
 
+  const initials = getInitials(displayName);
+
   return (
     <View style={styles.clientFocusPage}>
-      <View style={styles.clientSectionHeader}>
-        <Text style={styles.clientSectionTitle}>Аккаунт</Text>
-        <Text numberOfLines={2} style={styles.clientSectionText}>
-          Три быстрых входа: поддержка, настройки и профиль.
-        </Text>
+      <View style={styles.accountHeroCard}>
+        <View style={styles.accountHeroAvatar}>
+          <Text style={styles.accountHeroAvatarText}>{initials}</Text>
+        </View>
+        <View style={styles.accountHeroCopy}>
+          <Text numberOfLines={1} style={styles.accountHeroName}>{displayName}</Text>
+          <Text numberOfLines={1} style={styles.accountHeroMeta}>Клиент Kinetix</Text>
+          <Text numberOfLines={1} style={styles.accountHeroBadge}>
+            {savedHomeAddressLabel ?? 'Дом не указан'}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.accountRoundRow}>
         <ClientAccountRoundButton icon="support" title="Поддержка" onPress={onOpenSupportChat} />
-        <ClientAccountRoundButton icon="settings" title="Настройки" onPress={() => setActivePanel('settings')} />
-        <ClientAccountRoundButton icon="profile" title="Профиль" onPress={() => setActivePanel('profile')} />
+        <ClientAccountRoundButton
+          active={activePanel === 'settings'}
+          icon="settings"
+          title="Настройки"
+          onPress={() => setActivePanel('settings')}
+        />
+        <ClientAccountRoundButton
+          active={activePanel === 'profile'}
+          icon="profile"
+          title="Профиль"
+          onPress={() => setActivePanel('profile')}
+        />
       </View>
 
       {activePanel === 'settings' ? (
         <View style={styles.accountPanel}>
-          <Text style={styles.accountPanelTitle}>Настройки поездки</Text>
+          <Text style={styles.accountPanelTitle}>Настройки</Text>
           <ClientSettingToggle
             enabled={doNotCall}
             onPress={() => setDoNotCall((current) => !current)}
-            text="Попросим водителей не звонить вам без срочной нужды."
+            text="Звонок только по важному."
             title="Не звонить"
           />
           <ClientSettingToggle
             enabled={shareLocation}
             onPress={() => setShareLocation((current) => !current)}
-            text="Водитель будет видеть вас на карте, пока вы не сели в машину."
-            title="Показать водителю где я"
+            text="Пока водитель едет к вам."
+            title="Геопозиция"
           />
         </View>
       ) : (
         <View style={styles.accountPanel}>
-          <Text style={styles.accountPanelTitle}>Профиль клиента</Text>
+          <Text style={styles.accountPanelTitle}>Профиль</Text>
           <View style={styles.accountProfileRow}>
             <Text style={styles.accountProfileLabel}>Имя</Text>
             <Text style={styles.accountProfileValue}>{displayName}</Text>
@@ -775,10 +913,12 @@ function ClientAboutPage({ onOpenSupportChat }: { onOpenSupportChat: () => void 
 }
 
 function ClientAccountRoundButton({
+  active = false,
   icon,
   onPress,
   title,
 }: {
+  active?: boolean;
   icon: 'profile' | 'settings' | 'support';
   title: string;
   onPress: () => void;
@@ -791,10 +931,12 @@ function ClientAccountRoundButton({
       onPress={onPress}
       style={({ pressed }) => [styles.accountRoundButton, pressed && styles.pressed]}
     >
-      <View style={styles.accountRoundIcon}>
-        <Icon color="#008D49" size={24} strokeWidth={2.5} />
+      <View style={[styles.accountRoundIcon, active && styles.accountRoundIconActive]}>
+        <Icon color={active ? '#F4FAF6' : '#008D49'} size={24} strokeWidth={2.5} />
       </View>
-      <Text numberOfLines={1} style={styles.accountRoundText}>{title}</Text>
+      <Text numberOfLines={1} style={[styles.accountRoundText, active && styles.accountRoundTextActive]}>
+        {title}
+      </Text>
     </Pressable>
   );
 }
@@ -837,18 +979,22 @@ function ClientPremiumTrustRail({
 }) {
   const items = [
     {
+      Icon: CreditCard,
       title: 'Цена заранее',
       text: activeOrder?.priceLabel ?? 'До оформления',
     },
     {
+      Icon: RefreshCw,
       title: 'Статус и PIN',
       text: activeOrder?.statusLabel ?? 'Включим в заказ',
     },
     {
+      Icon: Phone,
       title: 'Номер скрыт',
       text: 'Связь в приложении',
     },
     {
+      Icon: Car,
       title: 'Машины рядом',
       text: String(availableCarsCount),
       live: true,
@@ -857,12 +1003,17 @@ function ClientPremiumTrustRail({
 
   return (
     <View style={styles.clientTrustRail}>
-      {items.map((item) => (
+      {items.map(({ Icon, ...item }) => (
         <View key={item.title} style={styles.clientTrustChip}>
-          <View style={[styles.clientTrustDot, item.live && styles.clientTrustDotLive]} />
+          <View style={styles.clientTrustIcon}>
+            <Icon color={kinetixColors.amber} size={18} strokeWidth={2.35} />
+          </View>
           <View style={styles.clientTrustCopy}>
             <Text numberOfLines={1} style={styles.clientTrustTitle}>{item.title}</Text>
-            <Text numberOfLines={1} style={styles.clientTrustText}>{item.text}</Text>
+            <View style={styles.clientTrustValueRow}>
+              <Text numberOfLines={1} style={styles.clientTrustText}>{item.text}</Text>
+              {item.live ? <View style={styles.clientTrustDotLive} /> : null}
+            </View>
           </View>
         </View>
       ))}
@@ -879,11 +1030,10 @@ function ClientMapPreview({
 }) {
   const reducedMotion = useReducedMotionPreference();
   const mapMotion = useRef(new Animated.Value(0)).current;
-  const routeLabel = activeOrder?.routeLabel ?? 'Маршрут появится после заказа';
-  const title = activeOrder ? 'Водитель на карте' : 'Карта подачи';
-  const meta = activeOrder
-    ? `Машина зеленая · ${availableCarsCount} на линии`
-    : `${availableCarsCount} ${formatCarsWord(availableCarsCount)} рядом · выберите адрес`;
+  const driverCaption = activeOrder?.driverLabel
+    ? `Водитель: ${activeOrder.driverLabel}`
+    : 'Водитель: Максимов А.Н. (Skoda Octavia, A123ВС)';
+  const mapAccessibilityLabel = `${availableCarsCount} ${formatCarsWord(availableCarsCount)} рядом`;
 
   useEffect(() => {
     if (reducedMotion) {
@@ -927,7 +1077,7 @@ function ClientMapPreview({
   });
 
   return (
-    <View style={styles.clientMapPanel}>
+    <View accessibilityLabel={mapAccessibilityLabel} style={styles.clientMapPanel}>
       <View style={styles.clientMapCanvas}>
         <View style={styles.clientMapGlow} />
         <View style={styles.clientMapDistrictOne} />
@@ -957,13 +1107,12 @@ function ClientMapPreview({
           <Car color="#F4FAF6" size={20} strokeWidth={2.6} />
         </Animated.View>
         <View style={styles.clientMapStatusPill}>
-          <Text style={styles.clientMapStatusText}>{activeOrder ? 'Live' : 'Готово'}</Text>
+          <Text style={styles.clientMapStatusText}>Live</Text>
         </View>
       </View>
       <View style={styles.clientMapCopy}>
-        <Text style={styles.clientMapTitle}>{title}</Text>
-        <Text numberOfLines={1} style={styles.clientMapText}>{routeLabel}</Text>
-        <Text style={styles.clientMapMeta}>{meta}</Text>
+        <Text style={styles.clientMapTitle}>Водитель на карте</Text>
+        <Text numberOfLines={2} style={styles.clientMapText}>{driverCaption}</Text>
       </View>
     </View>
   );
@@ -1124,8 +1273,8 @@ function DriverCommandCenter({
   const lineLabel = driverLine.isOnline ? 'На линии' : 'Не на линии';
   const lineHint = driverLine.canToggle
     ? driverLine.isOnline
-      ? 'Нажмите, чтобы завершить смену'
-      : 'Нажмите, чтобы начать смену'
+      ? 'Смена активна'
+      : 'Готов к заказам'
     : `Доступ: ${driverLine.status}`;
   const blockers = formatDriverBlockers(driverLine.accessBlockers ?? []);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -1137,7 +1286,7 @@ function DriverCommandCenter({
           <Car color={driverLine.isOnline ? '#008D49' : '#12382C'} size={30} strokeWidth={2.5} />
         </View>
         <View style={styles.commandCopy}>
-          <Text style={styles.commandEyebrow}>{isSelfEmployedDriver ? 'Смена и расчеты' : 'Смена водителя'}</Text>
+          <Text style={styles.commandEyebrow}>{isSelfEmployedDriver ? 'Смена' : 'Линия'}</Text>
           <Text style={styles.commandTitle}>{lineLabel}</Text>
           <Text style={styles.commandText}>{lineHint}</Text>
         </View>
@@ -1169,22 +1318,20 @@ function DriverCommandCenter({
         />
       </Pressable>
 
-      <DriverLineVisual online={driverLine.isOnline} stats={driverStats} />
-
       <View style={styles.commandMetaStrip}>
         <View style={styles.commandMetaItem}>
           <Text style={styles.commandMetaValue}>{driverStats?.todayOrders ?? 0}</Text>
-          <Text numberOfLines={2} style={styles.commandMetaLabel}>заказов сегодня</Text>
+          <Text numberOfLines={1} style={styles.commandMetaLabel}>заказы</Text>
         </View>
         <View style={styles.commandMetaDivider} />
         <View style={styles.commandMetaItem}>
           <Text style={styles.commandMetaValue}>{driverStats?.grossToday ?? 0} ₽</Text>
-          <Text numberOfLines={2} style={styles.commandMetaLabel}>собрано водителем</Text>
+          <Text numberOfLines={1} style={styles.commandMetaLabel}>сегодня</Text>
         </View>
         <View style={styles.commandMetaDivider} />
         <View style={styles.commandMetaItem}>
-          <Text style={styles.commandMetaValue}>{driverStats?.serviceShareToday ?? 0} ₽</Text>
-          <Text numberOfLines={2} style={styles.commandMetaLabel}>к сверке</Text>
+          <Text style={styles.commandMetaValue}>{formatDriverAccessLabel(driverStats)}</Text>
+          <Text numberOfLines={1} style={styles.commandMetaLabel}>{formatDriverAccessUntil(driverStats)}</Text>
         </View>
       </View>
 
@@ -1198,7 +1345,7 @@ function DriverCommandCenter({
           </Text>
           <Text numberOfLines={2} style={styles.driverAccessText}>
             {driverLine.canToggle
-              ? 'Проверка завершена, можно принимать заказы.'
+              ? 'Можно принимать заказы.'
               : `Не закрыто: ${blockers}`}
           </Text>
         </View>
@@ -1210,7 +1357,8 @@ function DriverCommandCenter({
           onPress={onOpenOrderFlow}
           style={({ pressed }) => [styles.commandSecondaryButton, pressed && styles.pressed]}
         >
-          <Text style={styles.commandSecondaryButtonText}>Лента заказов</Text>
+          <BriefcaseBusiness color="#008D49" size={16} strokeWidth={2.4} />
+          <Text style={styles.commandSecondaryButtonText}>Заказы</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -1218,7 +1366,7 @@ function DriverCommandCenter({
           style={({ pressed }) => [styles.commandSecondaryButton, pressed && styles.pressed]}
         >
           <Wallet color="#008D49" size={17} strokeWidth={2.4} />
-          <Text style={styles.commandSecondaryButtonText}>Расчитаться</Text>
+          <Text style={styles.commandSecondaryButtonText}>Оплата</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -1238,11 +1386,6 @@ function DriverCommandCenter({
 
       {statsOpen && driverStats ? <DriverStatsPanel stats={driverStats} /> : null}
 
-      {driverStats?.trialActive ? (
-        <Text style={styles.commandFootnote}>
-          Тестовый период: {driverStats.trialDaysLeft} дн. · {driverStats.trialOrdersLeft} бесплатных заказов
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -1278,8 +1421,8 @@ function DriverLineVisual({
           <Text style={styles.driverLineMiniLabel}>заказы</Text>
         </View>
         <View style={styles.driverLineMiniStat}>
-          <Text style={styles.driverLineMiniValue}>{stats?.serviceShareToday ?? 0} ₽</Text>
-          <Text style={styles.driverLineMiniLabel}>к оплате</Text>
+          <Text style={styles.driverLineMiniValue}>{formatDriverAccessLabel(stats)}</Text>
+          <Text style={styles.driverLineMiniLabel}>доступ</Text>
         </View>
       </View>
     </View>
@@ -1327,28 +1470,66 @@ function MenuButton({ active, compact = false, item, onPress }: MenuButtonProps)
 type BottomTabButtonProps = {
   item: MenuItem;
   active: boolean;
+  clientMode?: boolean;
   onPress: () => void;
 };
 
-function BottomTabButton({ active, item, onPress }: BottomTabButtonProps) {
-  const Icon = iconMap[item.icon];
+function BottomTabButton({ active, clientMode = false, item, onPress }: BottomTabButtonProps) {
+  const clientPresentation = getClientBottomTabPresentation(item);
+  const Icon = clientMode ? clientPresentation.Icon : iconMap[item.icon];
+  const title = clientMode ? clientPresentation.title : item.title;
+  const iconColor = active
+    ? kinetixColors.amber
+    : clientMode
+      ? kinetixColors.textSecondary
+      : kinetixColors.amber;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={({ pressed }) => [styles.bottomTab, active && styles.bottomTabActive, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.bottomTab,
+        clientMode && styles.clientBottomTab,
+        active && (clientMode ? styles.clientBottomTabActive : styles.bottomTabActive),
+        pressed && styles.pressed,
+      ]}
     >
-      <View style={[styles.bottomTabIndicator, active && styles.bottomTabIndicatorActive]} />
-      <View style={[styles.bottomTabIcon, active && styles.bottomTabIconActive]}>
-        <Icon color={active ? '#F4FAF6' : '#008D49'} size={20} strokeWidth={2.4} />
+      {clientMode ? null : <View style={[styles.bottomTabIndicator, active && styles.bottomTabIndicatorActive]} />}
+      <View
+        style={[
+          styles.bottomTabIcon,
+          clientMode && styles.clientBottomTabIcon,
+          active && !clientMode && styles.bottomTabIconActive,
+        ]}
+      >
+        <Icon
+          color={active && !clientMode ? kinetixColors.graphite : iconColor}
+          size={clientMode ? kinetixIconography.sizes.regular : 20}
+          strokeWidth={clientMode ? 2.25 : 2.4}
+        />
       </View>
       <Text numberOfLines={1} style={[styles.bottomTabText, active && styles.bottomTabTextActive]}>
-        {item.title}
+        {title}
       </Text>
     </Pressable>
   );
+}
+
+function getClientBottomTabPresentation(item: MenuItem): {
+  Icon: ComponentType<LucideProps>;
+  title: string;
+} {
+  if (item.id === 'rides') {
+    return { Icon: Clock, title: 'Поездки' };
+  }
+
+  if (item.id === 'profile') {
+    return { Icon: User, title: 'Профиль' };
+  }
+
+  return { Icon: Home, title: 'Главная' };
 }
 
 type SideDrawerProps = {
@@ -1503,9 +1684,205 @@ function QuickActionCard({ action, onActionTarget }: QuickActionCardProps) {
   );
 }
 
+function DriverPayoutsPage({
+  onActionTarget,
+  stats,
+}: {
+  onActionTarget: (target?: MenuActionTarget) => void;
+  stats?: DriverStatsSummary;
+}) {
+  const [statsOpen, setStatsOpen] = useState(false);
+  const activePlan = stats?.billingMode ?? 'daily';
+  const todayGross = stats?.grossToday ?? 0;
+  const todayOrders = stats?.todayOrders ?? 0;
+  const accessUntil = formatDriverAccessUntil(stats);
+
+  return (
+    <View style={styles.payoutPage}>
+      <View style={styles.payoutHeroCard}>
+        <View style={styles.payoutHeroTop}>
+          <View style={styles.payoutHeroIcon}>
+            <Wallet color="#F4FAF6" size={24} strokeWidth={2.5} />
+          </View>
+          <View style={styles.payoutHeroCopy}>
+            <Text style={styles.payoutHeroTitle}>{todayGross} ₽</Text>
+            <Text numberOfLines={1} style={styles.payoutHeroText}>Собрано сегодня</Text>
+          </View>
+          <Text style={styles.payoutHeroBadge}>Без комиссии</Text>
+        </View>
+
+        <View style={styles.payoutKeyGrid}>
+          <View style={styles.payoutKeyCard}>
+            <Text style={styles.payoutKeyValue}>{todayOrders}</Text>
+            <Text style={styles.payoutKeyLabel}>заказы</Text>
+          </View>
+          <View style={styles.payoutKeyCard}>
+            <Text style={styles.payoutKeyValue}>{formatDriverAccessLabel(stats)}</Text>
+            <Text numberOfLines={1} style={styles.payoutKeyLabel}>{accessUntil}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.payoutTariffRow}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onActionTarget('subscription')}
+          style={({ pressed }) => [
+            styles.payoutTariffChip,
+            activePlan === 'daily' && styles.payoutTariffChipActive,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.payoutTariffTitle, activePlan === 'daily' && styles.payoutTariffTitleActive]}>
+            День
+          </Text>
+          <Text style={[styles.payoutTariffText, activePlan === 'daily' && styles.payoutTariffTextActive]}>
+            100 ₽
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onActionTarget('subscription')}
+          style={({ pressed }) => [
+            styles.payoutTariffChip,
+            activePlan === 'monthly' && styles.payoutTariffChipActive,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.payoutTariffTitle, activePlan === 'monthly' && styles.payoutTariffTitleActive]}>
+            PRO
+          </Text>
+          <Text style={[styles.payoutTariffText, activePlan === 'monthly' && styles.payoutTariffTextActive]}>
+            2 490 ₽
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.payoutActionsRow}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onActionTarget('subscription')}
+          style={({ pressed }) => [styles.payoutPayButton, pressed && styles.pressed]}
+        >
+          <CreditCard color="#F4FAF6" size={18} strokeWidth={2.4} />
+          <Text style={styles.payoutPayButtonText}>
+            {activePlan === 'monthly' ? 'Оплатить PRO' : 'Оплатить смену 100 ₽'}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: statsOpen }}
+          onPress={() => setStatsOpen((current) => !current)}
+          style={({ pressed }) => [styles.payoutStatsButton, statsOpen && styles.payoutStatsButtonActive, pressed && styles.pressed]}
+        >
+          <Text style={[styles.payoutStatsButtonText, statsOpen && styles.payoutStatsButtonTextActive]}>
+            Статистика
+          </Text>
+        </Pressable>
+      </View>
+
+      {statsOpen && stats ? <DriverStatsPanel stats={stats} /> : null}
+    </View>
+  );
+}
+
+function DriverProfilePage({
+  displayName,
+  driverStats,
+  onActionTarget,
+}: {
+  displayName: string;
+  driverStats?: DriverStatsSummary;
+  onActionTarget: (target?: MenuActionTarget) => void;
+}) {
+  const [activePanel, setActivePanel] = useState<'settings' | 'profile'>('profile');
+  const initials = getInitials(displayName);
+
+  return (
+    <View style={styles.clientFocusPage}>
+      <View style={styles.accountHeroCard}>
+        <View style={styles.accountHeroAvatar}>
+          <Text style={styles.accountHeroAvatarText}>{initials}</Text>
+        </View>
+        <View style={styles.accountHeroCopy}>
+          <Text numberOfLines={1} style={styles.accountHeroName}>{displayName}</Text>
+          <Text numberOfLines={1} style={styles.accountHeroMeta}>Водитель-партнёр</Text>
+          <Text numberOfLines={1} style={styles.accountHeroBadge}>
+            {formatDriverAccessLabel(driverStats)} · {formatDriverAccessUntil(driverStats)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.accountRoundRow}>
+        <ClientAccountRoundButton
+          icon="support"
+          title="Поддержка"
+          onPress={() => onActionTarget('supportChat')}
+        />
+        <ClientAccountRoundButton
+          active={activePanel === 'settings'}
+          icon="settings"
+          title="Настройки"
+          onPress={() => setActivePanel('settings')}
+        />
+        <ClientAccountRoundButton
+          active={activePanel === 'profile'}
+          icon="profile"
+          title="Профиль"
+          onPress={() => setActivePanel('profile')}
+        />
+      </View>
+
+      {activePanel === 'settings' ? (
+        <View style={styles.accountPanel}>
+          <Text style={styles.accountPanelTitle}>Настройки</Text>
+          <View style={styles.accountProfileActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onActionTarget('documents')}
+              style={({ pressed }) => [styles.accountSecondaryButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.accountSecondaryButtonText}>Документы</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onActionTarget('subscription')}
+              style={({ pressed }) => [styles.accountSecondaryButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.accountSecondaryButtonText}>Тариф</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onActionTarget('deleteAccount')}
+              style={({ pressed }) => [styles.accountDangerButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.accountDangerButtonText}>Удалить</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.accountPanel}>
+          <Text style={styles.accountPanelTitle}>Профиль</Text>
+          <View style={styles.accountProfileRow}>
+            <Text style={styles.accountProfileLabel}>Имя</Text>
+            <Text style={styles.accountProfileValue}>{displayName}</Text>
+          </View>
+          <View style={styles.accountProfileRow}>
+            <Text style={styles.accountProfileLabel}>Доступ</Text>
+            <Text style={styles.accountProfileValue}>
+              {formatDriverAccessLabel(driverStats)} · {formatDriverAccessUntil(driverStats)}
+            </Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
 type SectionPageViewProps = {
   activeItemId: string;
   appTitle: string;
+  displayName: string;
   driverFeedBusyId?: string;
   driverFeedLockedReason?: string;
   driverFeedOrders?: DriverFeedPreviewOrder[];
@@ -1518,6 +1895,7 @@ type SectionPageViewProps = {
 function SectionPageView({
   activeItemId,
   appTitle,
+  displayName,
   driverFeedBusyId,
   driverFeedLockedReason,
   driverFeedOrders = [],
@@ -1528,6 +1906,38 @@ function SectionPageView({
 }: SectionPageViewProps) {
   const Icon = iconMap[page.icon];
   const showDriverFeed = activeItemId === 'orders' && Boolean(onAcceptDriverOrder);
+
+  if (activeItemId === 'payouts') {
+    return (
+      <>
+        <View style={styles.routeRow}>
+          <Text style={styles.routeText}>{appTitle}</Text>
+          <Text style={styles.routeDivider}>/</Text>
+          <Text style={styles.routeTextActive}>Доход</Text>
+        </View>
+
+        <DriverPayoutsPage onActionTarget={onActionTarget} stats={driverStats} />
+      </>
+    );
+  }
+
+  if (activeItemId === 'profile') {
+    return (
+      <>
+        <View style={styles.routeRow}>
+          <Text style={styles.routeText}>{appTitle}</Text>
+          <Text style={styles.routeDivider}>/</Text>
+          <Text style={styles.routeTextActive}>Профиль</Text>
+        </View>
+
+        <DriverProfilePage
+          displayName={displayName}
+          driverStats={driverStats}
+          onActionTarget={onActionTarget}
+        />
+      </>
+    );
+  }
 
   if (showDriverFeed) {
     return (
@@ -1711,15 +2121,18 @@ function DriverFeedPreview({
 
             return (
               <View key={order.id} style={styles.driverFeedCard}>
-                <View style={styles.driverFeedCardRow}>
-                  <View style={styles.driverFeedRouteMark}>
-                    <View style={styles.driverFeedRouteDot} />
-                    <View style={styles.driverFeedRouteLine} />
+                <View style={styles.driverFeedCardTop}>
+                  <View style={styles.driverFeedCardTags}>
+                    <Text numberOfLines={1} style={styles.driverFeedService}>{order.serviceLabel ?? 'Такси'}</Text>
+                    <Text numberOfLines={1} style={styles.driverFeedDistance}>{order.distanceLabel}</Text>
                   </View>
-                  <Text numberOfLines={1} style={styles.driverFeedService}>{order.serviceLabel ?? 'Такси'}</Text>
-                  <Text numberOfLines={1} style={styles.driverFeedDistance}>{order.distanceLabel}</Text>
-                  <Text numberOfLines={1} style={styles.driverFeedAddress}>{order.address}</Text>
                   <Text numberOfLines={1} style={styles.driverFeedPrice}>{order.priceLabel}</Text>
+                </View>
+                <View style={styles.driverFeedRouteRow}>
+                  <View style={styles.driverFeedRouteDot} />
+                  <Text numberOfLines={1} style={styles.driverFeedAddress}>{order.address}</Text>
+                </View>
+                <View style={styles.driverFeedActions}>
                   <Pressable
                     accessibilityLabel="Информация о заказе"
                     accessibilityRole="button"
@@ -1734,6 +2147,7 @@ function DriverFeedPreview({
                     onPress={() => onAcceptOrder?.(order.id)}
                     style={({ pressed }) => [
                       styles.driverFeedAcceptButton,
+                      styles.driverFeedAcceptButtonWide,
                       disabled && styles.disabledButton,
                       pressed && styles.pressed,
                     ]}
@@ -1784,19 +2198,11 @@ function DriverStatsCard({ stats }: { stats: DriverStatsSummary }) {
       <View style={styles.driverStatsRows}>
         <MiniStat label="Заказы" value={String(stats.todayOrders)} />
         <MiniStat label="Заработано" value={`${stats.grossToday} ₽`} />
-        <MiniStat label="К оплате" value={`${stats.serviceShareToday} ₽`} />
+        <MiniStat label="Доступ" value={formatDriverAccessLabel(stats)} />
       </View>
       <Text style={styles.driverStatsHint}>
-        Комиссия: {stats.serviceShareRate}% · {formatSettlementStatus(stats.settlementStatus)}
+        {formatDriverAccessDescription(stats)}
       </Text>
-      {stats.trialActive ? (
-        <Text style={styles.driverStatsHint}>
-          Тестовый период: {stats.trialDaysLeft} дн. · {stats.trialOrdersLeft} бесплатных заказов
-        </Text>
-      ) : null}
-      {stats.billingMode === 'monthly' && stats.subscriptionExpiresAt ? (
-        <Text style={styles.driverStatsHint}>Партнёр PRO активен до {formatDate(stats.subscriptionExpiresAt)}</Text>
-      ) : null}
     </View>
   );
 }
@@ -1806,32 +2212,61 @@ function DriverStatsPanel({ stats }: { stats: DriverStatsSummary }) {
     <View style={styles.financePanel}>
       <Text style={styles.panelTitle}>Статистика</Text>
       <Text style={styles.panelSubtitle}>
-        День, неделя и месяц в одном коротком блоке. Расчеты 7% / 5% / 3% сохранены.
+        День, неделя и месяц в одном коротком блоке. Процентов с заказов нет.
       </Text>
       <View style={styles.metricsGrid}>
         <MiniMetric label="День" value={`${stats.grossToday} ₽`} />
         <MiniMetric label="Заказы сегодня" value={String(stats.todayOrders)} />
-        <MiniMetric label="К оплате" value={`${stats.serviceShareToday} ₽`} />
+        <MiniMetric label="Доступ" value={formatDriverAccessLabel(stats)} />
         <MiniMetric label="Неделя" value={`${stats.weekOrders} заказов`} />
         <MiniMetric label="Месяц" value={`${stats.monthOrders} заказов`} />
-        <MiniMetric label="Статус" value={formatSettlementStatus(stats.settlementStatus)} />
+        <MiniMetric label="До" value={stats.subscriptionExpiresAt ? formatDate(stats.subscriptionExpiresAt) : '—'} />
       </View>
       <Text style={styles.panelSubtitle}>
-        Чем больше заказов за день — тем ниже комиссия: после 15 заказов 5%, после 20 заказов 3%.
+        Дневной доступ открывает линию на 24 часа, PRO — на 30 дней.
       </Text>
     </View>
   );
 }
 
-function formatSettlementStatus(status: DriverStatsSummary['settlementStatus']) {
-  const labels: Record<DriverStatsSummary['settlementStatus'], string> = {
-    confirmed: 'оплачен',
-    not_applicable: 'не начисляется',
-    pending_transfer: 'не оплачен',
-    reported_transferred: 'ожидает проверки',
-  };
+function formatDriverAccessLabel(stats?: DriverStatsSummary) {
+  if (!stats) {
+    return '—';
+  }
 
-  return labels[status];
+  return stats.billingMode === 'monthly' ? 'PRO' : 'День';
+}
+
+function formatDriverAccessUntil(stats?: DriverStatsSummary) {
+  if (!stats?.subscriptionExpiresAt) {
+    return 'доступ';
+  }
+
+  return `до ${formatDate(stats.subscriptionExpiresAt)}`;
+}
+
+function formatDriverAccessDescription(stats: DriverStatsSummary) {
+  const plan = stats.billingMode === 'monthly' ? 'Партнёр PRO' : 'Дневной доступ';
+
+  if (!stats.subscriptionExpiresAt) {
+    return `${plan} активен. С заказов ничего не удерживается.`;
+  }
+
+  return `${plan} активен до ${formatDate(stats.subscriptionExpiresAt)}. С заказов ничего не удерживается.`;
+}
+
+function getInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (!parts.length) {
+    return 'K';
+  }
+
+  return parts.map((part) => part.slice(0, 1).toUpperCase()).join('');
 }
 
 function formatCarsWord(count: number) {
@@ -1932,4 +2367,29 @@ function formatDate(value: string) {
     month: '2-digit',
     year: '2-digit',
   });
+}
+
+function formatTripDateTime(value?: string) {
+  if (!value) {
+    return 'Дата не указана';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+  });
+}
+
+function formatTripDriverLine(value: string) {
+  return value.trim().toLowerCase().startsWith('водитель')
+    ? value
+    : `Водитель: ${value}`;
 }

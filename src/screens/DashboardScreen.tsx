@@ -4,12 +4,13 @@ import { Alert, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } fro
 
 import {
   ClientOrderSummary,
+  ClientOrderSummaryTrip,
   DriverFeedPreviewOrder,
   DriverStatsSummary,
   PostRegistrationMenu,
 } from '../components/PostRegistrationMenu';
-import { AccountRole, isDriverLikeRole, isParkDriverRole, isSelfEmployedDriverRole } from '../data/registration';
-import { driverAccessPlans, getDriverDailyCommissionPercent } from '../data/subscription';
+import { AccountRole, isDriverLikeRole, isSelfEmployedDriverRole } from '../data/registration';
+import { driverAccessPlans } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
 import { requestUserLocation } from '../services/locationService';
 import { AppOrder, DriverProfile, DriverSubscription, useAppState } from '../state/AppState';
@@ -77,9 +78,9 @@ export function DashboardScreen({ navigation, route }: Props) {
   const driverStats = useMemo(
     () =>
       currentDriver
-        ? createDriverStats(currentDriver, orders, driverSubscription, role)
+        ? createDriverStats(currentDriver, orders, driverSubscription)
         : undefined,
-    [currentDriver, driverSubscription, orders, role],
+    [currentDriver, driverSubscription, orders],
   );
   const driverFeedLockedReason =
     isDriverRole && !currentDriver?.canReceiveOrders ? formatDriverAccessStatus(currentDriver) : undefined;
@@ -245,19 +246,8 @@ export function DashboardScreen({ navigation, route }: Props) {
 
           updateDriverAvailability(currentDriver.id, nextIsOnline, location);
         }}
+        onOpenDelivery={() => navigation.navigate('OrderFlow', { firstName, role, serviceType: 'delivery' })}
         onOpenOrderFlow={() => navigation.navigate('OrderFlow', { firstName, role })}
-        onOrderHome={() => {
-          if (!savedHomeAddress?.address) {
-            navigation.navigate('SavedPlace', { firstName, role });
-            return;
-          }
-
-          navigation.navigate('OrderFlow', {
-            firstName,
-            presetDestination: savedHomeAddress.address,
-            role,
-          });
-        }}
         onOpenDriverDocuments={() => navigation.navigate('DriverDocuments', { firstName, role })}
         onOpenFleetDriverRegistration={() =>
           navigation.navigate('Registration', {
@@ -356,20 +346,32 @@ function createClientOrderSummary(
   return {
     activeCount: activeOrders.length,
     completedCount,
-    lastOrderLabel: lastOrder ? `${getOrderServiceLabel(lastOrder)}: ${lastOrder.pickup} → ${lastOrder.destination}` : 'Пока нет поездок',
+    lastOrderLabel: lastOrder ? formatRouteTitle(lastOrder) : 'Пока нет поездок',
     lastOrderStatus: lastOrder ? formatClientOrderStatus(lastOrder.status) : 'Пусто',
+    lastOrder: lastOrder ? createClientSummaryTrip(lastOrder) : undefined,
     totalCount: clientOrders.length,
     totalSpent: clientOrders.reduce((sum, order) => sum + Number(order.total || 0), 0),
-    activeOrder: activeOrder
-      ? {
-          driverLabel: activeOrder.driver?.name ?? 'водитель ищется',
-          id: activeOrder.id,
-          priceLabel: `${activeOrder.total} ₽`,
-          routeLabel: `${getOrderServiceLabel(activeOrder)}: ${activeOrder.pickup} → ${activeOrder.destination}`,
-          statusLabel: formatClientOrderStatus(activeOrder.status),
-        }
-      : undefined,
+    activeOrder: activeOrder ? createClientSummaryTrip(activeOrder) : undefined,
   };
+}
+
+function createClientSummaryTrip(order: AppOrder): ClientOrderSummaryTrip {
+  return {
+    createdAt: order.createdAt,
+    destination: order.destination,
+    driverLabel: order.driver?.name ?? (isFinalOrderStatus(order.status) ? 'водитель не назначен' : 'водитель ищется'),
+    id: order.id,
+    pickup: order.pickup,
+    priceLabel: `${order.total} ₽`,
+    routeLabel: `${getOrderServiceLabel(order)}: ${formatRouteTitle(order)}`,
+    routeTitle: formatRouteTitle(order),
+    serviceType: order.serviceType === 'delivery' ? 'delivery' : 'taxi',
+    statusLabel: formatClientOrderStatus(order.status),
+  };
+}
+
+function formatRouteTitle(order: AppOrder) {
+  return `${order.pickup} → ${order.destination}`;
 }
 
 function isFinalOrderStatus(status: string) {
@@ -382,10 +384,10 @@ function formatClientOrderStatus(status: string) {
     arrived: 'Водитель на месте',
     arriving: 'Едет к вам',
     assigned: 'Назначен',
-    canceled: 'Отменен',
-    cancelled: 'Отменен',
+    canceled: 'Отменён',
+    cancelled: 'Отменён',
     closed: 'Закрыт',
-    completed: 'Завершен',
+    completed: 'Завершён',
     created: 'Создан',
     in_progress: 'В поездке',
     searching: 'Ищем водителя',
@@ -589,7 +591,6 @@ function createDriverStats(
   driver: DriverProfile,
   orders: AppOrder[],
   subscription: DriverSubscription,
-  role: AccountRole,
 ): DriverStatsSummary {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -605,87 +606,33 @@ function createDriverStats(
   const weekOrders = completedOrders.filter((order) => new Date(order.updatedAt ?? order.createdAt) >= weekStart);
   const todayOrders = completedOrders.filter((order) => new Date(order.updatedAt ?? order.createdAt) >= dayStart);
   const billingMode = driver.billingMode ?? subscription.billingMode;
-  const hasActivePartnerPro =
-    billingMode === 'monthly' &&
-    driver.subscriptionStatus === 'active' &&
-    Boolean((driver.subscriptionExpiresAt ?? driver.accessExpiresAt) && Date.parse(driver.subscriptionExpiresAt ?? driver.accessExpiresAt ?? '') > Date.now());
-  const trialEndsAt = driver.commissionTrialEndsAt ? Date.parse(driver.commissionTrialEndsAt) : NaN;
-  const trialDaysLeft = Number.isFinite(trialEndsAt)
-    ? Math.max(0, Math.ceil((trialEndsAt - Date.now()) / 86_400_000))
-    : 0;
-  const trialOrdersLimit = driver.commissionTrialOrderLimit ?? 20;
-  const trialOrdersUsed = completedOrders.filter(
-    (order) =>
-      Number.isFinite(trialEndsAt) &&
-      new Date(order.updatedAt ?? order.createdAt).getTime() <= trialEndsAt,
-  ).length;
-  const trialOrdersLeft = Math.max(0, trialOrdersLimit - trialOrdersUsed);
-  const trialActive = !hasActivePartnerPro && trialDaysLeft > 0 && trialOrdersLeft > 0;
-  const serviceShareRate = isParkDriverRole(role) || hasActivePartnerPro || trialActive
-    ? 0
-    : getDriverDailyCommissionPercent(todayOrders.length + 1);
+  const accessExpiresAt = driver.subscriptionExpiresAt ?? driver.accessExpiresAt ?? subscription.expiresAt;
   const gross = monthOrders.reduce((sum, order) => sum + getDriverCollectedAmount(order), 0);
   const grossToday = todayOrders.reduce((sum, order) => sum + getDriverCollectedAmount(order), 0);
-  const serviceShare = monthOrders.reduce(
-    (sum, order) => sum + getOrderServiceShareAmount(order, serviceShareRate),
-    0,
-  );
-  const serviceShareToday = todayOrders.reduce(
-    (sum, order) => sum + getOrderServiceShareAmount(order, serviceShareRate),
-    0,
-  );
-  const subscriptionCost =
-    !isParkDriverRole(role) && billingMode === 'monthly' ? subscription.monthlyPrice : 0;
-  const settlementStatus = getDailySettlementStatus(todayOrders, serviceShareToday);
+  const serviceShare = 0;
+  const serviceShareToday = 0;
+  const subscriptionCost = driverAccessPlans[billingMode].monthlyPrice;
+  const settlementStatus = 'not_applicable';
 
   return {
     billingMode,
-    driverNet: gross - serviceShare,
+    driverNet: gross,
     gross,
     grossToday,
     monthOrders: monthOrders.length,
     serviceShare,
-    serviceShareRate,
+    serviceShareRate: 0,
     serviceShareToday,
     settlementStatus,
-    subscriptionExpiresAt: driver.subscriptionExpiresAt ?? driver.accessExpiresAt,
+    subscriptionExpiresAt: accessExpiresAt,
     subscriptionCost,
     todayOrders: todayOrders.length,
-    trialActive,
-    trialDaysLeft,
-    trialOrdersLeft,
     weekOrders: weekOrders.length,
   };
 }
 
 function getDriverCollectedAmount(order: AppOrder) {
   return typeof order.driverCollectedAmount === 'number' ? order.driverCollectedAmount : order.total;
-}
-
-function getOrderServiceShareAmount(order: AppOrder, fallbackRate: number) {
-  if (typeof order.serviceShareAmount === 'number') {
-    return order.serviceShareAmount;
-  }
-
-  const rate = typeof order.serviceShareRate === 'number' ? order.serviceShareRate : fallbackRate;
-
-  return Math.round((getDriverCollectedAmount(order) * rate) / 100);
-}
-
-function getDailySettlementStatus(orders: AppOrder[], serviceShareToday: number) {
-  if (serviceShareToday <= 0) {
-    return 'not_applicable';
-  }
-
-  if (orders.every((order) => order.serviceShareStatus === 'confirmed')) {
-    return 'confirmed';
-  }
-
-  if (orders.some((order) => order.serviceShareStatus === 'reported_transferred')) {
-    return 'reported_transferred';
-  }
-
-  return 'pending_transfer';
 }
 
 const styles = StyleSheet.create({

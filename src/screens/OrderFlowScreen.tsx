@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
@@ -18,6 +18,8 @@ import {
   Wallet,
 } from 'lucide-react-native';
 import {
+  Animated,
+  Easing,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -41,6 +43,7 @@ import {
   isSelfEmployedDriverRole,
   roleCopy,
 } from '../data/registration';
+import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
 import {
   findSalavatAddressSuggestions,
   formatSalavatAddress,
@@ -68,7 +71,14 @@ type Props = NativeStackScreenProps<RootStackParamList, 'OrderFlow'>;
 
 type DriverFeedSort = 'near' | 'price' | 'new';
 type DeliveryHandoffId = 'door_to_door' | 'leave_at_door' | 'meet_outside';
-type DeliveryPackagePresetId = 'documents' | 'food' | 'fragile' | 'other' | 'parcel';
+type DeliveryPackagePresetId =
+  | 'documents'
+  | 'food'
+  | 'fragile'
+  | 'groceries'
+  | 'other'
+  | 'parcel'
+  | 'pharmacy';
 
 const selectedTariffBenefits = ['Фиксированная цена', 'Быстрая подача', '4 места'];
 const deliveryPackagePresets: Array<{
@@ -77,6 +87,18 @@ const deliveryPackagePresets: Array<{
   text: string;
   title: string;
 }> = [
+  {
+    defaultDescription: 'Продукты',
+    id: 'groceries',
+    text: 'Из магазина рядом',
+    title: 'Продукты',
+  },
+  {
+    defaultDescription: 'Лекарства',
+    id: 'pharmacy',
+    text: 'Заказ из аптеки',
+    title: 'Аптека',
+  },
   {
     defaultDescription: 'Документы',
     id: 'documents',
@@ -152,7 +174,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const [paymentMethod, setPaymentMethod] = useState(config.paymentMethods[0]);
   const [safetyPinRequired, setSafetyPinRequired] = useState(true);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
-  const [serviceType, setServiceType] = useState<OrderServiceType>(role === 'client' ? 'taxi' : initialServiceType ?? 'taxi');
+  const [serviceType, setServiceType] = useState<OrderServiceType>(initialServiceType ?? 'taxi');
   const [deliveryDetailsOpen, setDeliveryDetailsOpen] = useState(false);
   const [extraStops, setExtraStops] = useState<string[]>([]);
   const [routeDetailsOpen, setRouteDetailsOpen] = useState(false);
@@ -173,6 +195,8 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const [routeEstimateStatus, setRouteEstimateStatus] = useState<'local' | 'loading' | 'server'>('local');
   const isDriverRole = isDriverLikeRole(role);
   const isSelfEmployedDriver = isSelfEmployedDriverRole(role);
+  const reducedMotion = useReducedMotionPreference();
+  const clientStepTransition = useRef(new Animated.Value(1)).current;
 
   const selectedTariff = useMemo(
     () => config.tariffs.find((tariff) => tariff.id === selectedTariffId) ?? config.tariffs[0],
@@ -307,6 +331,20 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
     return () => clearInterval(timer);
   }, [isDriverRole]);
+
+  useEffect(() => {
+    if (isDriverRole) {
+      return;
+    }
+
+    clientStepTransition.setValue(0);
+    Animated.timing(clientStepTransition, {
+      duration: reducedMotion ? 0 : 240,
+      easing: Easing.out(Easing.cubic),
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  }, [clientStep, clientStepTransition, isDriverRole, reducedMotion, serviceType]);
 
   useEffect(() => {
     if (
@@ -715,30 +753,50 @@ export function OrderFlowScreen({ navigation, route }: Props) {
         ]
       : [
           {
-            label: 'Маршрут',
+            label: 'Такси',
             title: serviceCopy.routeStepTitle,
-            text: serviceCopy.routeStepText,
-          },
-          {
-            label: 'Тариф',
-            title: serviceCopy.priceStepTitle,
-            text: serviceCopy.priceStepText,
-          },
-          {
-            label: 'Проверка',
-            title: serviceCopy.confirmStepTitle,
-            text: serviceCopy.confirmStepText,
+            text: 'Адрес, цена и подача в одном коротком шаге.',
           },
         ];
-    const currentClientStep = clientStepMeta[0];
+    const lastClientStep = clientStepMeta.length - 1;
+    const currentClientStep = clientStepMeta[clientStep] ?? clientStepMeta[0];
+    const clientProgress = Math.round(((clientStep + 1) / clientStepMeta.length) * 100);
+    const clientStepAnimatedStyle = {
+      opacity: clientStepTransition,
+      transform: [
+        {
+          translateX: clientStepTransition.interpolate({
+            inputRange: [0, 1],
+            outputRange: [16, 0],
+          }),
+        },
+      ],
+    };
     const clientPrimaryLabel = isSubmitting
-      ? 'Ищем машину'
-      : canConfirm
-      ? 'Вызвать Эконом'
-      : 'Укажите маршрут';
+      ? isDeliveryOrder
+        ? 'Оформляем доставку'
+        : 'Ищем машину'
+      : !canConfirm
+      ? 'Укажите маршрут'
+      : isDeliveryOrder && clientStep < lastClientStep
+      ? 'Дальше'
+      : isDeliveryOrder
+      ? 'Оформить доставку'
+      : 'Вызвать Эконом';
     const handleClientStepAction = async () => {
       if (!canConfirm) {
         setConfirmed(true);
+        return;
+      }
+
+      if (isDeliveryOrder && clientStep === 1 && !deliveryPackageReady) {
+        setConfirmed(true);
+        return;
+      }
+
+      if (isDeliveryOrder && clientStep < lastClientStep) {
+        setConfirmed(false);
+        setClientStep((current) => Math.min(current + 1, lastClientStep));
         return;
       }
 
@@ -798,6 +856,46 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 </Text>
               </View>
             </View>
+            <View style={styles.clientStepRail}>
+              {clientStepMeta.map((step, index) => {
+                const active = index === clientStep;
+                const done = index < clientStep;
+                const locked = index > clientStep;
+
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: locked, selected: active }}
+                    disabled={locked || isSubmitting}
+                    key={step.label}
+                    onPress={() => {
+                      setConfirmed(false);
+                      setClientStep(index);
+                    }}
+                    style={({ pressed }) => [
+                      styles.clientStepPill,
+                      done && styles.clientStepPillDone,
+                      active && styles.clientStepPillActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.clientStepText,
+                        done && styles.clientStepTextDone,
+                        active && styles.clientStepTextActive,
+                      ]}
+                    >
+                      {index + 1}. {step.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.clientProgressTrack}>
+              <View style={[styles.clientProgressFill, { width: `${clientProgress}%` }]} />
+            </View>
             <View style={styles.clientFlowMap}>
               <View style={styles.clientMapRoadWide} />
               <View style={styles.clientMapRoadThin} />
@@ -816,6 +914,35 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             </View>
           </View>
 
+          <View style={styles.serviceSwitch}>
+            {(['taxi', 'delivery'] as OrderServiceType[]).map((item) => {
+              const active = serviceType === item;
+              const ItemIcon = item === 'delivery' ? Package : Car;
+              const itemCopy = getServiceCopy(item);
+
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  key={item}
+                  onPress={() => selectServiceType(item)}
+                  style={({ pressed }) => [
+                    styles.serviceSwitchButton,
+                    active && styles.serviceSwitchButtonActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ItemIcon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.5} />
+                  <Text style={[styles.serviceSwitchTitle, active && styles.serviceSwitchTitleActive]}>
+                    {itemCopy.shortTitle}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Animated.View style={[styles.clientStepBody, clientStepAnimatedStyle]}>
+          {!isDeliveryOrder || clientStep === 0 ? (
           <View style={styles.clientDestinationBlock}>
             <View style={styles.clientTripHeader}>
               <Text style={styles.clientTripTitle}>Детали поездки</Text>
@@ -1037,8 +1164,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               </View>
             ) : null}
           </View>
+          ) : null}
 
-          {!canConfirm ? (
+          {!canConfirm && (!isDeliveryOrder || clientStep === 0) ? (
           <View style={styles.clientShortcutRow}>
             {favoriteRoutes.map((item) => (
               <Pressable
@@ -1101,7 +1229,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                     autoCorrect={false}
                     multiline
                     onChangeText={(value) => updateValue('packageDescription', value)}
-                    placeholder="Например: документы, ключи, маленький пакет"
+                    placeholder={getDeliveryDescriptionPlaceholder(values.deliveryPackageType)}
                     placeholderTextColor="#557669"
                     style={[styles.clientDestinationInput, styles.deliveryListInput, simpleMode && styles.clientDestinationInputSimple]}
                     value={values.packageDescription ?? ''}
@@ -1403,6 +1531,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               </View>
             </View>
           ) : null}
+          </Animated.View>
 
           {confirmed && !canConfirm ? (
             <Text style={styles.clientError}>{serviceCopy.missingRouteText}</Text>
@@ -2146,6 +2275,25 @@ function getServiceCopy(serviceType: OrderServiceType) {
 
 function getDeliveryPackageLabel(value?: string) {
   return deliveryPackagePresets.find((preset) => preset.id === value)?.title || 'Не выбран';
+}
+
+function getDeliveryDescriptionPlaceholder(packageType?: string) {
+  switch (packageType) {
+    case 'groceries':
+      return 'Напишите список продуктов: молоко, хлеб, яйца…';
+    case 'pharmacy':
+      return 'Напишите список лекарств или приложите рецепт';
+    case 'documents':
+      return 'Какие документы забрать и кому передать';
+    case 'food':
+      return 'Что и откуда привезти';
+    case 'fragile':
+      return 'Что внутри и насколько бережно нести';
+    case 'parcel':
+      return 'Что в посылке';
+    default:
+      return 'Что нужно доставить?';
+  }
 }
 
 function getDeliveryHandoffLabel(value?: string) {

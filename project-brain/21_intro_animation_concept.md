@@ -1,4 +1,4 @@
-﻿# Intro Animation Concept
+# Intro Animation Concept
 
 ## Главная задача
 

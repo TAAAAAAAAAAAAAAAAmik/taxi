@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, Headphones, Send, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, Headphones, Send } from 'lucide-react-native';
 import {
   Pressable,
   SafeAreaView,
@@ -13,16 +13,15 @@ import {
 
 import { roleCopy } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
-import { getMessageServerState } from '../services/messageServer';
 import { SupportMessage, useAppState } from '../state/AppState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SupportChat'>;
 
 const categories = ['Поездка', 'Оплата', 'Профиль', 'Безопасность', 'Документы'];
 const quickMessages = [
-  'Нужна помощь по текущей поездке',
-  'Хочу уточнить стоимость и чек',
-  'Проблема с водителем или клиентом',
+  'Текущая поездка',
+  'Стоимость и чек',
+  'Проблема с участником',
 ];
 
 export function SupportChatScreen({ navigation, route }: Props) {
@@ -30,7 +29,6 @@ export function SupportChatScreen({ navigation, route }: Props) {
   const [category, setCategory] = useState(route.params.category ?? categories[0]);
   const [message, setMessage] = useState('');
   const { sendSupportMessage, supportThreads } = useAppState();
-  const serverState = getMessageServerState();
 
   const thread = useMemo(
     () =>
@@ -87,59 +85,55 @@ export function SupportChatScreen({ navigation, route }: Props) {
           <View style={styles.heroCopy}>
             <Text style={styles.title}>Чат поддержки</Text>
             <Text style={styles.subtitle}>
-              Простой диалог внутри приложения: категория, быстрые сообщения и история ответа.
+              Поможем с поездкой, оплатой или профилем.
             </Text>
             <Text style={styles.metaLine}>{firstName?.trim() || 'Пользователь'}</Text>
           </View>
         </View>
 
-        <View style={styles.serverBox}>
-          <ShieldCheck color="#008D49" size={20} strokeWidth={2.4} />
-          <View style={styles.serverCopy}>
-            <Text style={styles.serverTitle}>{serverState.label}</Text>
-            <Text style={styles.serverText}>{serverState.description}</Text>
-          </View>
-        </View>
-
         <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>Категория обращения</Text>
-          <View style={styles.categoryRow}>
-            {categories.map((item) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: item === category }}
-                key={item}
-                onPress={() => setCategory(item)}
-                style={({ pressed }) => [
-                  styles.categoryButton,
-                  item === category && styles.categoryButtonActive,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.categoryButtonText,
-                    item === category && styles.categoryButtonTextActive,
+          <View style={styles.compactSection}>
+            <Text style={styles.sectionTitle}>Категория</Text>
+            <View style={styles.categoryRow}>
+              {categories.map((item) => (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: item === category }}
+                  key={item}
+                  onPress={() => setCategory(item)}
+                  style={({ pressed }) => [
+                    styles.categoryButton,
+                    item === category && styles.categoryButtonActive,
+                    pressed && styles.pressed,
                   ]}
                 >
-                  {item}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      styles.categoryButtonText,
+                      item === category && styles.categoryButtonTextActive,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Быстрые действия</Text>
-          <View style={styles.quickList}>
-            {quickMessages.map((item) => (
-              <Pressable
-                accessibilityRole="button"
-                key={item}
-                onPress={() => send(item)}
-                style={({ pressed }) => [styles.quickButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.quickButtonText}>{item}</Text>
-              </Pressable>
-            ))}
+          <View style={styles.compactSection}>
+            <Text style={styles.sectionTitle}>Быстро</Text>
+            <View style={styles.quickList}>
+              {quickMessages.map((item) => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={item}
+                  onPress={() => send(item)}
+                  style={({ pressed }) => [styles.quickButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.quickButtonText}>{item}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -216,9 +210,9 @@ const styles = StyleSheet.create({
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
-    minHeight: 40,
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    minHeight: 44,
+    paddingHorizontal: 11,
   },
   categoryButtonActive: {
     backgroundColor: '#008D49',
@@ -230,7 +224,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   categoryButtonTextActive: {
-    color: '#12382C',
+    color: '#F4FAF6',
   },
   categoryRow: {
     flexDirection: 'row',
@@ -250,6 +244,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  compactSection: {
+    gap: 8,
+  },
   hero: {
     alignItems: 'flex-start',
     backgroundColor: '#FFFFFF',
@@ -258,7 +255,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: 14,
-    padding: 18,
+    padding: 16,
   },
   heroCopy: {
     flex: 1,
@@ -321,7 +318,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   messageTextUser: {
-    color: '#12382C',
+    color: '#F4FAF6',
   },
   metaLine: {
     color: '#008D49',
@@ -339,8 +336,8 @@ const styles = StyleSheet.create({
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
-    gap: 12,
-    padding: 16,
+    gap: 14,
+    padding: 14,
   },
   pressed: {
     opacity: 0.92,
@@ -351,7 +348,10 @@ const styles = StyleSheet.create({
     borderColor: '#008D49',
     borderRadius: 8,
     borderWidth: 1,
-    padding: 12,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   quickButtonText: {
     color: '#12382C',
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: '#12382C',
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '900',
   },
   sendButton: {
@@ -383,30 +383,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 50,
   },
-  serverBox: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    padding: 12,
-  },
-  serverCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  serverText: {
-    color: '#557669',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  serverTitle: {
-    color: '#008D49',
-    fontSize: 15,
-    fontWeight: '900',
-  },
   subtitle: {
     color: '#557669',
     fontSize: 15,
@@ -414,9 +390,9 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#12382C',
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '900',
-    lineHeight: 36,
+    lineHeight: 32,
   },
   topBar: {
     alignItems: 'center',

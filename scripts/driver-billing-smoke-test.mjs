@@ -135,22 +135,23 @@ try {
   assert(refund.payments[0].refundReceipt, 'Refunded payment should have refund receipt');
   assert(refund.driver.subscriptionStatus === 'active', 'Previous paid period should keep access active');
 
-  const commissionAccess = await api(`/drivers/${encodeURIComponent(driver.id)}/billing/pay`, {
+  const dailyAccess = await api(`/drivers/${encodeURIComponent(driver.id)}/billing/pay`, {
     body: {
-      billingMode: 'commission',
-      paymentMethod: 'Smoke commission mode',
+      billingMode: 'daily',
+      paymentMethod: 'Smoke daily access',
     },
     method: 'POST',
     token: admin.session.token,
   });
 
-  assert(commissionAccess.driver.subscriptionStatus === 'active', 'Commission mode should keep active access');
-  assert(commissionAccess.driver.billingMode === 'commission', 'Driver billing mode should switch to commission');
-  assert(!commissionAccess.driver.accessExpiresAt, 'Commission mode should not set monthly access expiry');
-  assert(commissionAccess.payments[0].amount === 0, 'Commission mode should not create monthly charge');
+  assert(dailyAccess.driver.subscriptionStatus === 'active', 'Daily access should activate driver access');
+  assert(dailyAccess.driver.billingMode === 'daily', 'Driver billing mode should switch to daily');
+  assert(dailyAccess.driver.accessExpiresAt, 'Daily access should set access expiry');
+  assert(dailyAccess.driver.subscriptionPlan === 'daily_line', 'Daily access should activate daily plan');
+  assert(dailyAccess.payments[0].amount === 100, 'Daily access should cost 100 RUB');
   assert(
-    commissionAccess.driver.canReceiveOrders,
-    'Commission driver should still receive orders after compliance',
+    dailyAccess.driver.canReceiveOrders,
+    'Daily access driver should still receive orders after compliance',
   );
 
   console.log('Driver billing smoke test passed');

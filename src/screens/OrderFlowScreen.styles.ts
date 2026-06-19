@@ -693,6 +693,20 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  clientProgressFill: {
+    backgroundColor: '#008D49',
+    borderRadius: 999,
+    height: '100%',
+  },
+  clientProgressTrack: {
+    backgroundColor: '#E8F3EF',
+    borderRadius: 999,
+    height: 7,
+    overflow: 'hidden',
+  },
+  clientStepBody: {
+    gap: 14,
+  },
   clientStepPill: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',

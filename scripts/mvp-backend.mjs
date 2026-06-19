@@ -59,21 +59,16 @@ const driverAccessPlans = {
   monthly: {
     accessDays: 30,
     commissionPercent: 0,
-    monthlyPrice: readNumberEnv('MVP_DRIVER_MONTHLY_PRICE', 3990),
+    monthlyPrice: 2490,
     name: 'Партнёр PRO',
   },
-  commission: {
-    commissionPercent: readNumberEnv('MVP_DRIVER_TRIP_COMMISSION_PERCENT', 7),
-    monthlyPrice: 0,
-    name: 'Комиссия с поездки',
+  daily: {
+    accessDays: 1,
+    commissionPercent: 0,
+    monthlyPrice: 100,
+    name: 'Дневной доступ',
   },
 };
-const driverDailyCommissionTiers = [
-  { fromOrder: 1, toOrder: 15, percent: 7 },
-  { fromOrder: 16, toOrder: 20, percent: 5 },
-  { fromOrder: 21, percent: 3 },
-];
-const driverTrialFreeOrderLimit = readNumberEnv('MVP_DRIVER_TRIAL_FREE_ORDERS', 20);
 const dispatchExclusiveOfferSeconds = clampNumber(readNumberEnv('MVP_DISPATCH_EXCLUSIVE_SECONDS', 30), 15, 60, 30);
 const driverLocationMaxAgeMinutes = clampNumber(readNumberEnv('MVP_DRIVER_LOCATION_MAX_AGE_MINUTES', 20), 3, 180, 20);
 const parkAccessPlan = {
@@ -2457,6 +2452,11 @@ function makeOrder(payload) {
     routeEstimate,
     paymentMethod,
     paymentStatus,
+    driverCommission: 0,
+    driverCommissionRate: 0,
+    serviceShareAmount: 0,
+    serviceShareRate: 0,
+    serviceShareStatus: 'not_applicable',
     paymentEvents: [
       makePaymentEvent(
         paymentStatus,
@@ -2669,10 +2669,17 @@ function normalizeOrder(order) {
   normalizedOrder.recipientName = order.recipientName ? String(order.recipientName) : undefined;
   normalizedOrder.recipientPhone = order.recipientPhone ? String(order.recipientPhone) : undefined;
   normalizedOrder.deliveryComment = order.deliveryComment ? String(order.deliveryComment) : undefined;
-  normalizedOrder.serviceShareStatus = normalizeServiceShareStatus(
-    order.serviceShareStatus,
-    Number(order.serviceShareAmount || 0) > 0 ? 'pending_transfer' : 'not_applicable',
-  );
+  normalizedOrder.driverCommission = 0;
+  normalizedOrder.driverCommissionRate = 0;
+  normalizedOrder.serviceShareAmount = 0;
+  normalizedOrder.serviceShareRate = 0;
+  normalizedOrder.serviceShareStatus = 'not_applicable';
+  if (['closed', 'completed'].includes(normalizedOrder.status)) {
+    const driverCollectedAmount = Number(normalizedOrder.driverCollectedAmount || normalizedOrder.total || 0);
+    normalizedOrder.driverCollectedAmount = driverCollectedAmount;
+    normalizedOrder.driverNetAmount = driverCollectedAmount;
+    normalizedOrder.driverPayout = driverCollectedAmount;
+  }
   normalizedOrder.serviceShareEvents = Array.isArray(order.serviceShareEvents)
     ? order.serviceShareEvents.map(normalizeServiceShareEvent)
     : [];
@@ -2767,76 +2774,20 @@ function getOrderSettlementTimestamp(order) {
   return Date.parse(order.completedAt || order.updatedAt || order.createdAt || '') || 0;
 }
 
-function countRealDriverCompletedOrdersUntil(db, driverId, timestamp) {
-  return db.orders.filter((item) => {
-    const itemTimestamp = getOrderSettlementTimestamp(item);
-
-    return (
-      String(item.driver?.id || '') === String(driverId) &&
-      ['closed', 'completed'].includes(item.status) &&
-      !item.isTestOrder &&
-      !item.disputeStatus &&
-      itemTimestamp > 0 &&
-      itemTimestamp <= timestamp
-    );
-  }).length;
-}
-
-function ensureDriverTrialStarted(driver, orderTimestamp) {
-  if (!driver || driver.employmentType === 'park_driver' || driver.parkId || driver.commissionTrialStartedAt) {
-    return;
-  }
-
-  const startedAt = new Date(orderTimestamp || Date.now());
-  const endsAt = new Date(startedAt);
-  endsAt.setDate(endsAt.getDate() + referralRewards.driverTrialDays);
-  driver.commissionTrialStartedAt = startedAt.toISOString();
-  driver.commissionTrialEndsAt = endsAt.toISOString();
-  driver.commissionTrialOrderLimit = driverTrialFreeOrderLimit;
-  driver.workMode = driver.workMode || 'trial';
-}
-
-function isDriverTrialActiveForOrder(db, driver, order) {
-  if (!driver || driver.employmentType === 'park_driver' || driver.parkId) {
-    return false;
-  }
-
-  const orderTimestamp = getOrderSettlementTimestamp(order) || Date.now();
-  ensureDriverTrialStarted(driver, orderTimestamp);
-
-  const trialEndsAt = Date.parse(driver.commissionTrialEndsAt || '');
-  const completedUntilOrder = countRealDriverCompletedOrdersUntil(db, driver.id, orderTimestamp);
-
-  return (
-    Number.isFinite(trialEndsAt) &&
-    orderTimestamp <= trialEndsAt &&
-    completedUntilOrder <= driverTrialFreeOrderLimit
-  );
-}
-
-function applyOrderSettlement(order, billingMode, serviceShareRate, driverDailyOrderNumber) {
+function applyOrderSettlement(order, billingMode) {
   const driverCollectedAmount = Number(order.total || 0);
-  const serviceShareAmount = Math.round((driverCollectedAmount * serviceShareRate) / 100);
-  const driverNetAmount = Math.max(0, driverCollectedAmount - serviceShareAmount);
-  const existingShareStatus = order.serviceShareStatus;
-  const serviceShareStatus =
-    serviceShareAmount > 0
-      ? ['reported_transferred', 'confirmed'].includes(existingShareStatus)
-        ? existingShareStatus
-        : 'pending_transfer'
-      : 'not_applicable';
 
-  order.driverBillingMode = billingMode;
+  order.driverBillingMode = normalizeBillingMode(billingMode);
   order.driverCollectedAmount = driverCollectedAmount;
-  order.driverCommissionRate = serviceShareRate;
-  order.driverCommission = serviceShareAmount;
-  order.driverDailyOrderNumber = driverDailyOrderNumber;
-  order.driverNetAmount = driverNetAmount;
-  order.driverPayout = driverNetAmount;
-  order.serviceShareRate = serviceShareRate;
-  order.serviceShareAmount = serviceShareAmount;
+  order.driverCommissionRate = 0;
+  order.driverCommission = 0;
+  order.driverDailyOrderNumber = 0;
+  order.driverNetAmount = driverCollectedAmount;
+  order.driverPayout = driverCollectedAmount;
+  order.serviceShareRate = 0;
+  order.serviceShareAmount = 0;
   order.serviceShareBatchDate = getOrderSettlementDate(order);
-  order.serviceShareStatus = serviceShareStatus;
+  order.serviceShareStatus = 'not_applicable';
 }
 
 function recalculateDriverDailyServiceShare(db, driverId, batchDate) {
@@ -2853,21 +2804,13 @@ function recalculateDriverDailyServiceShare(db, driverId, batchDate) {
   completedOrders.forEach((item, index) => {
     const driver = db.drivers.find((driverItem) => driverItem.id === item.driver?.id);
     const driverSnapshot = { ...(driver || {}), ...(item.driver || {}) };
-    const orderTimestamp = getOrderSettlementTimestamp(item) || Date.now();
     const billingMode = item.fulfilledByRole === 'park_driver'
       ? 'monthly'
-      : getEffectiveDriverBillingMode(driverSnapshot, orderTimestamp);
-    const trialActive = billingMode !== 'monthly' && isDriverTrialActiveForOrder(db, driver, item);
-    const serviceShareRate =
-      item.fulfilledByRole === 'park_driver' || billingMode === 'monthly' || trialActive
-        ? 0
-        : getDriverDailyCommissionPercent(index + 1);
+      : getEffectiveDriverBillingMode(driverSnapshot);
 
-    applyOrderSettlement(item, billingMode, serviceShareRate, index + 1);
-    item.driverTrialActive = trialActive;
-    item.driverTrialRemainingOrders = trialActive
-      ? Math.max(0, driverTrialFreeOrderLimit - countRealDriverCompletedOrdersUntil(db, item.driver?.id, orderTimestamp))
-      : 0;
+    applyOrderSettlement(item, billingMode);
+    item.driverTrialActive = false;
+    item.driverTrialRemainingOrders = 0;
   });
 }
 
@@ -2881,7 +2824,7 @@ function settleOrderPayment(db, order, actor = 'system') {
   if (order.driver?.id) {
     recalculateDriverDailyServiceShare(db, order.driver.id, batchDate);
   } else {
-    applyOrderSettlement(order, 'commission', getDriverDailyCommissionPercent(1), 1);
+    applyOrderSettlement(order, 'daily');
   }
 
   if (!order.receipt) {
@@ -2911,8 +2854,8 @@ function makeServiceShareSummary(db, batchDate = new Date().toISOString().slice(
     const driverId = String(order.driver?.id || 'unassigned-driver');
     const driverName = String(order.driver?.name || 'Driver not assigned');
     const collectedAmount = Number(order.driverCollectedAmount || order.total || 0);
-    const serviceShareAmount = Number(order.serviceShareAmount || order.driverCommission || 0);
-    const status = normalizeServiceShareStatus(order.serviceShareStatus, 'pending_transfer');
+    const serviceShareAmount = 0;
+    const status = 'not_applicable';
 
     if (!byDriver.has(driverId)) {
       byDriver.set(driverId, {
@@ -2926,7 +2869,7 @@ function makeServiceShareSummary(db, batchDate = new Date().toISOString().slice(
         reportedTransferAmount: 0,
         settlementStatus: 'not_applicable',
         subscriptionExpiresAt: order.driver?.subscriptionExpiresAt || order.driver?.accessExpiresAt,
-        subscriptionPlan: order.driver?.subscriptionPlan || (order.driverBillingMode === 'monthly' ? 'partner_pro' : 'commission'),
+        subscriptionPlan: order.driver?.subscriptionPlan || getDriverSubscriptionPlanId(order.driverBillingMode),
         totalCollectedAmount: 0,
         totalDriverNetAmount: 0,
         totalServiceShareAmount: 0,
@@ -2936,12 +2879,12 @@ function makeServiceShareSummary(db, batchDate = new Date().toISOString().slice(
     const driverSummary = byDriver.get(driverId);
     driverSummary.ordersCount += 1;
     driverSummary.billingMode = normalizeBillingMode(order.driverBillingMode || order.driver?.billingMode);
-    driverSummary.currentCommissionPercent = Number(order.serviceShareRate || order.driverCommissionRate || 0);
+    driverSummary.currentCommissionPercent = 0;
     driverSummary.subscriptionExpiresAt = order.driver?.subscriptionExpiresAt || order.driver?.accessExpiresAt;
     driverSummary.subscriptionPlan =
-      order.driver?.subscriptionPlan || (driverSummary.billingMode === 'monthly' ? 'partner_pro' : 'commission');
+      order.driver?.subscriptionPlan || getDriverSubscriptionPlanId(driverSummary.billingMode);
     driverSummary.totalCollectedAmount += collectedAmount;
-    driverSummary.totalDriverNetAmount += Number(order.driverNetAmount || Math.max(0, collectedAmount - serviceShareAmount));
+    driverSummary.totalDriverNetAmount += collectedAmount;
     driverSummary.totalServiceShareAmount += serviceShareAmount;
     summary.totalCollectedAmount += collectedAmount;
     summary.totalServiceShareAmount += serviceShareAmount;
@@ -2959,22 +2902,8 @@ function makeServiceShareSummary(db, batchDate = new Date().toISOString().slice(
   }
 
   for (const driverSummary of byDriver.values()) {
-    if (driverSummary.billingMode === 'monthly' || driverSummary.subscriptionPlan === 'partner_pro') {
-      driverSummary.currentCommissionPercent = 0;
-      driverSummary.settlementStatus = 'not_applicable';
-      continue;
-    }
-
-    driverSummary.currentCommissionPercent = getDriverDailyCommissionPercent(driverSummary.ordersCount + 1);
-    if (driverSummary.totalServiceShareAmount <= 0) {
-      driverSummary.settlementStatus = 'not_applicable';
-    } else if (driverSummary.confirmedAmount >= driverSummary.totalServiceShareAmount) {
-      driverSummary.settlementStatus = 'confirmed';
-    } else if (driverSummary.reportedTransferAmount > 0) {
-      driverSummary.settlementStatus = 'reported_transferred';
-    } else {
-      driverSummary.settlementStatus = 'pending_transfer';
-    }
+    driverSummary.currentCommissionPercent = 0;
+    driverSummary.settlementStatus = 'not_applicable';
   }
 
   return {
@@ -2983,44 +2912,21 @@ function makeServiceShareSummary(db, batchDate = new Date().toISOString().slice(
       right.totalServiceShareAmount - left.totalServiceShareAmount,
     ),
     orders: orders.map((order) => ({
-      commissionPercent: Number(order.serviceShareRate || order.driverCommissionRate || 0),
-      dailyOrderNumber: Number(order.driverDailyOrderNumber || 0),
+      commissionPercent: 0,
+      dailyOrderNumber: 0,
       driverId: order.driver?.id,
       driverName: order.driver?.name,
       id: order.id,
-      serviceShareAmount: Number(order.serviceShareAmount || order.driverCommission || 0),
-      status: normalizeServiceShareStatus(order.serviceShareStatus, 'pending_transfer'),
+      serviceShareAmount: 0,
+      status: 'not_applicable',
       total: Number(order.total || 0),
     })),
     summary,
   };
 }
 
-function updateOrderServiceShare(order, status, actor = 'system', note = '') {
-  const normalizedStatus = normalizeServiceShareStatus(status, '');
-  const now = new Date().toISOString();
-
-  order.serviceShareStatus = normalizedStatus;
-  order.serviceShareBatchDate = order.serviceShareBatchDate || String(order.completedAt || order.updatedAt || now).slice(0, 10);
-  order.serviceShareEvents = [
-    normalizeServiceShareEvent({
-      actor,
-      at: now,
-      note,
-      status: normalizedStatus,
-    }),
-    ...(Array.isArray(order.serviceShareEvents) ? order.serviceShareEvents : []),
-  ];
-  order.updatedAt = now;
-
-  if (normalizedStatus === 'reported_transferred') {
-    order.serviceShareReportedAt = order.serviceShareReportedAt || now;
-  }
-
-  if (normalizedStatus === 'confirmed') {
-    order.serviceShareReportedAt = order.serviceShareReportedAt || now;
-    order.serviceShareConfirmedAt = now;
-  }
+function updateOrderServiceShare(order) {
+  applyOrderSettlement(order, order.driverBillingMode || order.driver?.billingMode || 'daily');
 }
 
 function createReceipt(order) {
@@ -3045,23 +2951,15 @@ function createReceipt(order) {
 }
 
 function normalizeBillingMode(value) {
-  return value === 'monthly' ? 'monthly' : 'commission';
+  return value === 'monthly' ? 'monthly' : value === 'daily' ? 'daily' : 'daily';
 }
 
 function getDriverAccessPlan(value) {
-  return driverAccessPlans[normalizeBillingMode(value)] || driverAccessPlans.commission;
+  return driverAccessPlans[normalizeBillingMode(value)] || driverAccessPlans.daily;
 }
 
-function getDriverDailyCommissionPercent(orderNumber) {
-  if (orderNumber >= 21) {
-    return 3;
-  }
-
-  if (orderNumber >= 16) {
-    return 5;
-  }
-
-  return 7;
+function getDriverSubscriptionPlanId(value) {
+  return normalizeBillingMode(value) === 'monthly' ? 'partner_pro' : 'daily_line';
 }
 
 function maskPaymentCardNumber(value) {
@@ -3084,8 +2982,8 @@ function isDriverPartnerProActive(driver, at = Date.now()) {
   return Number.isFinite(expiresAt) && Number.isFinite(timestamp) && expiresAt > timestamp;
 }
 
-function getEffectiveDriverBillingMode(driver, at = Date.now()) {
-  return isDriverPartnerProActive(driver, at) ? 'monthly' : 'commission';
+function getEffectiveDriverBillingMode(driver) {
+  return normalizeBillingMode(driver?.billingMode);
 }
 
 function normalizeDriverPaymentProvider(provider = driverPaymentProvider) {
@@ -3458,6 +3356,10 @@ async function attachTBankPayment(driver, payment) {
 }
 
 async function attachProviderPayment(driver, payment) {
+  if (payment.status === 'paid') {
+    return payment;
+  }
+
   if (shouldUseTBank(payment.provider, payment.amount)) {
     return attachTBankPayment(driver, payment);
   }
@@ -3729,8 +3631,8 @@ async function makeDriverSubscriptionPayment(driver, payload = {}) {
   const plan = getDriverAccessPlan(billingMode);
   const amount = Number(payload.amount ?? plan.monthlyPrice);
   const provider = normalizeDriverPaymentProvider(payload.provider || driverPaymentProvider);
-  const shouldUseProvider = shouldUseLivePaymentProvider(provider, amount);
-  const shouldCaptureNow = !shouldUseProvider && (payload.captureNow === true || amount === 0);
+  const shouldUseProvider = billingMode === 'daily' ? false : shouldUseLivePaymentProvider(provider, amount);
+  const shouldCaptureNow = billingMode === 'daily' || (!shouldUseProvider && (payload.captureNow === true || amount === 0));
 
   assertSupportedLiveProvider(provider, amount);
 
@@ -3742,7 +3644,7 @@ async function makeDriverSubscriptionPayment(driver, payload = {}) {
     planName: plan.name,
     amount,
     currency: 'RUB',
-    paymentMethod: String(payload.paymentMethod || (amount > 0 ? 'Банковская карта' : 'Комиссия с поездок')),
+    paymentMethod: String(payload.paymentMethod || (amount > 0 ? 'Банковская карта' : 'Доступ к линии')),
     provider: { ...provider },
     providerPaymentId: `${provider.mode}_${randomUUID()}`,
     confirmationUrl: shouldCaptureNow ? undefined : String(payload.confirmationUrl || ''),
@@ -3794,26 +3696,28 @@ function createDriverPaymentReceipt(payment, type = 'payment') {
 function applyDriverAccessFromPayment(driver, payment) {
   const now = new Date();
   const plan = getDriverAccessPlan(payment.billingMode);
+  const previousBillingMode = normalizeBillingMode(driver.billingMode);
 
   driver.billingMode = payment.billingMode;
   driver.driverTariff = plan.name;
-  driver.subscriptionPlan = payment.billingMode === 'monthly' ? 'partner_pro' : 'commission';
+  driver.subscriptionPlan = getDriverSubscriptionPlanId(payment.billingMode);
 
   if (payment.status !== 'paid') {
     driver.updatedAt = new Date().toISOString();
     return applyDriverAccessState(driver);
   }
 
-  if (payment.billingMode === 'monthly') {
+  if (payment.billingMode === 'monthly' || payment.billingMode === 'daily') {
     if (!payment.accessStartsAt || !payment.accessExpiresAt) {
-      const currentExpiry = Date.parse(driver.accessExpiresAt || '');
+      const currentExpiry =
+        previousBillingMode === payment.billingMode ? Date.parse(driver.accessExpiresAt || '') : NaN;
       const startsAt =
         driver.subscriptionStatus === 'active' && Number.isFinite(currentExpiry) && currentExpiry > now.getTime()
           ? new Date(currentExpiry)
           : now;
       const expiresAt = new Date(startsAt);
 
-      expiresAt.setDate(expiresAt.getDate() + Number(plan.accessDays || 30));
+      expiresAt.setDate(expiresAt.getDate() + Number(plan.accessDays || 1));
       payment.accessStartsAt = startsAt.toISOString();
       payment.accessExpiresAt = expiresAt.toISOString();
     }
@@ -3875,15 +3779,15 @@ function refundDriverSubscriptionPayment(db, payment, reason = 'Refund requested
       driver.subscriptionStatus = 'active';
       driver.accessExpiresAt = replacement.accessExpiresAt;
       driver.subscriptionExpiresAt = replacement.accessExpiresAt;
-      driver.subscriptionPlan = replacement.billingMode === 'monthly' ? 'partner_pro' : 'commission';
+      driver.subscriptionPlan = getDriverSubscriptionPlanId(replacement.billingMode);
       driver.lastPaymentId = replacement.id;
     } else if (driver.lastPaymentId === payment.id || driver.accessExpiresAt === payment.accessExpiresAt) {
-      driver.billingMode = 'commission';
-      driver.driverTariff = getDriverAccessPlan('commission').name;
+      driver.billingMode = 'daily';
+      driver.driverTariff = getDriverAccessPlan('daily').name;
       driver.subscriptionStatus = 'inactive';
       driver.accessExpiresAt = undefined;
       driver.subscriptionExpiresAt = undefined;
-      driver.subscriptionPlan = 'commission';
+      driver.subscriptionPlan = getDriverSubscriptionPlanId('daily');
       driver.lastPaymentId = undefined;
       driver.isOnline = false;
     }
@@ -5343,7 +5247,7 @@ function makeReferral(inviter, invitee, code) {
     riskFlags: [],
     note:
       isDriverLikeRole(inviteeRole)
-        ? `Водитель получит ${referralRewards.driverTrialDays} дней доступа после одобрения; пригласивший получит бонус после первых ${referralRewards.driverQualificationOrders} заказов.`
+        ? `Водитель получит дневной доступ после одобрения; пригласивший получит бонус после первых ${referralRewards.driverQualificationOrders} заказов.`
         : `Пригласивший получит бонус после первых ${referralRewards.clientQualificationOrders} завершенных поездок клиента.`,
   };
 }
@@ -6180,7 +6084,7 @@ function settleDriverReferralForOrder(db, order) {
 function makeDriverFromUser(user, payload, options = {}) {
   const employmentType = options.employmentType || (isParkDriverRole(user.role) ? 'park_driver' : 'self_employed');
   const isParkDriver = employmentType === 'park_driver';
-  const billingMode = isParkDriver ? 'monthly' : 'commission';
+  const billingMode = isParkDriver ? 'monthly' : 'daily';
   return {
     id: `driver-${user.id}`,
     name: [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Водитель',
@@ -6192,7 +6096,7 @@ function makeDriverFromUser(user, payload, options = {}) {
     isOnline: false,
     billingMode,
     driverTariff: getDriverAccessPlan(billingMode).name,
-    subscriptionPlan: billingMode === 'monthly' ? 'partner_pro' : 'commission',
+    subscriptionPlan: getDriverSubscriptionPlanId(billingMode),
     subscriptionStatus: isParkDriver ? 'active' : 'inactive',
     canReceiveOrders: false,
     contractStatus: 'pending',
@@ -6296,15 +6200,11 @@ function normalizeDriver(driver) {
   const billingMode = normalizeBillingMode(driver.billingMode);
   const subscriptionExpiresAt = driver.subscriptionExpiresAt || driver.accessExpiresAt;
   const plan = getDriverAccessPlan(billingMode);
-  const trialEndsAt = Date.parse(driver.commissionTrialEndsAt || '');
-  const trialStillOpen = Number.isFinite(trialEndsAt) && trialEndsAt > Date.now();
   const subscriptionStatus = normalizeDriverSubscriptionStatus(driver);
   const workMode =
     billingMode === 'monthly' && subscriptionStatus === 'active'
       ? 'partner_pro'
-      : driver.commissionTrialStartedAt && trialStillOpen
-        ? 'trial'
-        : 'commission';
+      : 'daily';
   const normalizedDriver = {
     ...driver,
     billingMode,
@@ -6315,7 +6215,7 @@ function normalizeDriver(driver) {
     driverTariff: plan.name,
     registryStatus: normalizeDriverRegistryStatus(driver.registryStatus, driver),
     subscriptionExpiresAt: subscriptionExpiresAt ? String(subscriptionExpiresAt) : undefined,
-    subscriptionPlan: billingMode === 'monthly' ? 'partner_pro' : 'commission',
+    subscriptionPlan: getDriverSubscriptionPlanId(billingMode),
     subscriptionStatus,
     taxProfileStatus: normalizeDriverComplianceStatus(driver.taxProfileStatus, driver),
     vehiclePermitStatus: normalizeDriverComplianceStatus(driver.vehiclePermitStatus, driver),
@@ -8105,7 +8005,7 @@ async function handleRequest(request, response) {
         amount: driverAccessPlans.monthly.monthlyPrice,
         cardMask: maskPaymentCardNumber(paymentCardNumber),
         instructions:
-          'Для подключения тарифа переведите 3 990 ₽ на карту владельца проекта и отправьте чек администратору.',
+          'Для подключения Партнёр PRO переведите 2 490 ₽ на карту владельца проекта и отправьте чек администратору.',
         planName: driverAccessPlans.monthly.name,
       });
       return;
@@ -8527,7 +8427,7 @@ async function handleRequest(request, response) {
 
         if (driverReferral && driver.subscriptionStatus !== 'active') {
           const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + referralRewards.driverTrialDays);
+          expiresAt.setDate(expiresAt.getDate() + driverAccessPlans.daily.accessDays);
           driver.subscriptionStatus = 'active';
           driver.accessExpiresAt = expiresAt.toISOString();
           driverReferral.status = 'qualified';
@@ -8626,12 +8526,12 @@ async function handleRequest(request, response) {
         applyDriverAccessFromPayment(driver, payment);
       }
       if (driver.subscriptionStatus !== 'active') {
-        driver.billingMode = 'commission';
-        driver.driverTariff = getDriverAccessPlan('commission').name;
+        driver.billingMode = 'daily';
+        driver.driverTariff = getDriverAccessPlan('daily').name;
         driver.isOnline = false;
         driver.accessExpiresAt = undefined;
         driver.subscriptionExpiresAt = undefined;
-        driver.subscriptionPlan = 'commission';
+        driver.subscriptionPlan = getDriverSubscriptionPlanId('daily');
       }
       applyDriverAccessState(driver);
       driver.updatedAt = new Date().toISOString();
@@ -9038,13 +8938,11 @@ async function handleRequest(request, response) {
     }
 
     if (request.method === 'PATCH' && pathParts[0] === 'orders' && pathParts[2] === 'service-share') {
-      const payload = await readBody(request);
-      // Передача доли сервиса — деньги; ведём под замком на свежем состоянии, чтобы
-      // параллельные обновления доли/статуса того же заказа не затирали друг друга.
+      // Service-share оставлен для обратной совместимости. Доля сервиса больше
+      // не начисляется, endpoint только нормализует старые поля в no-op режиме.
       const outcome = await mutateDb(async (db) => {
         const sessionContext = getSessionContext(db, request);
         const order = db.orders.find((item) => item.id === pathParts[1]);
-        const nextStatus = normalizeServiceShareStatus(payload.status, '');
 
         if (!sessionContext) {
           return { status: 401, body: { error: 'Authentication required' } };
@@ -9054,51 +8952,15 @@ async function handleRequest(request, response) {
           return { status: 404, body: { error: 'Order not found' } };
         }
 
-        if (!['pending_transfer', 'reported_transferred', 'confirmed'].includes(nextStatus)) {
-          return { status: 400, body: { error: 'Invalid service share status' } };
-        }
-
-        if (!['closed', 'completed'].includes(order.status)) {
-          return { status: 409, body: { error: 'Service share can be updated only after trip completion' } };
-        }
-
-        if (Number(order.serviceShareAmount || order.driverCommission || 0) <= 0) {
-          return { status: 400, body: { error: 'Order has no service share to transfer' } };
-        }
-
         const driver = order.driver?.id
           ? db.drivers.find((item) => item.id === order.driver.id)
           : undefined;
 
-        if (nextStatus === 'confirmed' && !isAdminSession(sessionContext)) {
-          return { status: 403, body: { error: 'Admin access required to confirm transfer' } };
-        }
-
-        if (
-          !isAdminSession(sessionContext) &&
-          (nextStatus !== 'reported_transferred' || !canAccessDriver(sessionContext, driver))
-        ) {
+        if (!isAdminSession(sessionContext) && !canAccessDriver(sessionContext, driver)) {
           return { status: 403, body: { error: 'Service share access denied' } };
         }
 
-        const actor = makeActorFromSession(sessionContext);
-        const actorLabel = `${actor.role}:${actor.id}`;
-
-        updateOrderServiceShare(
-          order,
-          nextStatus,
-          actorLabel,
-          payload.note || 'Service share status updated',
-        );
-
-        const notification = notifyOrderChange(
-          db,
-          order,
-          'Service share updated',
-          `${order.id}: ${order.serviceShareStatus}.`,
-          'order_service_share',
-        );
-        broadcastRealtime('order_service_share', { notification, order }, db);
+        updateOrderServiceShare(order);
 
         return {
           status: 200,
@@ -9456,7 +9318,7 @@ async function handleRequest(request, response) {
           phone: driver.phone,
           rating: driver.rating,
           subscriptionExpiresAt: driver.subscriptionExpiresAt || driver.accessExpiresAt,
-          subscriptionPlan: driver.subscriptionPlan || (driver.billingMode === 'monthly' ? 'partner_pro' : 'commission'),
+          subscriptionPlan: driver.subscriptionPlan || getDriverSubscriptionPlanId(driver.billingMode),
           subscriptionStatus: driver.subscriptionStatus,
           vehicle: driver.vehicle,
           plate: driver.plate,
