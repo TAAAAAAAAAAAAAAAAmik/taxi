@@ -1,0 +1,217 @@
+{
+  "main": {
+    "id": "342cf63dcf3ae466",
+    "type": "split",
+    "children": [
+      {
+        "id": "06ec84f420e91b09",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b103aa397e8de59f",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "00_main.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "00_main"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "5ef305282050ad6d",
+    "type": "split",
+    "children": [
+      {
+        "id": "4f3952173f633d1c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "073b6616d0026ea9",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Файловый менеджер"
+            }
+          },
+          {
+            "id": "2d70a0119d67ac88",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Поиск"
+            }
+          },
+          {
+            "id": "79afdf065776b761",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Закладки"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "29ef106bf1280860",
+    "type": "split",
+    "children": [
+      {
+        "id": "a7d0310a5c8a3996",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4849072c55b32069",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "00_main.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Обратные ссылки для 00_main"
+            }
+          },
+          {
+            "id": "b3b21bd1598bc717",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "00_main.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Исходящие ссылки из 00_main"
+            }
+          },
+          {
+            "id": "a99921cbb8e3a5ef",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Теги"
+            }
+          },
+          {
+            "id": "1cf5c29fe88bda85",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Все свойства"
+            }
+          },
+          {
+            "id": "b50f65d86bfea809",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "00_main.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Структура 00_main"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Меню быстрого перехода": false,
+      "graph:Граф": false,
+      "canvas:Создать новый холст": false,
+      "daily-notes:Сегодняшняя заметка": false,
+      "templates:Вставить шаблон": false,
+      "command-palette:Открыть палитру команд": false,
+      "bases:Создать новую базу": false
+    }
+  },
+  "active": "b103aa397e8de59f",
+  "lastOpenFiles": [
+    "22_codex_skill_taxi_ui_ux.md",
+    "23_codex_skill_visual_qa.md",
+    "24_codex_skill_project_memory.md",
+    "design-learning/Без названия.md",
+    "design-learning/22_codex_skill_taxi_ui_ux.md",
+    "17_codex_roles.md",
+    "20_premium_local_identity.md",
+    "19_unique_product_identity.md",
+    "18_design_benchmark_yandex_uber.md",
+    "14_design_rules.md",
+    "00_main.md",
+    "design-learning/codex_learning_log.txt",
+    "design-learning/05_design_ideas_for_taxi_app.md",
+    "design-learning/04_mobile_mistakes.md",
+    "design-learning/03_component_patterns.md",
+    "design-learning/02_ui_rules_library.md",
+    "design-learning/01_daily_lessons.md",
+    "design-learning/24_daily_codex_design_prompt.md",
+    "design-learning",
+    "21_intro_animation_concept.md",
+    "16_release_runbook.md",
+    "15_api_contract.md",
+    "12_codex_limit_saving.md",
+    "11_task_template.md",
+    "10_current_task.md",
+    "09_last_state.md",
+    "08_codex_prompts_en.md",
+    "07_bugs.md"
+  ]
+}

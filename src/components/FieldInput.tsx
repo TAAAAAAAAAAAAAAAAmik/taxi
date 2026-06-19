@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { RegistrationField } from '../data/registration';
+import { kx } from '../theme/kinetixTheme';
 
 type FieldInputProps = {
   field: RegistrationField;
@@ -21,7 +22,7 @@ export function FieldInput({ field, value, onChangeText }: FieldInputProps) {
         keyboardType={field.keyboardType ?? 'default'}
         onChangeText={onChangeText}
         placeholder={field.placeholder}
-        placeholderTextColor="#8A8F98"
+        placeholderTextColor={kx.text.muted}
         secureTextEntry={field.secureTextEntry}
         style={styles.input}
         textContentType={field.textContentType}
@@ -34,29 +35,33 @@ export function FieldInput({ field, value, onChangeText }: FieldInputProps) {
 
 const styles = StyleSheet.create({
   field: {
-    gap: 8,
+    gap: 7,
   },
   helper: {
-    color: '#68717D',
+    color: kx.text.secondary,
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
-    borderRadius: 8,
+    backgroundColor: kx.surface.input,
+    borderColor: kx.border.muted,
+    borderRadius: kx.radius.control,
     borderWidth: 1,
-    color: '#20242A',
+    color: kx.text.primary,
     fontSize: 16,
-    minHeight: 50,
-    paddingHorizontal: 14,
+    fontWeight: '600',
+    lineHeight: 22,
+    minHeight: 58,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
   },
   label: {
-    color: '#20242A',
-    fontSize: 14,
-    fontWeight: '700',
+    color: kx.text.primary,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0,
   },
   required: {
-    color: '#C75319',
+    color: kx.color.danger,
   },
 });

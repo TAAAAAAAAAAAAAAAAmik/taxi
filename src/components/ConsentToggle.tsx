@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 
+import { kx } from '../theme/kinetixTheme';
+
 type ConsentToggleProps = {
   label: string;
   text: string;
@@ -17,7 +19,7 @@ export function ConsentToggle({ label, text, checked, onToggle }: ConsentToggleP
       style={({ pressed }) => [styles.row, pressed && styles.pressedRow]}
     >
       <View style={[styles.box, checked && styles.checkedBox]}>
-        {checked ? <Check color="#FFFFFF" size={16} strokeWidth={3} /> : null}
+        {checked ? <Check color={kx.color.graphite} size={16} strokeWidth={3} /> : null}
       </View>
       <View style={styles.copy}>
         <Text style={styles.label}>{label}</Text>
@@ -30,39 +32,45 @@ export function ConsentToggle({ label, text, checked, onToggle }: ConsentToggleP
 const styles = StyleSheet.create({
   box: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#AEB8C4',
-    borderRadius: 6,
-    borderWidth: 1.5,
-    height: 24,
+    backgroundColor: kx.surface.input,
+    borderColor: kx.border.subtle,
+    borderRadius: kx.radius.control,
+    borderWidth: 1,
+    height: 26,
     justifyContent: 'center',
-    width: 24,
+    width: 26,
   },
   checkedBox: {
-    backgroundColor: '#146C5D',
-    borderColor: '#146C5D',
+    backgroundColor: kx.color.amber,
+    borderColor: kx.color.amber,
   },
   copy: {
     flex: 1,
     gap: 3,
   },
   label: {
-    color: '#20242A',
-    fontSize: 14,
+    color: kx.text.primary,
+    fontSize: 15,
     fontWeight: '800',
+    lineHeight: 20,
   },
   pressedRow: {
-    opacity: 0.75,
+    opacity: 0.9,
   },
   row: {
     alignItems: 'flex-start',
+    backgroundColor: kx.surface.card,
+    borderColor: kx.border.muted,
+    borderRadius: kx.radius.card,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    paddingVertical: 8,
+    minHeight: 64,
+    padding: 12,
   },
   text: {
-    color: '#59616C',
+    color: kx.text.secondary,
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
   },
 });

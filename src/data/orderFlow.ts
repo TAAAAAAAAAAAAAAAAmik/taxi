@@ -1,5 +1,3 @@
-import { AccountRole } from './registration';
-
 export type OrderField = {
   id: string;
   label: string;
@@ -46,8 +44,8 @@ const baseTariffs: OrderTariff[] = [
   {
     id: 'economy',
     title: 'Эконом',
-    subtitle: 'Быстрая подача для обычной поездки',
-    price: 420,
+    subtitle: 'Фиксированная цена по Малоязу',
+    price: 120,
     eta: '4 мин',
   },
   {
@@ -66,15 +64,17 @@ const baseTariffs: OrderTariff[] = [
   },
 ];
 
-export const orderFlowConfig: Record<AccountRole, OrderFlowConfig> = {
+const clientTariffs: OrderTariff[] = [baseTariffs[0]];
+
+export const orderFlowConfig: Record<string, OrderFlowConfig> = {
   client: {
     title: 'Оформление поездки',
-    subtitle: 'Маршрут по Салаватскому району, тариф, опции и оплата на одном экране.',
+    subtitle: 'Маршрут по Салаватскому району, тариф, опции и расчет с водителем на одном экране.',
     routeTitle: 'Маршрут',
     tariffTitle: 'Тариф',
     detailsTitle: 'Опции поездки',
     summaryTitle: 'Итог заказа',
-    primaryAction: 'Заказать поездку',
+    primaryAction: 'Вызвать',
     secondaryAction: 'Сохранить черновик',
     statusTitle: 'Заказ готов к подтверждению',
     statusText: 'После подтверждения система начнет искать ближайшего подходящего водителя.',
@@ -87,7 +87,7 @@ export const orderFlowConfig: Record<AccountRole, OrderFlowConfig> = {
       },
       {
         id: 'destination',
-        label: 'Куда',
+        label: 'Куда едем?',
         placeholder: 'Например: санаторий Янгантау или источник Кургазак',
         helper: 'Цена пересчитается после выбора точки назначения.',
       },
@@ -109,14 +109,14 @@ export const orderFlowConfig: Record<AccountRole, OrderFlowConfig> = {
       { id: 'luggage', label: 'Багаж', price: 80 },
       { id: 'pet', label: 'Животное', price: 100 },
     ],
-    tariffs: baseTariffs,
-    paymentMethods: ['Карта', 'Наличные', 'Корпоративный счет'],
+    tariffs: clientTariffs,
+    paymentMethods: ['Перевод водителю', 'Наличные водителю'],
     timeline: ['Маршрут', 'Расчет', 'Поиск водителя', 'Подача', 'Поездка'],
     suggestions: ['Малояз', 'Янгантау', 'Кургазак', 'Мурсалимкино'],
   },
   driver: {
     title: 'Карточка заказа',
-    subtitle: 'Водитель видит только важное: подача по Салаватскому району, маршрут, тариф, оплата и действия.',
+    subtitle: 'Водитель видит только важное: подача по Салаватскому району, маршрут, тариф, расчет с клиентом и действия.',
     routeTitle: 'Заказ от клиента',
     tariffTitle: 'Условия',
     detailsTitle: 'Что важно перед принятием',
@@ -179,9 +179,9 @@ export const orderFlowConfig: Record<AccountRole, OrderFlowConfig> = {
         eta: '8 мин до клиента',
       },
     ],
-    paymentMethods: ['Карта', 'Наличные'],
+    paymentMethods: ['Перевод водителю', 'Наличные водителю'],
     timeline: ['Принять', 'Еду к клиенту', 'На месте', 'Начать', 'Завершить'],
-    suggestions: ['Ближайшие', 'Малояз', 'Янгантау', 'Без наличных'],
+    suggestions: ['Ближайшие', 'Малояз', 'Янгантау', 'Оплата напрямую'],
   },
   fleet: {
     title: 'Диспетчерский заказ',
@@ -233,11 +233,21 @@ export const orderFlowConfig: Record<AccountRole, OrderFlowConfig> = {
     options: [
       { id: 'priority', label: 'Приоритетная подача', price: 150 },
       { id: 'child-seat', label: 'Детское кресло', price: 120 },
-      { id: 'cashless', label: 'Безналичный расчет', price: 0 },
+      { id: 'cashless', label: 'Перевод водителю', price: 0 },
     ],
     tariffs: baseTariffs,
-    paymentMethods: ['Карта клиента', 'Наличные', 'Счет автопарка'],
+    paymentMethods: ['Перевод водителю', 'Наличные водителю', 'Сверка таксопарка'],
     timeline: ['Создать', 'Назначить', 'Подача', 'Контроль', 'Закрытие'],
     suggestions: ['Постоянный клиент', 'Свободный водитель', 'Комфорт', 'Счет компании'],
   },
+};
+
+orderFlowConfig.self_employed_driver = orderFlowConfig.driver;
+orderFlowConfig.park_admin = orderFlowConfig.fleet;
+orderFlowConfig.park_driver = {
+  ...orderFlowConfig.driver,
+  subtitle:
+    'Водитель таксопарка видит заказы, доступные через активный таксопарк, свой автомобиль и условия подачи.',
+  statusText:
+    'После принятия заказа в API будет передан park_id для статистики и финансов таксопарка.',
 };

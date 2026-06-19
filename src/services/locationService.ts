@@ -1,4 +1,14 @@
+import { Platform } from 'react-native';
+import * as Location from 'expo-location';
+
 import type { GeoPoint } from '../data/salavatDistrict';
+import {
+  getPublicEnv,
+  isExamplePublicValue,
+  isLocalPublicValue,
+  isProductionApp,
+} from '../utils/runtimeFlags';
+import { reverseGeocodeAddress } from './apiClient';
 
 type BrowserGeolocationPosition = {
   coords: {
@@ -56,15 +66,45 @@ export type ReverseGeocodeResult =
       point: GeoPoint;
     };
 
-export function requestUserLocation(): Promise<UserLocationResult> {
+export async function requestUserLocation(): Promise<UserLocationResult> {
+  if (Platform.OS !== 'web') {
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== 'granted') {
+        return {
+          message: 'Доступ к геолокации отклонен. Можно продолжить без точного ближайшего заказа.',
+          status: 'denied',
+        };
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      return {
+        accuracy: position.coords.accuracy ?? undefined,
+        point: {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        },
+        status: 'granted',
+      };
+    } catch {
+      return {
+        message: 'Не удалось получить геолокацию. Можно продолжить без точного ближайшего заказа.',
+        status: 'unavailable',
+      };
+    }
+  }
+
   const maybeNavigator = globalThis as typeof globalThis & { navigator?: BrowserNavigator };
 
   if (!maybeNavigator.navigator?.geolocation) {
-    return Promise.resolve({
-      message:
-        'Геолокация недоступна в этой среде. На телефоне нужно подключить нативный модуль Expo Location.',
+    return {
+      message: 'Геолокация недоступна в этой среде. Можно ввести адрес вручную.',
       status: 'unavailable',
-    });
+    };
   }
 
   return new Promise((resolve) => {
@@ -98,10 +138,28 @@ export function requestUserLocation(): Promise<UserLocationResult> {
 }
 
 export async function reverseGeocodePoint(point: GeoPoint): Promise<ReverseGeocodeResult> {
-  const endpoint = getPublicEnv('EXPO_PUBLIC_REVERSE_GEOCODE_URL');
+  const endpoint = String(getPublicEnv('EXPO_PUBLIC_REVERSE_GEOCODE_URL') || '').trim();
+  const hasProviderEndpoint =
+    Boolean(endpoint) && !isExamplePublicValue(endpoint) && (!isProductionApp() || !isLocalPublicValue(endpoint));
 
-  if (!endpoint) {
-    return makeReverseGeocodeUnavailable(point);
+  if (!hasProviderEndpoint) {
+    try {
+      const address = await reverseGeocodeAddress(point);
+
+      return {
+        address: {
+          displayAddress: address.displayAddress,
+          district: address.settlement,
+          latitude: address.latitude,
+          longitude: address.longitude,
+          region: address.region,
+          settlement: address.settlement,
+        },
+        status: 'resolved',
+      };
+    } catch {
+      return makeReverseGeocodeUnavailable(point);
+    }
   }
 
   try {
@@ -187,12 +245,4 @@ function makeReverseGeocodeUnavailable(point: GeoPoint): ReverseGeocodeResult {
 
 function readString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function getPublicEnv(key: string) {
-  const env = globalThis as typeof globalThis & {
-    process?: { env?: Record<string, string | undefined> };
-  };
-
-  return env.process?.env?.[key];
 }

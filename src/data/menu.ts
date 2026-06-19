@@ -1,5 +1,3 @@
-import { AccountRole } from './registration';
-
 export type MenuIconName =
   | 'bell'
   | 'briefcase'
@@ -21,14 +19,20 @@ export type MenuItem = {
   subtitle: string;
   icon: MenuIconName;
   badge?: string;
+  target?: MenuActionTarget;
 };
 
 export type MenuActionTarget =
+  | 'deleteAccount'
+  | 'fleetDriverInvite'
   | 'history'
+  | 'documents'
   | 'homeAddress'
   | 'none'
   | 'order'
+  | 'referral'
   | 'registration'
+  | 'logout'
   | 'subscription'
   | 'supportChat';
 
@@ -54,14 +58,15 @@ export type RoleMenuConfig = {
   primaryAction: string;
   secondaryAction: string;
   menuItems: MenuItem[];
+  drawerItems?: MenuItem[];
   quickActions: QuickAction[];
   metrics: DashboardMetric[];
 };
 
-export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
+export const roleMenuConfig: Record<string, RoleMenuConfig> = {
   client: {
     title: 'Меню клиента',
-    subtitle: 'Заказы, адреса, оплата и поддержка в одном кабинете.',
+    subtitle: 'Главная, вызов такси, адреса и поддержка в одном кабинете.',
     statusTitle: 'Аккаунт почти готов',
     statusText: 'После подтверждения телефона и почты клиент сможет заказать первую поездку.',
     primaryAction: 'Заказать поездку',
@@ -81,9 +86,16 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
       },
       {
         id: 'payment',
-        title: 'Оплата',
-        subtitle: 'Карты, наличные, промокоды',
-        icon: 'credit-card',
+        title: 'Оплата водителю',
+        subtitle: 'Клиент платит водителю напрямую',
+        icon: 'wallet',
+      },
+      {
+        id: 'referrals',
+        title: 'Пригласить',
+        subtitle: 'Код, ссылка и бонусы за друзей',
+        icon: 'users',
+        badge: 'Бонусы',
       },
       {
         id: 'support',
@@ -111,12 +123,21 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         title: 'Избранные адреса',
         subtitle: 'Дом, работа и частые маршруты.',
         icon: 'star',
+        target: 'homeAddress',
       },
       {
         id: 'support-ticket',
         title: 'Обращение',
         subtitle: 'Связь с поддержкой по поездке.',
         icon: 'headphones',
+        target: 'supportChat',
+      },
+      {
+        id: 'referral',
+        title: 'Пригласить',
+        subtitle: 'Код, ссылка и бонусы за клиентов и водителей.',
+        icon: 'users',
+        target: 'referral',
       },
     ],
     metrics: [
@@ -132,32 +153,32 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
       },
       {
         label: 'Оплата',
-        value: 'Не задана',
-        helper: 'Можно добавить карту',
+        value: 'Водителю',
+        helper: 'Без платежной системы',
       },
     ],
   },
   driver: {
     title: 'Меню водителя',
-    subtitle: 'Подписка, заказы, документы, выплаты и профиль водителя-партнера.',
-    statusTitle: 'Доступ к заказам по подписке',
-    statusText: 'Водитель оплачивает месяц доступа и принимает заказы без комиссии сервиса.',
-    primaryAction: 'Оформить подписку',
+    subtitle: 'Доступ к линии, заказы, документы и профиль водителя-партнера.',
+    statusTitle: 'Доступ к заказам',
+    statusText: 'Клиент платит водителю напрямую, сервис не удерживает процент с поездок.',
+    primaryAction: 'Открыть тариф',
     secondaryAction: 'Посмотреть заказы',
     menuItems: [
       {
         id: 'subscription',
-        title: 'Подписка',
-        subtitle: 'Месяц доступа, 0% комиссии с заказов',
+        title: 'Тариф',
+        subtitle: 'День 100 ₽ или PRO 2 490 ₽',
         icon: 'wallet',
         badge: 'Главное',
       },
       {
         id: 'orders',
         title: 'Лента заказов',
-        subtitle: 'Доступна после подписки и проверки',
+        subtitle: 'Доступна после проверки и допуска',
         icon: 'briefcase',
-        badge: 'После оплаты',
+        badge: 'После допуска',
       },
       {
         id: 'documents',
@@ -173,8 +194,8 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
       },
       {
         id: 'payouts',
-        title: 'Выплаты',
-        subtitle: 'Баланс, реквизиты, история',
+        title: 'Сверка дня',
+        subtitle: 'Собрано, к переводу, подтверждения',
         icon: 'wallet',
       },
       {
@@ -189,6 +210,12 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         subtitle: 'Помощь водителю и спорные поездки',
         icon: 'headphones',
       },
+      {
+        id: 'profile',
+        title: 'Профиль',
+        subtitle: 'Данные аккаунта и удаление',
+        icon: 'shield',
+      },
     ],
     quickActions: [
       {
@@ -196,18 +223,19 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         title: 'Документы на проверку',
         subtitle: 'Фото паспорта, ВУ, СТС и ОСАГО.',
         icon: 'file',
+        target: 'documents',
       },
       {
         id: 'subscription',
-        title: 'Месячный доступ',
-        subtitle: 'Оплата подписки открывает заказы.',
+        title: 'Тариф',
+        subtitle: 'Оплата доступа к линии.',
         icon: 'wallet',
         target: 'subscription',
       },
       {
         id: 'bank-details',
-        title: 'Реквизиты выплат',
-        subtitle: 'Банк, БИК и счет для переводов.',
+        title: 'Оплата доступа',
+        subtitle: 'Дневной пасс или месяц PRO.',
         icon: 'wallet',
       },
       {
@@ -219,27 +247,27 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
     ],
     metrics: [
       {
-        label: 'Подписка',
-        value: 'Не активна',
-        helper: 'Нужна оплата месяца',
+        label: 'Доступ',
+        value: '100 ₽',
+        helper: 'На 24 часа',
       },
       {
-        label: 'Баланс',
+        label: 'Собрано',
         value: '0 ₽',
-        helper: 'Все заказы без комиссии',
+        helper: 'После выполненных заказов',
       },
       {
-        label: 'Комиссия',
-        value: '0%',
-        helper: 'После оплаты доступа',
+        label: 'К переводу',
+        value: '0 ₽',
+        helper: 'После завершения поездок',
       },
     ],
   },
   fleet: {
-    title: 'Меню автопарка',
-    subtitle: 'Управление водителями, автомобилями, документами и выплатами.',
+    title: 'Меню таксопарка',
+    subtitle: 'ИП, водители, автомобили, документы и ручная сверка.',
     statusTitle: 'Проверка партнера',
-    statusText: 'После проверки юрлица откроется подключение водителей и автомобилей.',
+    statusText: 'После проверки ИП откроется подключение водителей и автомобилей.',
     primaryAction: 'Добавить водителя',
     secondaryAction: 'Добавить автомобиль',
     menuItems: [
@@ -264,7 +292,7 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
       {
         id: 'finance',
         title: 'Финансы',
-        subtitle: 'Выплаты, комиссии, акты',
+        subtitle: 'Выплаты, доступ, акты',
         icon: 'wallet',
       },
       {
@@ -279,6 +307,12 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         subtitle: 'Проверки, блокировки, события',
         icon: 'bell',
       },
+      {
+        id: 'profile',
+        title: 'Профиль',
+        subtitle: 'Данные аккаунта и удаление',
+        icon: 'shield',
+      },
     ],
     quickActions: [
       {
@@ -286,6 +320,7 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
         title: 'Пригласить водителя',
         subtitle: 'Отправка ссылки на регистрацию.',
         icon: 'users',
+        target: 'fleetDriverInvite',
       },
       {
         id: 'add-car',
@@ -314,8 +349,592 @@ export const roleMenuConfig: Record<AccountRole, RoleMenuConfig> = {
       {
         label: 'Статус',
         value: 'Модерация',
-        helper: 'Юрданные проверяются',
+        helper: 'ИП проверяется',
       },
     ],
   },
+};
+
+roleMenuConfig.client = {
+  ...roleMenuConfig.client,
+  title: 'Клиент',
+  subtitle: 'Заказ всегда под рукой, а история, оплата, рефералы, поддержка и профиль остаются в отдельных разделах.',
+  primaryAction: 'Заказать поездку',
+  secondaryAction: 'История',
+  menuItems: [
+    {
+      id: 'home',
+      title: 'Главная',
+      subtitle: 'Куда едем, активный заказ и быстрые действия',
+      icon: 'home',
+    },
+    {
+      id: 'rides',
+      title: 'Заказы',
+      subtitle: 'Заказать поездку, активный заказ и история',
+      icon: 'route',
+    },
+    {
+      id: 'payment',
+      title: 'Оплата',
+      subtitle: 'Оплата водителю напрямую и правила поездки',
+      icon: 'wallet',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Код, ссылка и бонусы',
+      icon: 'users',
+      badge: 'Бонусы',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Вопросы по поездкам и профилю',
+      icon: 'headphones',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные клиента и сохраненные адреса',
+      icon: 'shield',
+    },
+  ],
+};
+
+roleMenuConfig.driver = {
+  ...roleMenuConfig.driver,
+  title: 'Водитель',
+  subtitle: 'Главное как в водительском приложении: линия, заказы, доход, тариф, документы и поддержка в отдельных разделах.',
+  primaryAction: 'Смотреть заказы',
+  secondaryAction: 'Доход',
+  menuItems: [
+    {
+      id: 'orders',
+      title: 'Заказы',
+      subtitle: 'Доступные, активные и история',
+      icon: 'briefcase',
+      badge: 'Работа',
+    },
+    {
+      id: 'payouts',
+      title: 'Доход',
+      subtitle: 'Дневной заработок и доступ к линии',
+      icon: 'wallet',
+    },
+    {
+      id: 'subscription',
+      title: 'Тариф',
+      subtitle: 'День 100 ₽ или Партнер PRO',
+      icon: 'credit-card',
+    },
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Паспорт, ВУ, СТС, ОСАГО и проверка',
+      icon: 'file',
+    },
+    {
+      id: 'vehicle',
+      title: 'Авто',
+      subtitle: 'Данные машины и статус допуска',
+      icon: 'car',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Приглашенные водители и бонус 200 ₽',
+      icon: 'users',
+    },
+    {
+      id: 'rating',
+      title: 'Рейтинг',
+      subtitle: 'Оценки, качество и рекомендации',
+      icon: 'star',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Помощь водителю и спорные поездки',
+      icon: 'headphones',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные аккаунта и настройки',
+      icon: 'shield',
+    },
+  ],
+  quickActions: roleMenuConfig.driver.quickActions,
+};
+
+roleMenuConfig.self_employed_driver = roleMenuConfig.driver;
+roleMenuConfig.park_admin = roleMenuConfig.fleet;
+roleMenuConfig.park_driver = {
+  ...roleMenuConfig.driver,
+  title: 'Меню водителя таксопарка',
+  subtitle: 'Заказы, документы, выплаты и связь с вашим таксопарком.',
+  statusTitle: 'Доступ зависит от таксопарка',
+  statusText: 'Заказы доступны, если таксопарк активирован вручную, водитель активен и документы валидны.',
+  primaryAction: 'Посмотреть заказы',
+  secondaryAction: 'Мой таксопарк',
+  menuItems: [
+    {
+      id: 'orders',
+      title: 'Лента заказов',
+      subtitle: 'Доступ через активный таксопарк',
+      icon: 'briefcase',
+      badge: 'Работа',
+    },
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Паспорт, ВУ, СТС, ОСАГО',
+      icon: 'file',
+    },
+    {
+      id: 'vehicle',
+      title: 'Автомобиль',
+      subtitle: 'Данные машины и статус проверки',
+      icon: 'car',
+    },
+    {
+      id: 'payouts',
+      title: 'Выплаты',
+      subtitle: 'Баланс, реквизиты, история',
+      icon: 'wallet',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Связь с парком и сервисом',
+      icon: 'headphones',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные аккаунта и удаление',
+      icon: 'shield',
+    },
+  ],
+  metrics: [
+    { label: 'Таксопарк', value: 'Привязан', helper: 'Доступ через парк' },
+    { label: 'Документы', value: 'Проверка', helper: 'Нужна валидация' },
+    { label: 'Удержания', value: 'Нет', helper: 'Доступ через парк' },
+  ],
+};
+
+roleMenuConfig.client = {
+  ...roleMenuConfig.client,
+  menuItems: [
+    {
+      id: 'home',
+      title: 'Главная',
+      subtitle: 'Заказ поездки и активный статус',
+      icon: 'home',
+    },
+    {
+      id: 'rides',
+      title: 'Заказы',
+      subtitle: 'Активный заказ, история и статусы',
+      icon: 'route',
+    },
+    {
+      id: 'profile',
+      title: 'Аккаунт',
+      subtitle: 'Данные, настройки и поддержка',
+      icon: 'shield',
+    },
+  ],
+  drawerItems: [
+    {
+      id: 'history',
+      title: 'История поездок',
+      subtitle: 'Все поездки, чеки и статусы',
+      icon: 'route',
+      target: 'history',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Код, ссылка и бонусы',
+      icon: 'users',
+      target: 'referral',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Чат и вопросы по поездкам',
+      icon: 'headphones',
+      target: 'supportChat',
+    },
+    {
+      id: 'settings',
+      title: 'Настройки',
+      subtitle: 'Адреса, простой режим и безопасность',
+      icon: 'shield',
+    },
+    {
+      id: 'about',
+      title: 'О приложении',
+      subtitle: 'Kinetix, район работы и правила пилота',
+      icon: 'star',
+    },
+    {
+      id: 'registration',
+      title: 'Сменить роль',
+      subtitle: 'Вернуться к выбору анкеты',
+      icon: 'users',
+      target: 'registration',
+    },
+    {
+      id: 'logout',
+      title: 'Выйти',
+      subtitle: 'Завершить текущую сессию',
+      icon: 'shield',
+      target: 'logout',
+    },
+  ],
+  quickActions: [
+    {
+      id: 'order',
+      title: 'Заказать такси',
+      subtitle: 'По адресу или домой.',
+      icon: 'map',
+      target: 'order',
+    },
+    {
+      id: 'home',
+      title: 'Домой',
+      subtitle: 'Добавить или выбрать домашний адрес.',
+      icon: 'home',
+      target: 'homeAddress',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Открыть чат с оператором.',
+      icon: 'headphones',
+      target: 'supportChat',
+    },
+  ],
+};
+
+roleMenuConfig.driver = {
+  ...roleMenuConfig.driver,
+  menuItems: [
+    {
+      id: 'home',
+      title: 'Главная',
+      subtitle: 'Линия, лента, расчет и статистика',
+      icon: 'home',
+    },
+    {
+      id: 'orders',
+      title: 'Лента',
+      subtitle: 'Доступные заказы рядом',
+      icon: 'briefcase',
+      badge: 'Работа',
+    },
+    {
+      id: 'payouts',
+      title: 'Доход',
+      subtitle: 'День, заработок и доступ к линии',
+      icon: 'wallet',
+    },
+    {
+      id: 'profile',
+      title: 'Аккаунт',
+      subtitle: 'Данные, проверка и документы',
+      icon: 'shield',
+    },
+  ],
+  drawerItems: [
+    {
+      id: 'subscription',
+      title: 'Тариф',
+      subtitle: 'День 100 ₽ и Партнер PRO',
+      icon: 'credit-card',
+      target: 'subscription',
+    },
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Паспорт, ВУ, СТС и ОСАГО',
+      icon: 'file',
+      target: 'documents',
+    },
+    {
+      id: 'vehicle',
+      title: 'Автомобиль',
+      subtitle: 'Данные машины и допуск',
+      icon: 'car',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Дополнительная программа бонусов',
+      icon: 'users',
+      target: 'referral',
+    },
+    {
+      id: 'history',
+      title: 'История заказов',
+      subtitle: 'Выполненные поездки и суммы',
+      icon: 'route',
+      target: 'history',
+    },
+    {
+      id: 'settlementHistory',
+      title: 'История расчетов',
+      subtitle: 'Дневные сверки и оплаты',
+      icon: 'wallet',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Помощь водителю и спорные поездки',
+      icon: 'headphones',
+    },
+    {
+      id: 'settings',
+      title: 'Настройки',
+      subtitle: 'Профиль, уведомления и безопасность',
+      icon: 'shield',
+    },
+    {
+      id: 'rating',
+      title: 'Правила работы',
+      subtitle: 'Качество, рейтинг и требования сервиса',
+      icon: 'star',
+    },
+    {
+      id: 'registration',
+      title: 'Сменить роль',
+      subtitle: 'Вернуться к выбору анкеты',
+      icon: 'users',
+      target: 'registration',
+    },
+    {
+      id: 'logout',
+      title: 'Выйти',
+      subtitle: 'Завершить текущую сессию',
+      icon: 'shield',
+      target: 'logout',
+    },
+  ],
+  quickActions: [
+    {
+      id: 'orders',
+      title: 'Лента заказов',
+      subtitle: 'Короткие карточки и принятие заказа.',
+      icon: 'briefcase',
+      target: 'order',
+    },
+    {
+      id: 'payouts',
+      title: 'Расчитаться',
+      subtitle: 'Сумма к оплате и дневная сверка.',
+      icon: 'wallet',
+      target: 'subscription',
+    },
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Проверка допуска к линии.',
+      icon: 'file',
+      target: 'documents',
+    },
+  ],
+};
+
+roleMenuConfig.self_employed_driver = roleMenuConfig.driver;
+
+roleMenuConfig.fleet = {
+  ...roleMenuConfig.fleet,
+  menuItems: [
+    {
+      id: 'overview',
+      title: 'Обзор',
+      subtitle: 'Статистика, водители и уведомления',
+      icon: 'home',
+    },
+    {
+      id: 'drivers',
+      title: 'Водители',
+      subtitle: 'Список, статусы и активность',
+      icon: 'users',
+    },
+    {
+      id: 'orders',
+      title: 'Заказы',
+      subtitle: 'Активные, завершенные и отмененные',
+      icon: 'route',
+    },
+    {
+      id: 'finance',
+      title: 'Расчеты',
+      subtitle: 'Дневные суммы и история оплат',
+      icon: 'wallet',
+    },
+  ],
+  drawerItems: [
+    {
+      id: 'settings',
+      title: 'Настройки таксопарка',
+      subtitle: 'Данные ИП, договоры и реквизиты',
+      icon: 'briefcase',
+    },
+    {
+      id: 'cars',
+      title: 'Автомобили',
+      subtitle: 'СТС, ОСАГО и допуск к линии',
+      icon: 'car',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Приглашения и бонусы',
+      icon: 'users',
+      target: 'referral',
+    },
+    {
+      id: 'reports',
+      title: 'Отчеты',
+      subtitle: 'Финансовые и операционные сводки',
+      icon: 'file',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Связь с сервисом',
+      icon: 'headphones',
+    },
+    {
+      id: 'rules',
+      title: 'Правила работы',
+      subtitle: 'Требования к парку и водителям',
+      icon: 'shield',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные аккаунта и безопасность',
+      icon: 'shield',
+    },
+    {
+      id: 'registration',
+      title: 'Сменить роль',
+      subtitle: 'Вернуться к выбору анкеты',
+      icon: 'users',
+      target: 'registration',
+    },
+    {
+      id: 'logout',
+      title: 'Выйти',
+      subtitle: 'Завершить текущую сессию',
+      icon: 'shield',
+      target: 'logout',
+    },
+  ],
+};
+
+roleMenuConfig.park_admin = roleMenuConfig.fleet;
+
+roleMenuConfig.park_driver = {
+  ...roleMenuConfig.park_driver,
+  menuItems: [
+    {
+      id: 'orders',
+      title: 'Заказы',
+      subtitle: 'Лента и активная поездка',
+      icon: 'briefcase',
+      badge: 'Работа',
+    },
+    {
+      id: 'payouts',
+      title: 'Выплаты',
+      subtitle: 'Баланс и история',
+      icon: 'wallet',
+    },
+    {
+      id: 'subscription',
+      title: 'Парк',
+      subtitle: 'Статус доступа через таксопарк',
+      icon: 'credit-card',
+    },
+    {
+      id: 'profile',
+      title: 'Профиль',
+      subtitle: 'Данные, проверка и документы',
+      icon: 'shield',
+    },
+  ],
+  drawerItems: [
+    {
+      id: 'documents',
+      title: 'Документы',
+      subtitle: 'Паспорт, ВУ, СТС и ОСАГО',
+      icon: 'file',
+      target: 'documents',
+    },
+    {
+      id: 'vehicle',
+      title: 'Автомобиль',
+      subtitle: 'Данные машины и проверка',
+      icon: 'car',
+    },
+    {
+      id: 'history',
+      title: 'История заказов',
+      subtitle: 'Выполненные поездки и суммы',
+      icon: 'route',
+      target: 'history',
+    },
+    {
+      id: 'referrals',
+      title: 'Рефералы',
+      subtitle: 'Код, ссылка и бонусы',
+      icon: 'users',
+      target: 'referral',
+    },
+    {
+      id: 'settlementHistory',
+      title: 'История выплат',
+      subtitle: 'Баланс, реквизиты и статусы',
+      icon: 'wallet',
+    },
+    {
+      id: 'support',
+      title: 'Поддержка',
+      subtitle: 'Связь с парком и сервисом',
+      icon: 'headphones',
+    },
+    {
+      id: 'settings',
+      title: 'Настройки',
+      subtitle: 'Профиль и безопасность',
+      icon: 'shield',
+    },
+    {
+      id: 'rating',
+      title: 'Правила работы',
+      subtitle: 'Качество и требования сервиса',
+      icon: 'star',
+    },
+    {
+      id: 'registration',
+      title: 'Сменить роль',
+      subtitle: 'Вернуться к выбору анкеты',
+      icon: 'users',
+      target: 'registration',
+    },
+    {
+      id: 'logout',
+      title: 'Выйти',
+      subtitle: 'Завершить текущую сессию',
+      icon: 'shield',
+      target: 'logout',
+    },
+  ],
 };

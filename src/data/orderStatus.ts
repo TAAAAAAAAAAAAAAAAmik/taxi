@@ -1,5 +1,3 @@
-import { AccountRole } from './registration';
-
 export type OrderStatusStep = {
   id: string;
   title: string;
@@ -23,7 +21,7 @@ export type OrderStatusConfig = {
   details: string[];
 };
 
-export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
+export const orderStatusConfig: Record<string, OrderStatusConfig> = {
   client: {
     title: 'Статус поездки',
     subtitle: 'Клиент видит поиск водителя, подачу автомобиля и ход поездки.',
@@ -34,7 +32,7 @@ export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
     contactPhone: '+7 917 000-42-11',
     chatActionLabel: 'Написать водителю в приложении',
     callActionLabel: 'Позвонить водителю',
-    primaryAction: 'Обновить статус',
+    primaryAction: 'Статус обновляется автоматически',
     completedTitle: 'Поездка завершена',
     completedText: 'Чек сформирован, поездка добавлена в историю. Можно оставить оценку.',
     steps: [
@@ -44,14 +42,9 @@ export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
         description: 'Система подбирает ближайшего водителя по тарифу и расстоянию.',
       },
       {
-        id: 'assigned',
+        id: 'accepted',
         title: 'Водитель назначен',
         description: 'Клиент видит водителя, автомобиль, госномер и время подачи.',
-      },
-      {
-        id: 'arriving',
-        title: 'Водитель едет к вам',
-        description: 'Отображается примерное время подачи и связь с водителем.',
       },
       {
         id: 'arrived',
@@ -59,7 +52,7 @@ export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
         description: 'Можно начать ожидание и показать точку встречи.',
       },
       {
-        id: 'in_progress',
+        id: 'started',
         title: 'Поездка началась',
         description: 'Клиент видит текущий маршрут и статус поездки.',
       },
@@ -91,17 +84,12 @@ export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
         description: 'Водитель получил маршрут до точки подачи.',
       },
       {
-        id: 'to_pickup',
-        title: 'Еду к клиенту',
-        description: 'Клиент видит автомобиль и примерное время подачи.',
-      },
-      {
         id: 'arrived',
         title: 'На месте',
         description: 'Начинается ожидание по правилам тарифа.',
       },
       {
-        id: 'in_progress',
+        id: 'started',
         title: 'Поездка началась',
         description: 'Фиксируется время старта и маршрут поездки.',
       },
@@ -138,12 +126,12 @@ export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
         description: 'Выбран водитель и автомобиль автопарка.',
       },
       {
-        id: 'to_pickup',
+        id: 'arrived',
         title: 'Подача',
         description: 'Автопарк видит движение экипажа к клиенту.',
       },
       {
-        id: 'in_progress',
+        id: 'started',
         title: 'В поездке',
         description: 'Маршрут выполняется, диспетчер контролирует статус.',
       },
@@ -155,4 +143,12 @@ export const orderStatusConfig: Record<AccountRole, OrderStatusConfig> = {
     ],
     details: ['Контроль водителя', 'Контроль автомобиля', 'Финансовое закрытие'],
   },
+};
+
+orderStatusConfig.self_employed_driver = orderStatusConfig.driver;
+orderStatusConfig.park_admin = orderStatusConfig.fleet;
+orderStatusConfig.park_driver = {
+  ...orderStatusConfig.driver,
+  subtitle: 'Водитель таксопарка ведет заказ, а парк видит статус в своем кабинете.',
+  participantMeta: 'Комментарий, связь и данные таксопарка доступны после принятия заказа',
 };

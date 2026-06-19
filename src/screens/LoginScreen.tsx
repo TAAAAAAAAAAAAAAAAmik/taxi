@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Building2, Car, LogIn, UserRound } from 'lucide-react-native';
+import {
+  Building2,
+  Car,
+  LockKeyhole,
+  LogIn,
+  UserRound,
+} from 'lucide-react-native';
 import {
   Pressable,
   SafeAreaView,
@@ -11,29 +17,85 @@ import {
   View,
 } from 'react-native';
 
-import { AccountRole, roleCopy } from '../data/registration';
+import { AccountRole, roleCopy, normalizeAccountRole } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
+import { useAppState } from '../state/AppState';
+import { isDemoModeEnabled } from '../utils/runtimeFlags';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
-const roles: AccountRole[] = ['client', 'driver'];
+const roles: AccountRole[] = ['client', 'self_employed_driver'];
 const roleIcons = {
   client: UserRound,
+  self_employed_driver: Car,
+  park_admin: Building2,
+  park_driver: Car,
   driver: Car,
   fleet: Building2,
 };
 
+const demoAccounts: Array<{
+  identifier: string;
+  label: string;
+  password: string;
+  role: AccountRole;
+}> = [
+  {
+    identifier: 'demo-client@example.test',
+    label: 'Клиент',
+    password: 'Kinetix123',
+    role: 'client',
+  },
+  {
+    identifier: 'demo-driver@example.test',
+    label: 'Водитель',
+    password: 'Kinetix123',
+    role: 'self_employed_driver',
+  },
+];
+
 export function LoginScreen({ navigation }: Props) {
+  const { loginAccount, serverMessage, serverStatus } = useAppState();
   const [role, setRole] = useState<AccountRole>('client');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const canContinue = identifier.trim().length > 2 && password.length >= 4;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const canPasswordContinue = identifier.trim().length > 2 && password.length >= 4 && !isSubmitting;
+  const showDemoLogin = isDemoModeEnabled();
 
-  const handleLogin = () => {
+  const submitLogin = async (
+    nextIdentifier: string,
+    nextPassword: string,
+    nextRole: AccountRole,
+  ) => {
+    setIsSubmitting(true);
+    setErrorText(null);
+    const user = await loginAccount(nextIdentifier, nextPassword, normalizeAccountRole(nextRole));
+    setIsSubmitting(false);
+
+    if (!user) {
+      setErrorText('Не удалось войти. Проверьте роль, телефон/почту и пароль.');
+      return;
+    }
+
+    const resolvedRole = normalizeAccountRole(user.role);
+
     navigation.replace('Dashboard', {
-      firstName: identifier.includes('@') ? undefined : identifier.trim(),
-      role,
+      firstName: user.firstName || undefined,
+      role: resolvedRole,
     });
+  };
+
+  const handleLogin = async () => {
+    await submitLogin(identifier, password, role);
+  };
+
+  const handleDemoLogin = async (account: (typeof demoAccounts)[number]) => {
+    setRole(account.role);
+    setIdentifier(account.identifier);
+    setPassword(account.password);
+    await submitLogin(account.identifier, account.password, account.role);
   };
 
   return (
@@ -42,7 +104,10 @@ export function LoginScreen({ navigation }: Props) {
         <View style={styles.header}>
           <Text style={styles.title}>Вход</Text>
           <Text style={styles.subtitle}>
-            Пока сервер авторизации не подключен, экран ведет в кабинет выбранной роли.
+            Выберите тип аккаунта и войдите по телефону или email.
+          </Text>
+          <Text style={styles.serverText}>
+            {serverStatus === 'connected' ? 'Сервер подключен' : serverMessage}
           </Text>
         </View>
 
@@ -65,7 +130,7 @@ export function LoginScreen({ navigation }: Props) {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Icon color={active ? '#FFFFFF' : '#146C5D'} size={18} strokeWidth={2.4} />
+                  <Icon color={active ? '#F4FAF6' : '#008D49'} size={18} strokeWidth={2.4} />
                   <Text style={[styles.roleButtonText, active && styles.roleButtonTextActive]}>
                     {roleCopy[item].title}
                   </Text>
@@ -74,6 +139,34 @@ export function LoginScreen({ navigation }: Props) {
             })}
           </View>
 
+          {showDemoLogin ? (
+            <>
+              <Text style={styles.sectionTitle}>Демо-вход</Text>
+              <View style={styles.demoGrid}>
+                {demoAccounts.map((account) => {
+                  const Icon = roleIcons[account.role];
+
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={isSubmitting}
+                      key={account.role}
+                      onPress={() => handleDemoLogin(account)}
+                      style={({ pressed }) => [
+                        styles.demoButton,
+                        isSubmitting && styles.demoButtonMuted,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Icon color="#008D49" size={18} strokeWidth={2.4} />
+                      <Text style={styles.demoButtonText}>{account.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
+
           <View style={styles.field}>
             <Text style={styles.label}>Почта или телефон</Text>
             <TextInput
@@ -81,7 +174,7 @@ export function LoginScreen({ navigation }: Props) {
               autoCorrect={false}
               onChangeText={setIdentifier}
               placeholder="name@example.com или +7 900 000-00-00"
-              placeholderTextColor="#8A8F98"
+              placeholderTextColor="#557669"
               style={styles.input}
               value={identifier}
             />
@@ -92,7 +185,7 @@ export function LoginScreen({ navigation }: Props) {
             <TextInput
               onChangeText={setPassword}
               placeholder="Введите пароль"
-              placeholderTextColor="#8A8F98"
+              placeholderTextColor="#557669"
               secureTextEntry
               style={styles.input}
               value={password}
@@ -101,17 +194,19 @@ export function LoginScreen({ navigation }: Props) {
 
           <Pressable
             accessibilityRole="button"
-            disabled={!canContinue}
+            disabled={!canPasswordContinue}
             onPress={handleLogin}
             style={({ pressed }) => [
               styles.primaryButton,
-              !canContinue && styles.primaryButtonMuted,
+              !canPasswordContinue && styles.primaryButtonMuted,
               pressed && styles.pressed,
             ]}
           >
             <LogIn color="#FFFFFF" size={19} strokeWidth={2.4} />
-            <Text style={styles.primaryButtonText}>Войти</Text>
+            <Text style={styles.primaryButtonText}>{isSubmitting ? 'Проверяем...' : 'Войти'}</Text>
           </Pressable>
+
+          {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
 
           <Pressable
             accessibilityRole="button"
@@ -120,6 +215,23 @@ export function LoginScreen({ navigation }: Props) {
           >
             <Text style={styles.linkButtonText}>Создать новый аккаунт</Text>
           </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('PasswordReset')}
+            style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.linkButtonText}>Восстановить пароль</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('AdminPanel')}
+            style={({ pressed }) => [styles.adminButton, pressed && styles.pressed]}
+          >
+            <LockKeyhole color="#12382C" size={18} strokeWidth={2.4} />
+            <Text style={styles.adminButtonText}>Админ-панель</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -127,37 +239,100 @@ export function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  adminButton: {
+    alignItems: 'center',
+    backgroundColor: '#F1F8F3',
+    borderColor: 'rgba(0, 141, 73, 0.28)',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 16,
+  },
+  adminButtonText: {
+    color: '#12382C',
+    fontSize: 14,
+    fontWeight: '900',
+  },
   field: {
     gap: 8,
   },
-  form: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+  errorText: {
+    color: '#C17A70',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  demoButton: {
+    alignItems: 'center',
+    backgroundColor: '#F7FBF8',
+    borderColor: 'rgba(18, 56, 44, 0.1)',
     borderRadius: 8,
     borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 150,
+    paddingHorizontal: 12,
+  },
+  demoButtonMuted: {
+    opacity: 0.55,
+  },
+  demoButtonText: {
+    color: '#008D49',
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  demoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  form: {
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    elevation: 1,
     gap: 16,
     padding: 16,
+    shadowColor: 'rgba(18, 56, 44, 0.14)',
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
   },
   header: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
     borderRadius: 8,
     borderWidth: 1,
+    elevation: 1,
     gap: 8,
     padding: 18,
+    shadowColor: 'rgba(18, 56, 44, 0.14)',
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
   },
   input: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#D8DEE6',
+    borderColor: 'rgba(18, 56, 44, 0.16)',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#20242A',
+    color: '#12382C',
     fontSize: 16,
-    minHeight: 50,
+    fontWeight: '600',
+    minHeight: 56,
     paddingHorizontal: 14,
   },
   label: {
-    color: '#20242A',
+    color: '#12382C',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -167,41 +342,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   linkButtonText: {
-    color: '#146C5D',
+    color: '#008D49',
     fontSize: 14,
     fontWeight: '900',
   },
   page: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#F6F8F5',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   pressed: {
-    opacity: 0.76,
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#146C5D',
+    backgroundColor: '#008D49',
     borderRadius: 8,
+    elevation: 2,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 56,
     paddingHorizontal: 16,
+    shadowColor: 'rgba(0, 111, 58, 0.24)',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
   },
   primaryButtonMuted: {
-    backgroundColor: '#89958F',
+    backgroundColor: '#008D49',
+    opacity: 0.64,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#F4FAF6',
     fontSize: 15,
     fontWeight: '900',
   },
   roleButton: {
     alignItems: 'center',
-    backgroundColor: '#F8FAF9',
-    borderColor: '#D8DEE6',
+    backgroundColor: '#F7FBF8',
+    borderColor: 'rgba(18, 56, 44, 0.1)',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -213,11 +395,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   roleButtonActive: {
-    backgroundColor: '#146C5D',
-    borderColor: '#146C5D',
+    backgroundColor: '#008D49',
+    borderColor: '#008D49',
   },
   roleButtonText: {
-    color: '#146C5D',
+    color: '#008D49',
     flexShrink: 1,
     fontSize: 13,
     fontWeight: '900',
@@ -232,21 +414,26 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   safeArea: {
-    backgroundColor: '#F4F7F5',
+    backgroundColor: '#F6F8F5',
     flex: 1,
   },
   sectionTitle: {
-    color: '#20242A',
+    color: '#12382C',
     fontSize: 18,
     fontWeight: '900',
   },
+  serverText: {
+    color: '#008D49',
+    fontSize: 13,
+    fontWeight: '900',
+  },
   subtitle: {
-    color: '#59616C',
+    color: '#557669',
     fontSize: 15,
     lineHeight: 22,
   },
   title: {
-    color: '#20242A',
+    color: '#12382C',
     fontSize: 30,
     fontWeight: '900',
   },

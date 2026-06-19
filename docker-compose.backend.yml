@@ -1,0 +1,88 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - taxi_partner_redis:/data
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: taxi_partner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_USER: taxi
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taxi -d taxi_partner"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - taxi_partner_pg:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3100
+      MVP_BACKEND_ENV: production
+      MVP_STORAGE_DRIVER: postgres
+      MVP_DATABASE_URL: postgres://taxi:${POSTGRES_PASSWORD:-change-me}@db:5432/taxi_partner
+      MVP_DATABASE_SSL: disable
+      MVP_DOCUMENT_STORAGE_PATH: /var/lib/taxi-partner/driver-documents
+      MVP_ADMIN_PASSWORD: ${MVP_ADMIN_PASSWORD:?set MVP_ADMIN_PASSWORD}
+      MVP_LINKS_ORIGIN: ${MVP_LINKS_ORIGIN:?set MVP_LINKS_ORIGIN}
+      MVP_INVITE_BASE_URL: ${MVP_INVITE_BASE_URL:?set MVP_INVITE_BASE_URL}
+      MVP_DELIVERY_MODE: ${MVP_DELIVERY_MODE:-live}
+      MVP_PAYMENT_PROVIDER: ${MVP_PAYMENT_PROVIDER:-manual}
+      MVP_PAYMENT_PROVIDER_MODE: ${MVP_PAYMENT_PROVIDER_MODE:-manual}
+    ports:
+      - "3100:3100"
+    volumes:
+      - taxi_partner_documents:/var/lib/taxi-partner/driver-documents
+
+  logistics:
+    build:
+      context: .
+      dockerfile: logistics-services/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      KINETIX_LOGISTICS_DATABASE_URL: postgresql+asyncpg://taxi:${POSTGRES_PASSWORD:-change-me}@db:5432/taxi_partner
+      KINETIX_LOGISTICS_REDIS_URL: redis://redis:6379/0
+      KINETIX_LOGISTICS_NODE_API_BASE_URL: http://backend:3100
+      KINETIX_LOGISTICS_NODE_INTERNAL_TOKEN: ${KINETIX_LOGISTICS_NODE_INTERNAL_TOKEN:-}
+    ports:
+      - "3200:3200"
+
+  logistics-consumer:
+    build:
+      context: .
+      dockerfile: logistics-services/Dockerfile
+    command: ["python", "-m", "app.workers.stream_consumer"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      backend:
+        condition: service_started
+    environment:
+      KINETIX_LOGISTICS_DATABASE_URL: postgresql+asyncpg://taxi:${POSTGRES_PASSWORD:-change-me}@db:5432/taxi_partner
+      KINETIX_LOGISTICS_REDIS_URL: redis://redis:6379/0
+      KINETIX_LOGISTICS_NODE_API_BASE_URL: http://backend:3100
+      KINETIX_LOGISTICS_NODE_INTERNAL_TOKEN: ${KINETIX_LOGISTICS_NODE_INTERNAL_TOKEN:-}
+
+volumes:
+  taxi_partner_documents:
+  taxi_partner_pg:
+  taxi_partner_redis:

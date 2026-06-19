@@ -1,9 +1,9 @@
+import { loadHouseRecords } from './houseLoader';
 import {
-  salavatDistrictHouses,
   salavatDistrictHouseSourceSummary,
   type SalavatHouseRecord,
   type SalavatHouseSource,
-} from './salavatDistrictHouses';
+} from './salavatDistrictHouseSourceSummary';
 import {
   salavatDistrictSettlements,
   salavatDistrictStreetSourceSummary,
@@ -13,7 +13,6 @@ import {
 } from './salavatDistrictStreets';
 
 export {
-  salavatDistrictHouses,
   salavatDistrictHouseSourceSummary,
   salavatDistrictSettlements,
   salavatDistrictStreetSourceSummary,
@@ -54,6 +53,7 @@ export type SalavatRoutePreset = {
   pickup: string;
   destination: string;
   subtitle: string;
+  estimatedDistanceKm: number;
   estimatedTime: string;
 };
 
@@ -226,14 +226,67 @@ const fixedDistrictPoints: SalavatAddressSuggestion[] = [
   },
 ];
 
-const generatedHouseSuggestions = salavatDistrictHouses.map(houseRecordToSuggestion);
 const generatedStreetSuggestions = salavatDistrictStreets.map(streetRecordToSuggestion);
 
-export const salavatAddressSuggestions: SalavatAddressSuggestion[] = [
+// Дома Салаватского района (~14 тыс. записей, ~8.7 МБ) грузятся лениво: иначе тяжёлый
+// map выполнялся бы синхронно при импорте модуля и блокировал старт приложения.
+// До загрузки поиск работает по улицам и POI, затем дома «дозагружаются» в кэш.
+let loadedHouseRecords: SalavatHouseRecord[] = [];
+let cachedAddressSuggestions: SalavatAddressSuggestion[] = [
   ...fixedDistrictPoints,
-  ...generatedHouseSuggestions,
   ...generatedStreetSuggestions,
 ];
+let houseRecordsPromise: Promise<SalavatHouseRecord[]> | null = null;
+
+export function ensureSalavatHousesLoaded(): Promise<SalavatHouseRecord[]> {
+  if (!houseRecordsPromise) {
+    houseRecordsPromise = loadHouseRecords()
+      .then((records) => {
+        loadedHouseRecords = records;
+        cachedAddressSuggestions = [
+          ...fixedDistrictPoints,
+          ...records.map(houseRecordToSuggestion),
+          ...generatedStreetSuggestions,
+        ];
+
+        return records;
+      })
+      .catch((error) => {
+        houseRecordsPromise = null;
+        throw error;
+      });
+  }
+
+  return houseRecordsPromise;
+}
+
+// Предзагрузка вне критического пути старта: дома начинают грузиться, как только
+// модуль адресов впервые используется экраном, но не задерживают первый рендер.
+void ensureSalavatHousesLoaded().catch(() => undefined);
+
+// Полное число подсказок берём из метаданных, чтобы статистика не зависела от того,
+// успели ли дома догрузиться к моменту чтения.
+export const salavatAddressSuggestionCount =
+  fixedDistrictPoints.length +
+  salavatDistrictHouseSourceSummary.houses +
+  generatedStreetSuggestions.length;
+
+export const salavatDistrictCoverageSummary = {
+  settlements: salavatDistrictSettlements.length,
+  streets: salavatDistrictStreetSourceSummary.streets,
+  houses: salavatDistrictHouseSourceSummary.houses,
+  poi: fixedDistrictPoints.length,
+  suggestions: salavatAddressSuggestionCount,
+  sources: {
+    gar: salavatDistrictHouseSourceSummary.garHouses + salavatDistrictStreetSourceSummary.garStreets,
+    osm: salavatDistrictHouseSourceSummary.osmHouses + salavatDistrictStreetSourceSummary.osmStreets,
+    manualPoi: fixedDistrictPoints.length,
+  },
+  generatedAt: {
+    houses: salavatDistrictHouseSourceSummary.generatedAt,
+    streets: salavatDistrictStreetSourceSummary.generatedAt,
+  },
+} as const;
 
 export const salavatPopularRoutes: SalavatRoutePreset[] = [
   {
@@ -242,6 +295,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Санаторий Янгантау, с. Янгантау',
     subtitle: 'Самый понятный курортный маршрут района',
+    estimatedDistanceKm: 17.5,
     estimatedTime: '25-35 мин',
   },
   {
@@ -250,6 +304,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Санаторий Янгантау, с. Янгантау',
     destination: 'Источник Кургазак, д. Комсомол',
     subtitle: 'Короткая поездка к источнику',
+    estimatedDistanceKm: 5.2,
     estimatedTime: '10-15 мин',
   },
   {
@@ -258,6 +313,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Источник Кургазак, д. Комсомол',
     subtitle: 'Маршрут для гостей района',
+    estimatedDistanceKm: 19.5,
     estimatedTime: '25-35 мин',
   },
   {
@@ -266,6 +322,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Мурсалимкино, железнодорожная станция',
     subtitle: 'Связь с железнодорожной точкой',
+    estimatedDistanceKm: 31,
     estimatedTime: '35-50 мин',
   },
   {
@@ -274,6 +331,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Центр Аркаулово, с. Аркаулово',
     subtitle: 'Сельский маршрут внутри района',
+    estimatedDistanceKm: 22,
     estimatedTime: '25-40 мин',
   },
   {
@@ -282,6 +340,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'Центр Лаклы, с. Лаклы',
     subtitle: 'Маршрут к южной части района',
+    estimatedDistanceKm: 34,
     estimatedTime: '35-55 мин',
   },
   {
@@ -290,6 +349,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Центр Малояза, с. Малояз',
     destination: 'д. Идрисово',
     subtitle: 'Направление к природным точкам Юрюзани',
+    estimatedDistanceKm: 24,
     estimatedTime: '25-40 мин',
   },
   {
@@ -298,6 +358,7 @@ export const salavatPopularRoutes: SalavatRoutePreset[] = [
     pickup: 'Салаватская центральная районная больница, с. Малояз',
     destination: 'Санаторий Янгантау, с. Янгантау',
     subtitle: 'Медицинский и курортный маршрут',
+    estimatedDistanceKm: 18,
     estimatedTime: '25-35 мин',
   },
 ];
@@ -312,10 +373,10 @@ export function findSalavatAddressSuggestions(query: string, limit = 8) {
   const baseSuggestions = exactHouseSuggestion ? [exactHouseSuggestion] : [];
 
   if (!normalizedQuery) {
-    return [...baseSuggestions, ...salavatAddressSuggestions].slice(0, limit);
+    return [...baseSuggestions, ...cachedAddressSuggestions].slice(0, limit);
   }
 
-  const found = salavatAddressSuggestions
+  const found = cachedAddressSuggestions
     .map((address) => ({
       address,
       score: getAddressScore(address, normalizedQuery),
@@ -361,26 +422,30 @@ export function isInsideSalavatDistrict(point: GeoPoint) {
 }
 
 function houseRecordToSuggestion(record: SalavatHouseRecord): SalavatAddressSuggestion {
+  const displayStreet = getDisplayStreet(record.settlement, record.street);
+
   return {
     id: `house-${slug(record.settlement)}-${slug(record.street)}-${slug(record.house)}`,
-    title: `${record.street}, дом ${record.house}`,
-    subtitle: record.fullAddress,
+    title: `${displayStreet}, дом ${record.house}`,
+    subtitle: `${record.settlement}, ${displayStreet}, ${record.house}`,
     settlement: record.settlement,
     category: 'address',
-    aliases: record.aliases,
+    aliases: [...record.aliases, `${displayStreet} ${record.house}`],
     source: record.source,
     coordinates: record.coordinates,
   };
 }
 
 function streetRecordToSuggestion(record: SalavatStreetRecord): SalavatAddressSuggestion {
+  const displayStreet = getDisplayStreet(record.settlement, record.street);
+
   return {
     id: `street-${slug(record.settlement)}-${slug(record.street)}`,
-    title: record.street,
-    subtitle: `${record.settlement}, ${record.street}`,
+    title: displayStreet,
+    subtitle: `${record.settlement}, ${displayStreet}`,
     settlement: record.settlement,
     category: 'street',
-    aliases: record.aliases,
+    aliases: [...record.aliases, displayStreet],
     source: record.source,
     coordinates: record.coordinates,
   };
@@ -401,7 +466,7 @@ function createExactHouseSuggestion(query: string): SalavatAddressSuggestion | n
     return null;
   }
 
-  const exactHouse = salavatDistrictHouses
+  const exactHouse = loadedHouseRecords
     .map((record) => ({
       record,
       score: getHouseRecordScore(record, streetQuery, house),
@@ -425,15 +490,19 @@ function createExactHouseSuggestion(query: string): SalavatAddressSuggestion | n
     return null;
   }
 
+  const displayStreet = getDisplayStreet(bestRecord.settlement, bestRecord.street);
+
   return {
     id: `address-${slug(bestRecord.settlement)}-${slug(bestRecord.street)}-${slug(house)}-exact`,
-    title: `${bestRecord.street}, дом ${house}`,
-    subtitle: `${bestRecord.settlement}, ${bestRecord.street}, ${house}`,
+    title: `${displayStreet}, дом ${house}`,
+    subtitle: `${bestRecord.settlement}, ${displayStreet}, ${house}`,
     settlement: bestRecord.settlement,
     category: 'address',
     aliases: [
       `${bestRecord.street} ${house}`,
+      `${displayStreet} ${house}`,
       `${bestRecord.settlement} ${bestRecord.street} ${house}`,
+      `${bestRecord.settlement} ${displayStreet} ${house}`,
       ...bestRecord.aliases.map((alias) => `${alias} ${house}`),
     ],
     source: bestRecord.source,
@@ -466,7 +535,7 @@ function getAddressScore(address: SalavatAddressSuggestion, query: string) {
 
   if (
     queryParts.length > 1 &&
-    queryParts.every((part) => searchable.some((value) => value.includes(part)))
+    matchesQueryParts(searchable, queryParts)
   ) {
     return 3;
   }
@@ -492,7 +561,7 @@ function getHouseRecordScore(record: SalavatHouseRecord, streetQuery: string, ho
 
   if (
     queryParts.length > 1 &&
-    queryParts.every((part) => searchable.some((value) => value.includes(part)))
+    matchesQueryParts(searchable, queryParts)
   ) {
     return 6;
   }
@@ -514,7 +583,7 @@ function getStreetRecordScore(record: SalavatStreetRecord, query: string) {
 
   if (
     queryParts.length > 1 &&
-    queryParts.every((part) => searchable.some((value) => value.includes(part)))
+    matchesQueryParts(searchable, queryParts)
   ) {
     return 4;
   }
@@ -533,6 +602,48 @@ function mergeSuggestions(items: SalavatAddressSuggestion[]) {
     seen.add(item.id);
     return true;
   });
+}
+
+function matchesQueryParts(searchable: string[], queryParts: string[]) {
+  return queryParts.every((part) =>
+    searchable.some((value) => {
+      if (value.includes(part)) {
+        return true;
+      }
+
+      return value
+        .split(' ')
+        .filter(Boolean)
+        .some((token) => token.length === 1 && part.startsWith(token));
+    }),
+  );
+}
+
+function getDisplayStreet(settlement: string, street: string) {
+  const normalizedStreet = normalize(street);
+  const streetParts = normalizedStreet.split(' ').filter(Boolean);
+  const [initial, ...restParts] = streetParts;
+
+  if (!initial || initial.length !== 1 || restParts.length === 0) {
+    return street;
+  }
+
+  const expandedStreet = salavatDistrictStreets.find((candidate) => {
+    if (candidate.settlement !== settlement || candidate.street === street) {
+      return false;
+    }
+
+    const candidateParts = normalize(candidate.street).split(' ').filter(Boolean);
+    const [firstName, ...candidateRestParts] = candidateParts;
+
+    return (
+      firstName?.startsWith(initial) &&
+      firstName.length > 1 &&
+      candidateRestParts.join(' ') === restParts.join(' ')
+    );
+  });
+
+  return expandedStreet?.street ?? street;
 }
 
 function normalize(value: string) {

@@ -2,6 +2,8 @@ import { ComponentType, ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LucideProps } from 'lucide-react-native';
 
+import { kx } from '../theme/kinetixTheme';
+
 type InfoPanelProps = {
   title: string;
   children: ReactNode;
@@ -11,19 +13,19 @@ type InfoPanelProps = {
 
 const toneColors = {
   default: {
-    background: '#EEF5F3',
-    border: '#C5DDD7',
-    icon: '#146C5D',
+    background: kx.surface.card,
+    border: kx.border.subtle,
+    icon: kx.color.amber,
   },
   warning: {
-    background: '#FFF3E5',
-    border: '#F3C38A',
-    icon: '#C75319',
+    background: '#FFF9E8',
+    border: kx.color.warning,
+    icon: kx.color.warning,
   },
   success: {
-    background: '#EAF6EA',
-    border: '#B9DDBB',
-    icon: '#26733E',
+    background: '#F1F8F3',
+    border: kx.color.success,
+    icon: kx.color.success,
   },
 };
 
@@ -59,15 +61,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   panel: {
-    borderRadius: 8,
+    borderRadius: kx.radius.card,
     borderWidth: 1,
+    elevation: 1,
     gap: 10,
     padding: 14,
+    shadowColor: kx.color.shadow,
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
   },
   title: {
-    color: '#20242A',
+    color: kx.text.primary,
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '900',
+    lineHeight: 20,
   },
 });

@@ -1,3 +1,11 @@
+import { getApiBaseUrl } from './apiClient';
+import {
+  getPublicEnv,
+  isExamplePublicValue,
+  isLocalPublicValue,
+  isProductionApp,
+} from '../utils/runtimeFlags';
+
 export type MessageServerState = {
   mode: 'local' | 'server';
   label: string;
@@ -6,13 +14,17 @@ export type MessageServerState = {
 
 export function getMessageServerState(): MessageServerState {
   const url = getPublicEnv('EXPO_PUBLIC_MESSAGE_SERVER_URL');
+  const hasConfiguredServerUrl =
+    Boolean(url) && !isExamplePublicValue(url) && (!isProductionApp() || !isLocalPublicValue(url));
 
-  if (!url) {
+  if (!hasConfiguredServerUrl) {
+    const apiUrl = getApiBaseUrl();
+
     return {
       description:
-        'Сообщения сохраняются локально в прототипе. После настройки URL экран будет готов отправлять переписку в сервер сообщений.',
-      label: 'Локальный канал',
-      mode: 'local',
+        `Сообщения отправляются в MVP backend: ${apiUrl}/support/messages. Поток событий доступен через SSE ${apiUrl}/realtime/stream.`,
+      label: 'MVP сервер сообщений',
+      mode: 'server',
     };
   }
 
@@ -21,12 +33,4 @@ export function getMessageServerState(): MessageServerState {
     label: 'Сервер сообщений',
     mode: 'server',
   };
-}
-
-function getPublicEnv(key: string) {
-  const env = globalThis as typeof globalThis & {
-    process?: { env?: Record<string, string | undefined> };
-  };
-
-  return env.process?.env?.[key];
 }
