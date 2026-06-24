@@ -8,6 +8,7 @@ import {
   Clock3,
   CreditCard,
   Heart,
+  Info,
   MapPinned,
   MessageCircle,
   Package,
@@ -73,6 +74,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const initialStepIndex = getStepIndex(config.steps, (order as { status?: string }).status);
   const [activeStepIndex, setActiveStepIndex] = useState(initialStepIndex);
   const [contactOpen, setContactOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const [contactResult, setContactResult] = useState<string | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewMood, setReviewMood] = useState(reviewMoods[0]);
@@ -515,36 +518,6 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               {shareResult ? <Text style={styles.inlineNotice}>{shareResult}</Text> : null}
             </View>
 
-            <View style={styles.panel}>
-              <SectionHeader title="Этапы заказа" />
-              <View style={styles.steps}>
-                {config.steps.map((step, index) => {
-                  const isDone = index < activeStepIndex;
-                  const isActive = index === activeStepIndex;
-
-                  return (
-                    <View key={step.id} style={styles.stepRow}>
-                      <View
-                        style={[
-                          styles.stepDot,
-                          isDone && styles.stepDotDone,
-                          isActive && styles.stepDotActive,
-                        ]}
-                      >
-                        {isDone ? <Check color="#12382C" size={14} strokeWidth={3} /> : null}
-                      </View>
-                      <View style={styles.stepCopy}>
-                        <Text style={[styles.stepTitle, isActive && styles.stepTitleActive]}>
-                          {step.title}
-                        </Text>
-                        <Text numberOfLines={2} style={styles.stepDescription}>{step.description}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-
             {isCompleted && role === 'client' ? (
               <View style={styles.goodRoadPanel}>
                 <View style={styles.goodRoadCar}>
@@ -703,52 +676,72 @@ export function OrderStatusScreen({ navigation, route }: Props) {
 
           <View style={[styles.sideColumn, isWide && styles.sideColumnWide]}>
             <View style={styles.panel}>
-              <SectionHeader title={serviceCopy.routePanelTitle} />
+              <View style={styles.panelHeaderRow}>
+                <SectionHeader title={serviceCopy.routePanelTitle} />
+                <Pressable
+                  accessibilityLabel={detailsOpen ? 'Скрыть детали заказа' : 'Показать детали заказа'}
+                  accessibilityRole="button"
+                  onPress={() => setDetailsOpen((current) => !current)}
+                  style={({ pressed }) => [styles.infoButton, detailsOpen && styles.infoButtonActive, pressed && styles.pressed]}
+                >
+                  <Info color={detailsOpen ? '#FFFFFF' : '#008D49'} size={18} strokeWidth={2.5} />
+                </Pressable>
+              </View>
               <InfoRow icon={<MapPinned color="#008D49" size={18} />} label={serviceCopy.pickupLabel} value={displayedOrder.pickup} />
               <InfoRow
                 icon={<Route color="#008D49" size={18} />}
                 label={serviceCopy.destinationLabel}
                 value={displayedOrder.destination}
               />
-              {displayedOrder.serviceType === 'delivery' ? (
+              <InfoRow icon={<Clock3 color="#008D49" size={18} />} label="Тариф" value={displayedOrder.tariff} />
+
+              {detailsOpen ? (
                 <>
-                  <InfoRow
-                    icon={<Package color="#008D49" size={18} />}
-                    label="Тип"
-                    value={formatDeliveryPackageType(displayedOrder.deliveryPackageType)}
-                  />
+                  {displayedOrder.serviceType === 'delivery' ? (
+                    <>
+                      <InfoRow
+                        icon={<Package color="#008D49" size={18} />}
+                        label="Тип"
+                        value={formatDeliveryPackageType(displayedOrder.deliveryPackageType)}
+                      />
+                      <InfoRow
+                        icon={<ShieldCheck color="#008D49" size={18} />}
+                        label="Передача"
+                        value={formatDeliveryHandoff(displayedOrder.deliveryHandoff)}
+                      />
+                      <InfoRow
+                        icon={<Package color="#008D49" size={18} />}
+                        label="Посылка"
+                        value={displayedOrder.packageDescription || 'Не указано'}
+                      />
+                      <InfoRow
+                        icon={<UserRound color="#008D49" size={18} />}
+                        label="Получатель"
+                        value={[displayedOrder.recipientName, displayedOrder.recipientPhone].filter(Boolean).join(' · ') || 'Не указан'}
+                      />
+                    </>
+                  ) : null}
+                  {displayedOrder.stops?.length ? (
+                    <InfoRow
+                      icon={<MapPinned color="#008D49" size={18} />}
+                      label="Остановки"
+                      value={displayedOrder.stops.join(' · ')}
+                    />
+                  ) : null}
+                  {displayedOrder.scheduledAt ? (
+                    <InfoRow
+                      icon={<Clock3 color="#008D49" size={18} />}
+                      label="Подача"
+                      value={displayedOrder.scheduledAt}
+                    />
+                  ) : null}
                   <InfoRow
                     icon={<ShieldCheck color="#008D49" size={18} />}
-                    label="Передача"
-                    value={formatDeliveryHandoff(displayedOrder.deliveryHandoff)}
-                  />
-                  <InfoRow
-                    icon={<Package color="#008D49" size={18} />}
-                    label="Посылка"
-                    value={displayedOrder.packageDescription || 'Не указано'}
-                  />
-                  <InfoRow
-                    icon={<UserRound color="#008D49" size={18} />}
-                    label="Получатель"
-                    value={[displayedOrder.recipientName, displayedOrder.recipientPhone].filter(Boolean).join(' · ') || 'Не указан'}
+                    label="Опции"
+                    value={displayedOrder.options.length > 0 ? displayedOrder.options.join(', ') : 'Без опций'}
                   />
                 </>
               ) : null}
-              {displayedOrder.stops?.length ? (
-                <InfoRow
-                  icon={<MapPinned color="#008D49" size={18} />}
-                  label="Остановки"
-                  value={displayedOrder.stops.join(' · ')}
-                />
-              ) : null}
-              {displayedOrder.scheduledAt ? (
-                <InfoRow
-                  icon={<Clock3 color="#008D49" size={18} />}
-                  label="Подача"
-                  value={displayedOrder.scheduledAt}
-                />
-              ) : null}
-              <InfoRow icon={<Clock3 color="#008D49" size={18} />} label="Тариф" value={displayedOrder.tariff} />
             </View>
 
             <View style={styles.panel}>
@@ -888,66 +881,70 @@ export function OrderStatusScreen({ navigation, route }: Props) {
             </View>
 
             <View style={styles.panel}>
-              <SectionHeader title="Оплата и детали" />
-              <View style={[styles.paymentStatusBox, isPaid && styles.paymentStatusBoxPaid]}>
-                <View style={styles.paymentStatusTop}>
-                  <CreditCard color={isPaid ? '#008D49' : '#5C8D89'} size={18} strokeWidth={2.4} />
-                  <Text style={styles.paymentStatusTitle}>{paymentStatusLabels[paymentStatus]}</Text>
-                </View>
-                <Text style={styles.paymentStatusText}>
-                  {isPaid
-                    ? `Оплата закрыта${
-                        displayedOrder.paidAt ? `: ${new Date(displayedOrder.paidAt).toLocaleString('ru-RU')}` : ''
-                      }.`
-                    : paymentStatus === 'authorized'
-                    ? 'Средства авторизованы. Оплата закроется после поездки.'
-                    : 'Оплата ожидает подтверждения.'}
-                </Text>
-                {paymentEvent?.note ? <Text style={styles.paymentStatusText}>{paymentEvent.note}</Text> : null}
-                {!isPaid ? (
+              <SectionHeader title="Оплата" />
+
+              {isPaid ? (
+                <>
+                  <View style={[styles.paymentStatusBox, styles.paymentStatusBoxPaid]}>
+                    <View style={styles.paymentStatusTop}>
+                      <CreditCard color="#008D49" size={18} strokeWidth={2.4} />
+                      <Text style={styles.paymentStatusTitle}>{paymentStatusLabels[paymentStatus]}</Text>
+                    </View>
+                    <Text style={styles.paymentStatusText}>
+                      Оплата закрыта{displayedOrder.paidAt ? `: ${new Date(displayedOrder.paidAt).toLocaleString('ru-RU')}` : ''}.
+                    </Text>
+                  </View>
+                  {displayedOrder.receipt ? (
+                    <View style={styles.receiptBox}>
+                      <Text style={styles.receiptTitle}>Чек {displayedOrder.receipt.id}</Text>
+                      <Text style={styles.receiptText}>
+                        {displayedOrder.receipt.fiscalNumber || 'Пилотный номер чека'} ·{' '}
+                        {new Date(displayedOrder.receipt.issuedAt).toLocaleString('ru-RU')}
+                      </Text>
+                      {(displayedOrder.receipt.items ?? []).map((item) => (
+                        <View key={`${item.label}-${item.amount}`} style={styles.receiptLine}>
+                          <Text style={styles.receiptText}>{item.label}</Text>
+                          <Text style={styles.receiptValue}>{item.amount} ₽</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </>
+              ) : (
+                <>
                   <Pressable
                     accessibilityRole="button"
-                    onPress={confirmPayment}
-                    style={({ pressed }) => [styles.paymentActionButton, pressed && styles.pressed]}
+                    onPress={() => (isDriverRole ? confirmPayment() : setPayOpen((current) => !current))}
+                    style={({ pressed }) => [styles.payButton, pressed && styles.pressed]}
                   >
-                    <Text style={styles.paymentActionButtonText}>Подтвердить оплату</Text>
+                    <CreditCard color="#06140D" size={21} strokeWidth={2.6} />
+                    <Text style={styles.payButtonText}>
+                      {isDriverRole ? 'Отметить оплату' : 'Оплатить'} · {displayedOrder.total} ₽
+                    </Text>
                   </Pressable>
-                ) : null}
-              </View>
-              <InfoRow
-                icon={<CreditCard color="#008D49" size={18} />}
-                label="Способ"
-                value={displayedOrder.paymentMethod}
-              />
-              <InfoRow icon={<ReceiptText color="#008D49" size={18} />} label="Сумма" value={`${displayedOrder.total} ₽`} />
-              <InfoRow
-                icon={<ShieldCheck color="#008D49" size={18} />}
-                label="Опции"
-                value={displayedOrder.options.length > 0 ? displayedOrder.options.join(', ') : 'Без дополнительных опций'}
-              />
-              {displayedOrder.receipt ? (
-                <View style={styles.receiptBox}>
-                  <Text style={styles.receiptTitle}>Чек {displayedOrder.receipt.id}</Text>
-                  <Text style={styles.receiptText}>
-                    {displayedOrder.receipt.fiscalNumber || 'Пилотный номер чека'} ·{' '}
-                    {new Date(displayedOrder.receipt.issuedAt).toLocaleString('ru-RU')}
-                  </Text>
-                  {(displayedOrder.receipt.items ?? []).map((item) => (
-                    <View key={`${item.label}-${item.amount}`} style={styles.receiptLine}>
-                      <Text style={styles.receiptText}>{item.label}</Text>
-                      <Text style={styles.receiptValue}>{item.amount} ₽</Text>
+
+                  {payOpen && !isDriverRole ? (
+                    <View style={styles.payPanel}>
+                      <View style={styles.payAmountRow}>
+                        <Text style={styles.payAmountLabel}>К оплате водителю</Text>
+                        <Text style={styles.payAmountValue}>{displayedOrder.total} ₽</Text>
+                      </View>
+                      <InfoRow icon={<CreditCard color="#008D49" size={18} />} label="Способ" value={displayedOrder.paymentMethod} />
+                      <InfoRow icon={<UserRound color="#008D49" size={18} />} label="Получатель" value={participantName} />
+                      <InfoRow icon={<ReceiptText color="#008D49" size={18} />} label="Карта" value="2200 24•• •••• 4011" />
+                      <Text style={styles.payHint}>Переведите сумму водителю и подтвердите оплату.</Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={confirmPayment}
+                        style={({ pressed }) => [styles.payConfirmButton, pressed && styles.pressed]}
+                      >
+                        <Text style={styles.payConfirmText}>Подтвердить оплату</Text>
+                      </Pressable>
                     </View>
-                  ))}
-                </View>
-              ) : null}
-              <View style={styles.detailList}>
-                {config.details.map((detail) => (
-                  <View key={detail} style={styles.detailItem}>
-                    <Check color="#008D49" size={15} strokeWidth={3} />
-                    <Text style={styles.detailText}>{detail}</Text>
-                  </View>
-                ))}
-              </View>
+                  ) : null}
+                  {paymentEvent?.note ? <Text style={styles.paymentStatusText}>{paymentEvent.note}</Text> : null}
+                </>
+              )}
             </View>
           </View>
         </View>
@@ -2196,6 +2193,90 @@ const styles = StyleSheet.create({
   safeArea: {
     backgroundColor: '#F2F7F3',
     flex: 1,
+  },
+  panelHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  infoButton: {
+    alignItems: 'center',
+    backgroundColor: '#EEF6F0',
+    borderColor: 'rgba(0, 141, 73, 0.22)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  infoButtonActive: {
+    backgroundColor: '#00A65A',
+    borderColor: '#00A65A',
+  },
+  payButton: {
+    alignItems: 'center',
+    backgroundColor: '#5CE6A0',
+    borderRadius: 16,
+    elevation: 3,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+    minHeight: 60,
+    paddingHorizontal: 18,
+    shadowColor: 'rgba(0, 111, 58, 0.3)',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+  },
+  payButtonText: {
+    color: '#06140D',
+    fontSize: 18,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+    letterSpacing: -0.2,
+  },
+  payPanel: {
+    backgroundColor: '#F4FAF6',
+    borderColor: 'rgba(0, 141, 73, 0.18)',
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: 12,
+    padding: 14,
+  },
+  payAmountRow: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  payAmountLabel: {
+    color: '#49665A',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  payAmountValue: {
+    color: '#0B2F25',
+    fontSize: 24,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
+  payHint: {
+    color: '#49665A',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  payConfirmButton: {
+    alignItems: 'center',
+    backgroundColor: '#00A65A',
+    borderRadius: 14,
+    justifyContent: 'center',
+    minHeight: 50,
+    paddingHorizontal: 16,
+  },
+  payConfirmText: {
+    color: '#F4FAF6',
+    fontSize: 15,
+    fontWeight: '900',
   },
   secondaryButton: {
     alignItems: 'center',

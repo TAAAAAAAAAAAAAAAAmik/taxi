@@ -302,7 +302,6 @@ function NightHero({ onAdmin, styles, theme }: NightHeroProps) {
         </View>
 
         <View style={styles.heroBottom}>
-          <Text style={styles.heroTitle}>Ночной город{'\n'}едет к вам</Text>
           <View style={styles.heroLive}>
             <View style={styles.heroLiveDot} />
             <Text style={styles.heroLiveText}>12 на линии</Text>
