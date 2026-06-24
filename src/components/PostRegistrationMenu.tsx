@@ -241,22 +241,12 @@ export function PostRegistrationMenu({
 
   useEffect(() => {
     pageTransition.setValue(0);
-    const animation = reducedMotion
-      ? Animated.timing(pageTransition, {
-          toValue: 1,
-          duration: 130,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: false,
-        })
-      : Animated.spring(pageTransition, {
-          toValue: 1,
-          damping: 26,
-          mass: 1,
-          stiffness: 210,
-          restDisplacementThreshold: 0.01,
-          restSpeedThreshold: 0.01,
-          useNativeDriver: false,
-        });
+    const animation = Animated.timing(pageTransition, {
+      toValue: 1,
+      duration: reducedMotion ? 0 : 200,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    });
 
     animation.start();
 
@@ -264,20 +254,7 @@ export function PostRegistrationMenu({
   }, [activeItem.id, pageTransition, reducedMotion]);
 
   const pageAnimatedStyle = {
-    opacity: pageTransition.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
-      extrapolate: 'clamp',
-    }),
-    transform: [
-      {
-        translateX: pageTransition.interpolate({
-          inputRange: [0, 1],
-          outputRange: [22, 0],
-          extrapolate: 'clamp',
-        }),
-      },
-    ],
+    opacity: pageTransition,
   };
 
   const handleActionTarget = (target?: MenuActionTarget) => {
@@ -1585,22 +1562,12 @@ function SideDrawer({
       setMounted(true);
     }
 
-    const animation = reducedMotion
-      ? Animated.timing(progress, {
-          toValue: open ? 1 : 0,
-          duration: 150,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: false,
-        })
-      : Animated.spring(progress, {
-          toValue: open ? 1 : 0,
-          damping: 30,
-          mass: 1,
-          stiffness: 240,
-          restDisplacementThreshold: 0.01,
-          restSpeedThreshold: 0.01,
-          useNativeDriver: false,
-        });
+    const animation = Animated.timing(progress, {
+      toValue: open ? 1 : 0,
+      duration: reducedMotion ? 0 : 220,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    });
 
     animation.start(({ finished }) => {
       if (finished && !open) {
