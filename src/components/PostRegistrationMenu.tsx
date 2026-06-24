@@ -241,12 +241,16 @@ export function PostRegistrationMenu({
 
   useEffect(() => {
     pageTransition.setValue(0);
-    Animated.timing(pageTransition, {
+    const animation = Animated.timing(pageTransition, {
       toValue: 1,
-      duration: reducedMotion ? 0 : 240,
+      duration: reducedMotion ? 120 : 300,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+      useNativeDriver: false,
+    });
+
+    animation.start();
+
+    return () => animation.stop();
   }, [activeItem.id, pageTransition, reducedMotion]);
 
   const pageAnimatedStyle = {
@@ -255,13 +259,13 @@ export function PostRegistrationMenu({
       {
         translateY: pageTransition.interpolate({
           inputRange: [0, 1],
-          outputRange: [10, 0],
+          outputRange: [18, 0],
         }),
       },
       {
         scale: pageTransition.interpolate({
           inputRange: [0, 1],
-          outputRange: [0.992, 1],
+          outputRange: [0.985, 1],
         }),
       },
     ],
