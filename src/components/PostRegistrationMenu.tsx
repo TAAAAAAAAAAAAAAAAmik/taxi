@@ -333,10 +333,8 @@ export function PostRegistrationMenu({
       return;
     }
 
-    if (pages[item.id] || isClientRole) {
-      setActiveItemId(item.id);
-      setDrawerOpen(false);
-    }
+    setActiveItemId(item.id);
+    setDrawerOpen(false);
   };
   const handleClientSettingsPress = () => {
     setActiveItemId('settings');

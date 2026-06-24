@@ -1568,3 +1568,7 @@ sectionPages.park_driver = {
     ],
   },
 };
+
+sectionPages.self_employed_driver = sectionPages.driver;
+sectionPages.park_driver = sectionPages.driver;
+sectionPages.park_admin = sectionPages.fleet;
