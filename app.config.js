@@ -61,6 +61,9 @@ module.exports = {
     web: {
       favicon: './assets/favicon.png',
     },
+    experiments: compact({
+      baseUrl: String(process.env.EXPO_BASE_URL || '').trim().replace(/\/+$/, ''),
+    }),
     plugins: [
       [
         'expo-image-picker',
