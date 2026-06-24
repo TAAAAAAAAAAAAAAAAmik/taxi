@@ -329,7 +329,7 @@ export function PostRegistrationMenu({
       return;
     }
 
-    if (pages[item.id]) {
+    if (pages[item.id] || isClientRole) {
       setActiveItemId(item.id);
       setDrawerOpen(false);
     }
@@ -343,7 +343,11 @@ export function PostRegistrationMenu({
     <View style={styles.shell}>
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
         {isClientRole ? (
-          <ClientTopBar displayName={displayName} onOpenSettings={handleClientSettingsPress} />
+          <ClientTopBar
+            displayName={displayName}
+            onOpenMenu={() => setDrawerOpen(true)}
+            onOpenSettings={handleClientSettingsPress}
+          />
         ) : (
           <View style={styles.topBar}>
             <Pressable
@@ -473,9 +477,11 @@ export function PostRegistrationMenu({
 
 function ClientTopBar({
   displayName,
+  onOpenMenu,
   onOpenSettings,
 }: {
   displayName: string;
+  onOpenMenu: () => void;
   onOpenSettings: () => void;
 }) {
   const initials = getInitials(displayName);
@@ -483,6 +489,14 @@ function ClientTopBar({
   return (
     <View style={styles.clientTopBar}>
       <View style={styles.clientHeaderLeft}>
+        <Pressable
+          accessibilityLabel="Открыть меню"
+          accessibilityRole="button"
+          onPress={onOpenMenu}
+          style={({ pressed }) => [styles.clientHeaderIconButton, pressed && styles.pressed]}
+        >
+          <MenuIcon color={kinetixColors.textSecondary} size={24} strokeWidth={2.4} />
+        </Pressable>
         <View style={styles.clientHeaderAvatar}>
           <Text style={styles.clientHeaderAvatarText}>{initials}</Text>
         </View>
