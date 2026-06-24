@@ -259,7 +259,13 @@ export function PostRegistrationMenu({
       {
         translateY: pageTransition.interpolate({
           inputRange: [0, 1],
-          outputRange: [16, 0],
+          outputRange: [22, 0],
+        }),
+      },
+      {
+        scale: pageTransition.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.97, 1],
         }),
       },
     ],
@@ -1624,15 +1630,17 @@ function SideDrawer({
           </View>
 
           <ScrollView contentContainerStyle={styles.drawerList} showsVerticalScrollIndicator={false}>
-            {items.map((item) => {
+            {items.map((item, index) => {
               const active = item.id === activeItemId;
 
               return (
                 <DrawerMenuItem
                   active={active}
+                  index={index}
                   item={item}
                   key={item.id}
                   onPress={() => onItemPress(item)}
+                  progress={progress}
                 />
               );
             })}
@@ -1648,30 +1656,48 @@ function SideDrawer({
 
 type DrawerMenuItemProps = {
   active: boolean;
+  index: number;
   item: MenuItem;
   onPress: () => void;
+  progress: Animated.Value;
 };
 
-function DrawerMenuItem({ active, item, onPress }: DrawerMenuItemProps) {
+function DrawerMenuItem({ active, index, item, onPress, progress }: DrawerMenuItemProps) {
   const Icon = iconMap[item.icon];
+  const start = Math.min(0.55, index * 0.07);
+  const end = Math.min(1, start + 0.45);
+  const cascadeStyle = {
+    opacity: progress.interpolate({ inputRange: [start, end], outputRange: [0, 1], extrapolate: 'clamp' }),
+    transform: [
+      {
+        translateX: progress.interpolate({
+          inputRange: [start, end],
+          outputRange: [-26, 0],
+          extrapolate: 'clamp',
+        }),
+      },
+    ],
+  };
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.drawerItem, active && styles.drawerItemActive, pressed && styles.pressed]}
-    >
-      <View style={[styles.drawerIconWrap, active && styles.drawerIconWrapActive]}>
-        <Icon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.4} />
-      </View>
-      <View style={styles.drawerItemCopy}>
-        <Text numberOfLines={1} style={[styles.drawerItemTitle, active && styles.drawerItemTitleActive]}>
-          {item.title}
-        </Text>
-        <Text numberOfLines={1} style={styles.drawerItemSubtitle}>{item.subtitle}</Text>
-      </View>
-    </Pressable>
+    <Animated.View style={cascadeStyle}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
+        onPress={onPress}
+        style={({ pressed }) => [styles.drawerItem, active && styles.drawerItemActive, pressed && styles.pressed]}
+      >
+        <View style={[styles.drawerIconWrap, active && styles.drawerIconWrapActive]}>
+          <Icon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.4} />
+        </View>
+        <View style={styles.drawerItemCopy}>
+          <Text numberOfLines={1} style={[styles.drawerItemTitle, active && styles.drawerItemTitleActive]}>
+            {item.title}
+          </Text>
+          <Text numberOfLines={1} style={styles.drawerItemSubtitle}>{item.subtitle}</Text>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
