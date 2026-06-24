@@ -51,7 +51,7 @@ import {
 } from '../data/menu';
 import { SectionPage, SectionRow, sectionPages } from '../data/sectionPages';
 import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
-import { kinetixColors, kinetixEasing, kinetixIconography, kinetixMotion } from '../theme/kinetixTokens';
+import { kinetixColors, kinetixEasing, kinetixIconography } from '../theme/kinetixTokens';
 import { styles } from './PostRegistrationMenu.styles';
 import { TripCard, type TripCardServiceType } from './TripCard';
 
@@ -243,7 +243,7 @@ export function PostRegistrationMenu({
     pageTransition.setValue(0);
     const animation = Animated.timing(pageTransition, {
       toValue: 1,
-      duration: reducedMotion ? 0 : kinetixMotion.duration.list,
+      duration: reducedMotion ? 0 : 300,
       easing: kinetixEasing.easeOut,
       useNativeDriver: false,
     });
@@ -255,6 +255,14 @@ export function PostRegistrationMenu({
 
   const pageAnimatedStyle = {
     opacity: pageTransition,
+    transform: [
+      {
+        translateY: pageTransition.interpolate({
+          inputRange: [0, 1],
+          outputRange: [16, 0],
+        }),
+      },
+    ],
   };
 
   const handleActionTarget = (target?: MenuActionTarget) => {
@@ -1564,7 +1572,7 @@ function SideDrawer({
 
     const animation = Animated.timing(progress, {
       toValue: open ? 1 : 0,
-      duration: reducedMotion ? 0 : kinetixMotion.duration.drawer,
+      duration: reducedMotion ? 0 : 300,
       easing: kinetixEasing.easeOut,
       useNativeDriver: false,
     });

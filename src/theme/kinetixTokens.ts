@@ -127,8 +127,10 @@ export const kinetixMotion = {
 // Single source of truth for in-app transitions; useNativeDriver:false so
 // they animate consistently on web and native.
 export const kinetixEasing = {
-  easeOut: Easing.bezier(0.16, 1, 0.3, 1),
-  standard: Easing.bezier(0.2, 0, 0, 1),
+  // Gentle, clearly-readable easeOutCubic (not front-loaded) so JS-driven
+  // transitions on web stay visibly smooth.
+  easeOut: Easing.bezier(0.33, 1, 0.68, 1),
+  standard: Easing.bezier(0.4, 0, 0.2, 1),
 } as const;
 
 export const kinetixIconography = {
