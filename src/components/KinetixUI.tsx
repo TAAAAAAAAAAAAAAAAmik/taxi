@@ -124,7 +124,7 @@ export function KinetixSkeleton({
         duration: 1450,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     );
 

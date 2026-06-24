@@ -1,3 +1,5 @@
+import { Easing } from "react-native";
+
 export const kinetixColors = {
   graphite: "#F3F7F2",
   surface: "#FFFFFF",
@@ -119,6 +121,14 @@ export const kinetixMotion = {
   },
   pressScale: 0.95,
   screenOffset: 10,
+} as const;
+
+// RN Animated easing functions matching kinetixMotion.easing CSS curves.
+// Single source of truth for in-app transitions; useNativeDriver:false so
+// they animate consistently on web and native.
+export const kinetixEasing = {
+  easeOut: Easing.bezier(0.16, 1, 0.3, 1),
+  standard: Easing.bezier(0.2, 0, 0, 1),
 } as const;
 
 export const kinetixIconography = {

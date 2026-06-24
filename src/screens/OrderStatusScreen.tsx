@@ -176,7 +176,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
         duration: 1600,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ).start();
   }, [pulseAnim, reducedMotion]);
@@ -192,7 +192,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
       duration: reducedMotion ? 0 : 300,
       easing: Easing.out(Easing.cubic),
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   }, [reducedMotion, tripChatOpen, tripChatTransition]);
 
@@ -209,12 +209,12 @@ export function OrderStatusScreen({ navigation, route }: Props) {
         Animated.timing(etaFlickerAnim, {
           duration: 120,
           toValue: 0.45,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(etaFlickerAnim, {
           duration: 220,
           toValue: 1,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ]).start();
     }, 30000);

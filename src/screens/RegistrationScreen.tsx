@@ -45,6 +45,7 @@ import {
   createConsentState,
   validateRegistration,
 } from '../utils/validation';
+import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
 import { validateReferralCode } from '../services/apiClient';
 import { useAppState } from '../state/AppState';
 import { getPublicEnv, isPhoneVerificationSkipped, normalizePublicOrigin } from '../utils/runtimeFlags';
@@ -109,6 +110,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
   const [serverNotice, setServerNotice] = useState<string | null>(null);
   const [activeStepId, setActiveStepId] = useState<RegistrationStepId>('role');
   const stepTransition = useRef(new Animated.Value(1)).current;
+  const reducedMotion = useReducedMotionPreference();
 
   const fields = useMemo(() => getFieldsForRole(role), [role]);
   const validationErrors = useMemo(
@@ -220,13 +222,17 @@ export function RegistrationScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     stepTransition.setValue(0);
-    Animated.timing(stepTransition, {
-      duration: 220,
+    const animation = Animated.timing(stepTransition, {
+      duration: reducedMotion ? 0 : 240,
       easing: Easing.out(Easing.cubic),
       toValue: 1,
-      useNativeDriver: true,
-    }).start();
-  }, [activeStep.id, stepTransition]);
+      useNativeDriver: false,
+    });
+
+    animation.start();
+
+    return () => animation.stop();
+  }, [activeStep.id, reducedMotion, stepTransition]);
 
   const updateValue = (id: string, nextValue: string) => {
     setSubmitted(false);

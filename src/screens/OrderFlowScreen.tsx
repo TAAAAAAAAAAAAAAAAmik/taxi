@@ -342,7 +342,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       duration: reducedMotion ? 0 : 240,
       easing: Easing.out(Easing.cubic),
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   }, [clientStep, clientStepTransition, isDriverRole, reducedMotion, serviceType]);
 

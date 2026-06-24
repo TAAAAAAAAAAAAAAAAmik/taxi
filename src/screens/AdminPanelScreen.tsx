@@ -1753,14 +1753,27 @@ function AdminSideDrawer({
 }: AdminSideDrawerProps) {
   const reducedMotion = useReducedMotionPreference();
   const progress = useRef(new Animated.Value(open ? 1 : 0)).current;
+  const [mounted, setMounted] = useState(open);
 
   useEffect(() => {
-    Animated.timing(progress, {
+    if (open) {
+      setMounted(true);
+    }
+
+    const animation = Animated.timing(progress, {
       toValue: open ? 1 : 0,
       duration: reducedMotion ? 0 : 285,
       easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+      useNativeDriver: false,
+    });
+
+    animation.start(({ finished }) => {
+      if (finished && !open) {
+        setMounted(false);
+      }
+    });
+
+    return () => animation.stop();
   }, [open, progress, reducedMotion]);
 
   const panelAnimatedStyle = {
@@ -1791,7 +1804,7 @@ function AdminSideDrawer({
   };
 
   return (
-    <Modal animationType="none" onRequestClose={onClose} transparent visible={open}>
+    <Modal animationType="none" onRequestClose={onClose} transparent visible={mounted}>
       <View style={styles.drawerRoot}>
         <Animated.View style={[styles.drawerPanel, panelAnimatedStyle]}>
           <View style={styles.drawerHeader}>

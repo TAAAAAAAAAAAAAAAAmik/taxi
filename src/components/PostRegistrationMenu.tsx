@@ -51,7 +51,7 @@ import {
 } from '../data/menu';
 import { SectionPage, SectionRow, sectionPages } from '../data/sectionPages';
 import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
-import { kinetixColors, kinetixIconography } from '../theme/kinetixTokens';
+import { kinetixColors, kinetixEasing, kinetixIconography, kinetixMotion } from '../theme/kinetixTokens';
 import { styles } from './PostRegistrationMenu.styles';
 import { TripCard, type TripCardServiceType } from './TripCard';
 
@@ -243,8 +243,8 @@ export function PostRegistrationMenu({
     pageTransition.setValue(0);
     const animation = Animated.timing(pageTransition, {
       toValue: 1,
-      duration: reducedMotion ? 0 : 200,
-      easing: Easing.out(Easing.quad),
+      duration: reducedMotion ? 0 : kinetixMotion.duration.list,
+      easing: kinetixEasing.easeOut,
       useNativeDriver: false,
     });
 
@@ -1048,7 +1048,7 @@ function ClientMapPreview({
         duration: 2200,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     );
 
@@ -1564,8 +1564,8 @@ function SideDrawer({
 
     const animation = Animated.timing(progress, {
       toValue: open ? 1 : 0,
-      duration: reducedMotion ? 0 : 220,
-      easing: Easing.out(Easing.quad),
+      duration: reducedMotion ? 0 : kinetixMotion.duration.drawer,
+      easing: kinetixEasing.easeOut,
       useNativeDriver: false,
     });
 
