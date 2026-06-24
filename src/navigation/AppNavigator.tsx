@@ -4,7 +4,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AdminPanelScreen } from '../screens/AdminPanelScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { DriverDocumentsScreen } from '../screens/DriverDocumentsScreen';
-import { LoginScreen } from '../screens/LoginScreen';
 import { OrderFlowScreen } from '../screens/OrderFlowScreen';
 import { OrderHistoryScreen } from '../screens/OrderHistoryScreen';
 import { OrderStatusScreen } from '../screens/OrderStatusScreen';
@@ -34,7 +33,6 @@ const linking: LinkingOptions<RootStackParamList> = {
   config: {
     screens: {
       AdminPanel: 'admin',
-      Login: 'login',
       OrderFlow: {
         parse: {
           role: normalizeRoleParam,
@@ -110,10 +108,6 @@ function getInitialWebState(): InitialState | undefined {
 
   const [screen, value] = segments;
 
-  if (screen === 'login') {
-    return { routes: [{ name: 'Login' }] };
-  }
-
   if (screen === 'admin') {
     return { routes: [{ name: 'AdminPanel' }] };
   }
@@ -161,7 +155,6 @@ export function AppNavigator() {
         })}
       >
         <Stack.Screen component={WelcomeScreen} name="Welcome" />
-        <Stack.Screen component={LoginScreen} name="Login" />
         <Stack.Screen component={PasswordResetScreen} name="PasswordReset" />
         <Stack.Screen component={AdminPanelScreen} name="AdminPanel" />
         <Stack.Screen component={RegistrationScreen} name="Registration" />
@@ -182,7 +175,7 @@ export function AppNavigator() {
 }
 
 function getScreenAnimation(routeName: keyof RootStackParamList) {
-  if (['Login', 'AdminPanel', 'Welcome'].includes(routeName)) {
+  if (['AdminPanel', 'Welcome'].includes(routeName)) {
     return 'fade' as const;
   }
 

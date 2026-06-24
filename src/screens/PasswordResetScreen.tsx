@@ -213,10 +213,10 @@ export function PasswordResetScreen({ navigation }: Props) {
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => navigation.navigate('Login')}
+            onPress={() => navigation.navigate('Welcome')}
             style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
           >
-            <Text style={styles.linkButtonText}>Вернуться ко входу</Text>
+            <Text style={styles.linkButtonText}>На главный экран</Text>
           </Pressable>
         </View>
       </ScrollView>

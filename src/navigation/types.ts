@@ -41,7 +41,6 @@ export type OrderStatusSummary = {
 
 export type RootStackParamList = {
   Welcome: undefined;
-  Login: undefined;
   PasswordReset: undefined;
   AdminPanel: undefined;
   Registration:

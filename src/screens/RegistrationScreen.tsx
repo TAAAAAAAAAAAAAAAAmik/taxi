@@ -603,7 +603,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => navigation.navigate('Login')}
+                onPress={() => navigation.navigate('Welcome')}
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressedButton]}
               >
                 <Text style={styles.secondaryButtonText}>Уже есть аккаунт</Text>

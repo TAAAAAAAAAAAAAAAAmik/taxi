@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import {
   ArrowRight,
   BadgePercent,
+  Car,
   ChevronRight,
   Clock,
   Globe,
@@ -23,7 +24,10 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'rea
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 
 import { BashkortostanEmblem } from '../components/BashkortostanEmblem';
+import { AccountRole, normalizeAccountRole } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
+import { useAppState } from '../state/AppState';
+import { isDemoModeEnabled } from '../utils/runtimeFlags';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 type ThemeName = keyof typeof themes;
@@ -64,11 +68,43 @@ function alpha(hex: string, a: number) {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
+type DemoAccount = { Icon: IconType; identifier: string; label: string; password: string; role: AccountRole };
+
+const demoAccounts: DemoAccount[] = [
+  { Icon: User, identifier: 'demo-client@example.test', label: 'Клиент', password: 'Kinetix123', role: 'client' },
+  { Icon: Car, identifier: 'demo-driver@example.test', label: 'Водитель', password: 'Kinetix123', role: 'self_employed_driver' },
+];
+
 export function WelcomeScreen({ navigation }: Props) {
+  const { loginAccount } = useAppState();
   const [themeName, setThemeName] = useState<ThemeName>('light');
+  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoError, setDemoError] = useState<string | null>(null);
   const theme = themes[themeName];
   const styles = useMemo(() => createStyles(theme), [theme]);
   const ThemeIcon = themeName === 'light' ? Moon : Sun;
+  const showDemo = isDemoModeEnabled();
+
+  const handleDemoLogin = async (account: DemoAccount) => {
+    if (demoBusy) {
+      return;
+    }
+
+    setDemoBusy(true);
+    setDemoError(null);
+    const user = await loginAccount(account.identifier, account.password, normalizeAccountRole(account.role));
+    setDemoBusy(false);
+
+    if (!user) {
+      setDemoError('Не удалось открыть демо-аккаунт. Попробуйте ещё раз.');
+      return;
+    }
+
+    navigation.replace('Dashboard', {
+      firstName: user.firstName || undefined,
+      role: normalizeAccountRole(user.role),
+    });
+  };
 
   const passengerFeatures: Feature[] = [
     { Icon: Clock, label: 'Быстро', sub: 'Подача за 3 мин' },
@@ -80,10 +116,10 @@ export function WelcomeScreen({ navigation }: Props) {
   ];
   const navItems = [
     { Icon: Home, active: true, label: 'Главная', onPress: undefined },
-    { Icon: RouteIcon, active: false, label: 'Поездки', onPress: () => navigation.navigate('Login') },
-    { Icon: MessageCircle, active: false, label: 'Сообщения', onPress: () => navigation.navigate('Login') },
-    { Icon: Settings, active: false, label: 'Настройки', onPress: () => navigation.navigate('Login') },
-    { Icon: User, active: false, label: 'Профиль', onPress: () => navigation.navigate('Login') },
+    { Icon: RouteIcon, active: false, label: 'Поездки', onPress: () => navigation.navigate('Registration') },
+    { Icon: MessageCircle, active: false, label: 'Сообщения', onPress: () => navigation.navigate('Registration') },
+    { Icon: Settings, active: false, label: 'Настройки', onPress: () => navigation.navigate('Registration') },
+    { Icon: User, active: false, label: 'Профиль', onPress: () => navigation.navigate('Registration') },
   ];
 
   return (
@@ -148,17 +184,47 @@ export function WelcomeScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
+        {showDemo ? (
+          <View style={styles.demoCard}>
+            <Text style={styles.demoTitle}>Демо-вход</Text>
+            <Text style={styles.demoSub}>Без backend, данные хранятся только в браузере.</Text>
+            <View style={styles.demoGrid}>
+              {demoAccounts.map((account) => {
+                const DemoIcon = account.Icon;
+
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={demoBusy}
+                    key={account.role}
+                    onPress={() => handleDemoLogin(account)}
+                    style={({ pressed }) => [
+                      styles.demoButton,
+                      demoBusy && styles.demoButtonMuted,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <DemoIcon color={theme.brand} size={18} strokeWidth={2.4} />
+                    <Text style={styles.demoButtonText}>{account.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {demoError ? <Text style={styles.demoError}>{demoError}</Text> : null}
+          </View>
+        ) : null}
+
         <Pressable
           accessibilityRole="button"
-          onPress={() => navigation.navigate('Login')}
+          onPress={() => navigation.navigate('Registration')}
           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
         >
           <View style={styles.primaryIcon}>
             <ShieldCheck color={theme.onBrand} size={20} strokeWidth={2.3} />
           </View>
           <View style={styles.primaryCopy}>
-            <Text style={styles.primaryTitle}>Войти / Регистрация</Text>
-            <Text style={styles.primarySub}>Безопасный доступ к сервису</Text>
+            <Text style={styles.primaryTitle}>Регистрация</Text>
+            <Text style={styles.primarySub}>Создайте аккаунт за минуту</Text>
           </View>
           <ChevronRight color={theme.onBrand} size={22} strokeWidth={2.5} />
         </Pressable>
@@ -322,6 +388,56 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       flexDirection: 'row',
       gap: 8,
+    },
+    demoButton: {
+      alignItems: 'center',
+      backgroundColor: theme.surfaceAlt,
+      borderColor: theme.border,
+      borderRadius: 14,
+      borderWidth: 1,
+      flex: 1,
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'center',
+      minHeight: 48,
+      minWidth: 140,
+      paddingHorizontal: 12,
+    },
+    demoButtonMuted: {
+      opacity: 0.55,
+    },
+    demoButtonText: {
+      color: theme.brand,
+      fontSize: 14,
+      fontWeight: '900',
+    },
+    demoCard: {
+      backgroundColor: theme.surface,
+      borderColor: theme.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      gap: 10,
+      padding: 16,
+    },
+    demoError: {
+      color: '#C17A70',
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    demoGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    demoSub: {
+      color: theme.muted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    demoTitle: {
+      color: theme.text,
+      fontSize: 16,
+      fontWeight: '900',
     },
     emblemButton: {
       alignItems: 'center',
