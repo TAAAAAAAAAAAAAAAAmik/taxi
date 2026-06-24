@@ -241,12 +241,22 @@ export function PostRegistrationMenu({
 
   useEffect(() => {
     pageTransition.setValue(0);
-    const animation = Animated.timing(pageTransition, {
-      toValue: 1,
-      duration: reducedMotion ? 160 : 460,
-      easing: Easing.bezier(0.22, 1, 0.36, 1),
-      useNativeDriver: false,
-    });
+    const animation = reducedMotion
+      ? Animated.timing(pageTransition, {
+          toValue: 1,
+          duration: 130,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        })
+      : Animated.spring(pageTransition, {
+          toValue: 1,
+          damping: 26,
+          mass: 1,
+          stiffness: 210,
+          restDisplacementThreshold: 0.01,
+          restSpeedThreshold: 0.01,
+          useNativeDriver: false,
+        });
 
     animation.start();
 
@@ -254,18 +264,17 @@ export function PostRegistrationMenu({
   }, [activeItem.id, pageTransition, reducedMotion]);
 
   const pageAnimatedStyle = {
-    opacity: pageTransition,
+    opacity: pageTransition.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+      extrapolate: 'clamp',
+    }),
     transform: [
       {
-        translateY: pageTransition.interpolate({
+        translateX: pageTransition.interpolate({
           inputRange: [0, 1],
-          outputRange: [18, 0],
-        }),
-      },
-      {
-        scale: pageTransition.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0.985, 1],
+          outputRange: [22, 0],
+          extrapolate: 'clamp',
         }),
       },
     ],
@@ -1576,12 +1585,22 @@ function SideDrawer({
       setMounted(true);
     }
 
-    const animation = Animated.timing(progress, {
-      toValue: open ? 1 : 0,
-      duration: reducedMotion ? 160 : open ? 460 : 340,
-      easing: open ? Easing.bezier(0.22, 1, 0.36, 1) : Easing.bezier(0.4, 0, 0.7, 1),
-      useNativeDriver: false,
-    });
+    const animation = reducedMotion
+      ? Animated.timing(progress, {
+          toValue: open ? 1 : 0,
+          duration: 150,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        })
+      : Animated.spring(progress, {
+          toValue: open ? 1 : 0,
+          damping: 30,
+          mass: 1,
+          stiffness: 240,
+          restDisplacementThreshold: 0.01,
+          restSpeedThreshold: 0.01,
+          useNativeDriver: false,
+        });
 
     animation.start(({ finished }) => {
       if (finished && !open) {
@@ -1597,20 +1616,11 @@ function SideDrawer({
       {
         translateX: progress.interpolate({
           inputRange: [0, 1],
-          outputRange: [-330, 0],
-        }),
-      },
-      {
-        scale: progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0.985, 1],
+          outputRange: [-340, 0],
+          extrapolate: 'clamp',
         }),
       },
     ],
-    opacity: progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.72, 1],
-    }),
   };
   const scrimAnimatedStyle = {
     opacity: progress.interpolate({
