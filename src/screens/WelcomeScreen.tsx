@@ -24,7 +24,6 @@ import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 
 import { BashkortostanEmblem } from '../components/BashkortostanEmblem';
 import { RootStackParamList } from '../navigation/types';
-import { WelcomeScreenVariant } from './WelcomeScreenVariant';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 type ThemeName = keyof typeof themes;
@@ -65,8 +64,7 @@ function alpha(hex: string, a: number) {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
-export function WelcomeScreen({ navigation, route }: Props) {
-  const [variant, setVariant] = useState<'claude' | 'codex'>('claude');
+export function WelcomeScreen({ navigation }: Props) {
   const [themeName, setThemeName] = useState<ThemeName>('light');
   const theme = themes[themeName];
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -90,123 +88,104 @@ export function WelcomeScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={abStyles.bar}>
-        {(['claude', 'codex'] as const).map((value) => (
+      <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerCard}>
+          <Text style={styles.logo}>Kinetix</Text>
+          <Pressable
+            accessibilityLabel="Скрытый вход администратора"
+            accessibilityRole="button"
+            onLongPress={() => navigation.navigate('AdminPanel')}
+            style={({ pressed }) => [styles.emblemButton, pressed && styles.pressed]}
+          >
+            <BashkortostanEmblem size={48} />
+          </Pressable>
+        </View>
+
+        <RoleCard
+          badge="Онлайн"
+          dark={false}
+          features={passengerFeatures}
+          onPress={() => navigation.navigate('Registration', { role: 'client' })}
+          styles={styles}
+          subtitle="Заказать поездку"
+          theme={theme}
+          title="Пассажир"
+        />
+
+        <RoleCard
+          badge="На линии"
+          dark
+          features={driverFeatures}
+          onPress={() => navigation.navigate('Registration', { role: 'self_employed_driver' })}
+          styles={styles}
+          subtitle="Принимать заказы"
+          theme={theme}
+          title="Водитель"
+        />
+
+        <View style={styles.controlRow}>
           <Pressable
             accessibilityRole="button"
-            key={value}
-            onPress={() => setVariant(value)}
-            style={[abStyles.seg, variant === value && abStyles.segActive]}
+            onPress={() => navigation.navigate('Dashboard', { firstName: 'Гость', role: 'client' })}
+            style={({ pressed }) => [styles.guestButton, pressed && styles.pressed]}
           >
-            <Text style={[abStyles.segText, variant === value && abStyles.segTextActive]}>
-              {value === 'claude' ? 'Claude' : 'Codex'}
-            </Text>
+            <User color={theme.text} size={18} strokeWidth={2.3} />
+            <Text style={styles.guestText}>Продолжить как Гость</Text>
           </Pressable>
-        ))}
-      </View>
 
-      {variant === 'codex' ? (
-        <WelcomeScreenVariant navigation={navigation} route={route} />
-      ) : (
-        <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
-          <View style={styles.headerCard}>
-            <Text style={styles.logo}>Kinetix</Text>
-            <Pressable
-              accessibilityLabel="Скрытый вход администратора"
-              accessibilityRole="button"
-              onLongPress={() => navigation.navigate('AdminPanel')}
-              style={({ pressed }) => [styles.emblemButton, pressed && styles.pressed]}
-            >
-              <BashkortostanEmblem size={48} />
-            </Pressable>
-          </View>
-
-          <RoleCard
-            badge="Онлайн"
-            dark={false}
-            features={passengerFeatures}
-            onPress={() => navigation.navigate('Registration', { role: 'client' })}
-            styles={styles}
-            subtitle="Заказать поездку"
-            theme={theme}
-            title="Пассажир"
-          />
-
-          <RoleCard
-            badge="На линии"
-            dark
-            features={driverFeatures}
-            onPress={() => navigation.navigate('Registration', { role: 'self_employed_driver' })}
-            styles={styles}
-            subtitle="Принимать заказы"
-            theme={theme}
-            title="Водитель"
-          />
-
-          <View style={styles.controlRow}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('Dashboard', { firstName: 'Гость', role: 'client' })}
-              style={({ pressed }) => [styles.guestButton, pressed && styles.pressed]}
-            >
-              <User color={theme.text} size={18} strokeWidth={2.3} />
-              <Text style={styles.guestText}>Продолжить как Гость</Text>
-            </Pressable>
-
-            <View style={styles.langChip}>
-              <Globe color={theme.text} size={15} strokeWidth={2.3} />
-              <Text style={styles.langText}>RU</Text>
-            </View>
-
-            <Pressable
-              accessibilityLabel={themeName === 'light' ? 'Тёмная тема' : 'Светлая тема'}
-              accessibilityRole="button"
-              onPress={() => setThemeName((current) => (current === 'light' ? 'dark' : 'light'))}
-              style={({ pressed }) => [styles.themeButton, pressed && styles.pressed]}
-            >
-              <ThemeIcon color={theme.text} size={20} strokeWidth={2.3} />
-            </Pressable>
+          <View style={styles.langChip}>
+            <Globe color={theme.text} size={15} strokeWidth={2.3} />
+            <Text style={styles.langText}>RU</Text>
           </View>
 
           <Pressable
+            accessibilityLabel={themeName === 'light' ? 'Тёмная тема' : 'Светлая тема'}
             accessibilityRole="button"
-            onPress={() => navigation.navigate('Login')}
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+            onPress={() => setThemeName((current) => (current === 'light' ? 'dark' : 'light'))}
+            style={({ pressed }) => [styles.themeButton, pressed && styles.pressed]}
           >
-            <View style={styles.primaryIcon}>
-              <ShieldCheck color={theme.onBrand} size={20} strokeWidth={2.3} />
-            </View>
-            <View style={styles.primaryCopy}>
-              <Text style={styles.primaryTitle}>Войти / Регистрация</Text>
-              <Text style={styles.primarySub}>Безопасный доступ к сервису</Text>
-            </View>
-            <ChevronRight color={theme.onBrand} size={22} strokeWidth={2.5} />
+            <ThemeIcon color={theme.text} size={20} strokeWidth={2.3} />
           </Pressable>
+        </View>
 
-          <View style={styles.bottomBar}>
-            {navItems.map((item) => {
-              const ItemIcon = item.Icon;
-
-              return (
-                <Pressable
-                  accessibilityLabel={item.label}
-                  accessibilityRole="button"
-                  key={item.label}
-                  onPress={item.onPress}
-                  style={({ pressed }) => [
-                    styles.navItem,
-                    item.active && styles.navItemActive,
-                    pressed && !item.active && styles.pressed,
-                  ]}
-                >
-                  <ItemIcon color={item.active ? theme.brand : theme.muted} size={20} strokeWidth={2.3} />
-                  <Text style={[styles.navLabel, item.active && styles.navLabelActive]}>{item.label}</Text>
-                </Pressable>
-              );
-            })}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('Login')}
+          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+        >
+          <View style={styles.primaryIcon}>
+            <ShieldCheck color={theme.onBrand} size={20} strokeWidth={2.3} />
           </View>
-        </ScrollView>
-      )}
+          <View style={styles.primaryCopy}>
+            <Text style={styles.primaryTitle}>Войти / Регистрация</Text>
+            <Text style={styles.primarySub}>Безопасный доступ к сервису</Text>
+          </View>
+          <ChevronRight color={theme.onBrand} size={22} strokeWidth={2.5} />
+        </Pressable>
+
+        <View style={styles.bottomBar}>
+          {navItems.map((item) => {
+            const ItemIcon = item.Icon;
+
+            return (
+              <Pressable
+                accessibilityLabel={item.label}
+                accessibilityRole="button"
+                key={item.label}
+                onPress={item.onPress}
+                style={({ pressed }) => [
+                  styles.navItem,
+                  item.active && styles.navItemActive,
+                  pressed && !item.active && styles.pressed,
+                ]}
+              >
+                <ItemIcon color={item.active ? theme.brand : theme.muted} size={20} strokeWidth={2.3} />
+                <Text style={[styles.navLabel, item.active && styles.navLabelActive]}>{item.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -324,37 +303,6 @@ function CarArt({ dark, theme }: { dark: boolean; theme: Theme }) {
     </Svg>
   );
 }
-
-const abStyles = StyleSheet.create({
-  bar: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(18, 56, 44, 0.06)',
-    borderRadius: 12,
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 8,
-    padding: 4,
-  },
-  seg: {
-    alignItems: 'center',
-    borderRadius: 9,
-    justifyContent: 'center',
-    minWidth: 96,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  segActive: {
-    backgroundColor: '#008D49',
-  },
-  segText: {
-    color: '#12382C',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  segTextActive: {
-    color: '#FFFFFF',
-  },
-});
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
