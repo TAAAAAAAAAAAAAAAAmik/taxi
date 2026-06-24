@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ComponentType } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   BadgePercent,
@@ -8,23 +8,20 @@ import {
   ChevronRight,
   Clock,
   Globe,
-  Home,
   type LucideProps,
   MapPin,
-  MessageCircle,
   Moon,
   Navigation,
-  Route as RouteIcon,
-  Settings,
   ShieldCheck,
   Sun,
   User,
 } from 'lucide-react-native';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 
 import { BashkortostanEmblem } from '../components/BashkortostanEmblem';
 import { AccountRole, normalizeAccountRole } from '../data/registration';
+import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
 import { RootStackParamList } from '../navigation/types';
 import { useAppState } from '../state/AppState';
 import { isDemoModeEnabled } from '../utils/runtimeFlags';
@@ -36,27 +33,31 @@ type IconType = ComponentType<LucideProps>;
 type Feature = { Icon: IconType; label: string; sub: string };
 
 const themes = {
+  dark: {
+    bg: '#0A1411',
+    border: 'rgba(140, 230, 185, 0.12)',
+    brand: '#00A65A',
+    brandSoft: 'rgba(0, 166, 90, 0.16)',
+    accent: '#5CE6A0',
+    amber: '#F4C95B',
+    muted: '#88A597',
+    onBrand: '#FFFFFF',
+    surface: '#11201A',
+    surfaceAlt: '#17291F',
+    text: '#ECF6EF',
+  },
   light: {
-    bg: '#F6F8F5',
-    border: 'rgba(18, 56, 44, 0.10)',
+    bg: '#F4F8F5',
+    border: 'rgba(10, 50, 36, 0.10)',
     brand: '#008D49',
     brandSoft: 'rgba(0, 141, 73, 0.10)',
-    muted: '#58776A',
+    accent: '#0EA45C',
+    amber: '#C98A12',
+    muted: '#577468',
     onBrand: '#FFFFFF',
     surface: '#FFFFFF',
-    surfaceAlt: '#EAF1ED',
-    text: '#12382C',
-  },
-  dark: {
-    bg: '#0E1A15',
-    border: 'rgba(255, 255, 255, 0.08)',
-    brand: '#1FA85B',
-    brandSoft: 'rgba(31, 168, 91, 0.16)',
-    muted: '#9DB5AA',
-    onBrand: '#FFFFFF',
-    surface: '#16241E',
-    surfaceAlt: '#1E3128',
-    text: '#EAF3EE',
+    surfaceAlt: '#E9F1EC',
+    text: '#0C2A20',
   },
 } as const;
 
@@ -75,14 +76,16 @@ const demoAccounts: DemoAccount[] = [
   { Icon: Car, identifier: 'demo-driver@example.test', label: 'Водитель', password: 'Kinetix123', role: 'self_employed_driver' },
 ];
 
+const skyline = [22, 38, 30, 54, 26, 46, 34, 60, 28, 42, 24, 50, 32];
+
 export function WelcomeScreen({ navigation }: Props) {
   const { loginAccount } = useAppState();
-  const [themeName, setThemeName] = useState<ThemeName>('light');
+  const [themeName, setThemeName] = useState<ThemeName>('dark');
   const [demoBusy, setDemoBusy] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
   const theme = themes[themeName];
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const ThemeIcon = themeName === 'light' ? Moon : Sun;
+  const ThemeIcon = themeName === 'dark' ? Sun : Moon;
   const showDemo = isDemoModeEnabled();
 
   const handleDemoLogin = async (account: DemoAccount) => {
@@ -114,28 +117,15 @@ export function WelcomeScreen({ navigation }: Props) {
     { Icon: MapPin, label: 'Больше заказов', sub: 'Рядом с вами' },
     { Icon: ShieldCheck, label: 'Удобно', sub: 'Простой интерфейс' },
   ];
-  const navItems = [
-    { Icon: Home, active: true, label: 'Главная', onPress: undefined },
-    { Icon: RouteIcon, active: false, label: 'Поездки', onPress: () => navigation.navigate('Registration') },
-    { Icon: MessageCircle, active: false, label: 'Сообщения', onPress: () => navigation.navigate('Registration') },
-    { Icon: Settings, active: false, label: 'Настройки', onPress: () => navigation.navigate('Registration') },
-    { Icon: User, active: false, label: 'Профиль', onPress: () => navigation.navigate('Registration') },
-  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerCard}>
-          <Text style={styles.logo}>Kinetix</Text>
-          <Pressable
-            accessibilityLabel="Скрытый вход администратора"
-            accessibilityRole="button"
-            onLongPress={() => navigation.navigate('AdminPanel')}
-            style={({ pressed }) => [styles.emblemButton, pressed && styles.pressed]}
-          >
-            <BashkortostanEmblem size={48} />
-          </Pressable>
-        </View>
+        <NightHero
+          onAdmin={() => navigation.navigate('AdminPanel')}
+          styles={styles}
+          theme={theme}
+        />
 
         <RoleCard
           badge="Онлайн"
@@ -159,35 +149,10 @@ export function WelcomeScreen({ navigation }: Props) {
           title="Водитель"
         />
 
-        <View style={styles.controlRow}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.navigate('Dashboard', { firstName: 'Гость', role: 'client' })}
-            style={({ pressed }) => [styles.guestButton, pressed && styles.pressed]}
-          >
-            <User color={theme.text} size={18} strokeWidth={2.3} />
-            <Text style={styles.guestText}>Продолжить как Гость</Text>
-          </Pressable>
-
-          <View style={styles.langChip}>
-            <Globe color={theme.text} size={15} strokeWidth={2.3} />
-            <Text style={styles.langText}>RU</Text>
-          </View>
-
-          <Pressable
-            accessibilityLabel={themeName === 'light' ? 'Тёмная тема' : 'Светлая тема'}
-            accessibilityRole="button"
-            onPress={() => setThemeName((current) => (current === 'light' ? 'dark' : 'light'))}
-            style={({ pressed }) => [styles.themeButton, pressed && styles.pressed]}
-          >
-            <ThemeIcon color={theme.text} size={20} strokeWidth={2.3} />
-          </Pressable>
-        </View>
-
         {showDemo ? (
           <View style={styles.demoCard}>
             <Text style={styles.demoTitle}>Демо-вход</Text>
-            <Text style={styles.demoSub}>Без backend, данные хранятся только в браузере.</Text>
+            <Text style={styles.demoSub}>Без сервера — данные хранятся только в браузере.</Text>
             <View style={styles.demoGrid}>
               {demoAccounts.map((account) => {
                 const DemoIcon = account.Icon;
@@ -204,7 +169,7 @@ export function WelcomeScreen({ navigation }: Props) {
                       pressed && styles.pressed,
                     ]}
                   >
-                    <DemoIcon color={theme.brand} size={18} strokeWidth={2.4} />
+                    <DemoIcon color={theme.accent} size={18} strokeWidth={2.4} />
                     <Text style={styles.demoButtonText}>{account.label}</Text>
                   </Pressable>
                 );
@@ -220,39 +185,131 @@ export function WelcomeScreen({ navigation }: Props) {
           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
         >
           <View style={styles.primaryIcon}>
-            <ShieldCheck color={theme.onBrand} size={20} strokeWidth={2.3} />
+            <ShieldCheck color={theme.bg} size={20} strokeWidth={2.5} />
           </View>
           <View style={styles.primaryCopy}>
             <Text style={styles.primaryTitle}>Регистрация</Text>
             <Text style={styles.primarySub}>Создайте аккаунт за минуту</Text>
           </View>
-          <ChevronRight color={theme.onBrand} size={22} strokeWidth={2.5} />
+          <ChevronRight color={theme.bg} size={22} strokeWidth={2.6} />
         </Pressable>
 
-        <View style={styles.bottomBar}>
-          {navItems.map((item) => {
-            const ItemIcon = item.Icon;
+        <View style={styles.controlRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('Dashboard', { firstName: 'Гость', role: 'client' })}
+            style={({ pressed }) => [styles.guestButton, pressed && styles.pressed]}
+          >
+            <User color={theme.text} size={18} strokeWidth={2.3} />
+            <Text style={styles.guestText}>Продолжить как Гость</Text>
+          </Pressable>
 
-            return (
-              <Pressable
-                accessibilityLabel={item.label}
-                accessibilityRole="button"
-                key={item.label}
-                onPress={item.onPress}
-                style={({ pressed }) => [
-                  styles.navItem,
-                  item.active && styles.navItemActive,
-                  pressed && !item.active && styles.pressed,
-                ]}
-              >
-                <ItemIcon color={item.active ? theme.brand : theme.muted} size={20} strokeWidth={2.3} />
-                <Text style={[styles.navLabel, item.active && styles.navLabelActive]}>{item.label}</Text>
-              </Pressable>
-            );
-          })}
+          <View style={styles.langChip}>
+            <Globe color={theme.text} size={15} strokeWidth={2.3} />
+            <Text style={styles.langText}>RU</Text>
+          </View>
+
+          <Pressable
+            accessibilityLabel={themeName === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+            accessibilityRole="button"
+            onPress={() => setThemeName((current) => (current === 'dark' ? 'light' : 'dark'))}
+            style={({ pressed }) => [styles.themeButton, pressed && styles.pressed]}
+          >
+            <ThemeIcon color={theme.text} size={20} strokeWidth={2.3} />
+          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+type NightHeroProps = {
+  onAdmin: () => void;
+  styles: ReturnType<typeof createStyles>;
+  theme: Theme;
+};
+
+function NightHero({ onAdmin, styles, theme }: NightHeroProps) {
+  const { width } = useWindowDimensions();
+  const reducedMotion = useReducedMotionPreference();
+  const heroWidth = Math.max(280, Math.min(640, width) - 32);
+  const drive = useRef(new Animated.Value(reducedMotion ? 0.5 : 0)).current;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      drive.setValue(0.5);
+      return;
+    }
+
+    drive.setValue(0);
+    const animation = Animated.loop(
+      Animated.timing(drive, {
+        toValue: 1,
+        duration: 5600,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: false,
+      }),
+    );
+
+    animation.start();
+
+    return () => animation.stop();
+  }, [drive, reducedMotion]);
+
+  const carTranslate = drive.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-72, heroWidth - 60],
+  });
+
+  return (
+    <View style={styles.hero}>
+      <View style={styles.heroSky}>
+        {skyline.map((height, index) => (
+          <View
+            key={index}
+            style={[
+              styles.heroBuilding,
+              { backgroundColor: alpha(theme.accent, index % 2 === 0 ? 0.1 : 0.16), height: height * 1.4 },
+            ]}
+          />
+        ))}
+      </View>
+
+      <View style={[styles.heroStar, { left: '18%', top: 26 }]} />
+      <View style={[styles.heroStar, { left: '52%', top: 18 }]} />
+      <View style={[styles.heroStar, { left: '74%', top: 40 }]} />
+      <View style={[styles.heroStar, { left: '88%', top: 22 }]} />
+
+      <View style={styles.heroRoad} />
+      <View style={styles.heroRoadLine} />
+
+      <Animated.View style={[styles.heroCar, { transform: [{ translateX: carTranslate }] }]}>
+        <View style={styles.heroBeam} />
+        <CarArt dark theme={theme} />
+      </Animated.View>
+
+      <View style={styles.heroOverlay}>
+        <View style={styles.heroTopRow}>
+          <Text style={styles.heroEyebrow}>KINETIX · САЛАВАТ</Text>
+          <Pressable
+            accessibilityLabel="Скрытый вход администратора"
+            accessibilityRole="button"
+            onLongPress={onAdmin}
+            style={({ pressed }) => [styles.heroEmblem, pressed && styles.pressed]}
+          >
+            <BashkortostanEmblem size={34} />
+          </Pressable>
+        </View>
+
+        <View style={styles.heroBottom}>
+          <Text style={styles.heroTitle}>Ночной город{'\n'}едет к вам</Text>
+          <View style={styles.heroLive}>
+            <View style={styles.heroLiveDot} />
+            <Text style={styles.heroLiveText}>12 на линии</Text>
+          </View>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -271,8 +328,8 @@ function RoleCard({ badge, dark, features, onPress, styles, subtitle, theme, tit
   const onText = dark ? theme.onBrand : theme.text;
   const subText = dark ? alpha(theme.onBrand, 0.78) : theme.muted;
   const chipBg = dark ? alpha(theme.onBrand, 0.16) : theme.surfaceAlt;
-  const iconColor = dark ? theme.onBrand : theme.brand;
-  const routeColor = theme.brand;
+  const iconColor = dark ? theme.onBrand : theme.accent;
+  const routeColor = dark ? theme.onBrand : theme.accent;
 
   return (
     <Pressable
@@ -305,14 +362,14 @@ function RoleCard({ badge, dark, features, onPress, styles, subtitle, theme, tit
         </View>
 
         <View style={[styles.roleArrow, dark && styles.roleArrowDark]}>
-          <ArrowRight color={dark ? theme.brand : theme.onBrand} size={22} strokeWidth={2.6} />
+          <ArrowRight color={dark ? theme.brand : theme.bg} size={22} strokeWidth={2.6} />
         </View>
       </View>
 
       <View style={styles.roleScene}>
-        <View style={[styles.skyA, { backgroundColor: alpha(routeColor, 0.1) }]} />
-        <View style={[styles.skyB, { backgroundColor: alpha(routeColor, 0.14) }]} />
-        <View style={[styles.skyC, { backgroundColor: alpha(routeColor, 0.08) }]} />
+        <View style={[styles.skyA, { backgroundColor: alpha(routeColor, 0.12) }]} />
+        <View style={[styles.skyB, { backgroundColor: alpha(routeColor, 0.18) }]} />
+        <View style={[styles.skyC, { backgroundColor: alpha(routeColor, 0.1) }]} />
         <View style={[styles.sceneRoute, { backgroundColor: alpha(routeColor, 0.5) }]} />
         <View style={[styles.scenePin, { backgroundColor: chipBg }]}>
           {dark ? (
@@ -325,7 +382,7 @@ function RoleCard({ badge, dark, features, onPress, styles, subtitle, theme, tit
           <CarArt dark={dark} theme={theme} />
         </View>
         <View style={[styles.statusBadge, { backgroundColor: chipBg }]}>
-          <View style={[styles.statusDot, { backgroundColor: theme.brand }]} />
+          <View style={[styles.statusDot, { backgroundColor: dark ? theme.onBrand : theme.brand }]} />
           <Text style={[styles.statusText, { color: onText }]}>{badge}</Text>
         </View>
       </View>
@@ -341,7 +398,7 @@ function CarArt({ dark, theme }: { dark: boolean; theme: Theme }) {
   const tire = dark ? '#08160F' : '#262F2A';
   const rim = dark ? alpha(theme.onBrand, 0.85) : '#C9D2CE';
   const accent = theme.brand;
-  const head = dark ? '#EAF3EE' : '#FBE6A6';
+  const head = dark ? '#FBE6A6' : '#FBE6A6';
   const tail = '#E24B4A';
   const shadow = dark ? 'rgba(0,0,0,0.32)' : 'rgba(18,56,44,0.16)';
 
@@ -372,18 +429,6 @@ function CarArt({ dark, theme }: { dark: boolean; theme: Theme }) {
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
-    bottomBar: {
-      alignItems: 'center',
-      backgroundColor: theme.surface,
-      borderColor: theme.border,
-      borderRadius: 18,
-      borderWidth: 1,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: 2,
-      paddingHorizontal: 6,
-      paddingVertical: 6,
-    },
     controlRow: {
       alignItems: 'center',
       flexDirection: 'row',
@@ -407,7 +452,7 @@ function createStyles(theme: Theme) {
       opacity: 0.55,
     },
     demoButtonText: {
-      color: theme.brand,
+      color: theme.accent,
       fontSize: 14,
       fontWeight: '900',
     },
@@ -420,7 +465,7 @@ function createStyles(theme: Theme) {
       padding: 16,
     },
     demoError: {
-      color: '#C17A70',
+      color: '#E4847A',
       fontSize: 12,
       fontWeight: '800',
     },
@@ -438,16 +483,6 @@ function createStyles(theme: Theme) {
       color: theme.text,
       fontSize: 16,
       fontWeight: '900',
-    },
-    emblemButton: {
-      alignItems: 'center',
-      backgroundColor: theme.surfaceAlt,
-      borderColor: theme.border,
-      borderRadius: 14,
-      borderWidth: 1,
-      height: 52,
-      justifyContent: 'center',
-      width: 52,
     },
     featureCopy: {
       flex: 1,
@@ -495,11 +530,128 @@ function createStyles(theme: Theme) {
       fontSize: 14,
       fontWeight: '800',
     },
-    headerCard: {
+    hero: {
+      backgroundColor: '#06100C',
+      borderColor: theme.border,
+      borderRadius: 24,
+      borderWidth: 1,
+      height: 244,
+      overflow: 'hidden',
+    },
+    heroBeam: {
+      backgroundColor: alpha(theme.amber, 0.5),
+      borderRadius: 999,
+      bottom: 30,
+      height: 10,
+      position: 'absolute',
+      right: -16,
+      width: 40,
+    },
+    heroBottom: {
+      alignItems: 'flex-end',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    heroBuilding: {
+      borderTopLeftRadius: 3,
+      borderTopRightRadius: 3,
+      width: 16,
+    },
+    heroCar: {
+      bottom: 24,
+      left: 0,
+      position: 'absolute',
+    },
+    heroEmblem: {
+      alignItems: 'center',
+      backgroundColor: alpha('#FFFFFF', 0.08),
+      borderColor: alpha('#FFFFFF', 0.16),
+      borderRadius: 12,
+      borderWidth: 1,
+      height: 42,
+      justifyContent: 'center',
+      width: 42,
+    },
+    heroEyebrow: {
+      color: theme.accent,
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 2.5,
+    },
+    heroLive: {
+      alignItems: 'center',
+      backgroundColor: alpha('#FFFFFF', 0.1),
+      borderRadius: 999,
+      flexDirection: 'row',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    heroLiveDot: {
+      backgroundColor: theme.amber,
+      borderRadius: 999,
+      height: 7,
+      width: 7,
+    },
+    heroLiveText: {
+      color: '#EAF6EF',
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    heroOverlay: {
+      bottom: 0,
+      justifyContent: 'space-between',
+      left: 0,
+      padding: 18,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+    },
+    heroRoad: {
+      backgroundColor: '#0C1A14',
+      bottom: 0,
+      height: 40,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+    },
+    heroRoadLine: {
+      backgroundColor: alpha(theme.amber, 0.5),
+      borderRadius: 2,
+      bottom: 19,
+      height: 2,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+    },
+    heroSky: {
+      alignItems: 'flex-end',
+      bottom: 40,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      left: 0,
+      paddingHorizontal: 14,
+      position: 'absolute',
+      right: 0,
+    },
+    heroStar: {
+      backgroundColor: alpha('#FFFFFF', 0.55),
+      borderRadius: 999,
+      height: 3,
+      position: 'absolute',
+      width: 3,
+    },
+    heroTitle: {
+      color: '#F3FBF6',
+      fontSize: 27,
+      fontWeight: '900',
+      letterSpacing: -0.4,
+      lineHeight: 30,
+    },
+    heroTopRow: {
       alignItems: 'center',
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingHorizontal: 4,
     },
     langChip: {
       alignItems: 'center',
@@ -517,38 +669,13 @@ function createStyles(theme: Theme) {
       fontSize: 13,
       fontWeight: '900',
     },
-    logo: {
-      color: theme.text,
-      fontSize: 28,
-      fontWeight: '900',
-    },
-    navItem: {
-      alignItems: 'center',
-      borderRadius: 14,
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-      minHeight: 52,
-      paddingHorizontal: 2,
-    },
-    navItemActive: {
-      backgroundColor: theme.brandSoft,
-    },
-    navLabel: {
-      color: theme.muted,
-      fontSize: 10,
-      fontWeight: '700',
-    },
-    navLabelActive: {
-      color: theme.brand,
-    },
     page: {
       backgroundColor: theme.bg,
       flexGrow: 1,
       gap: 14,
-      paddingBottom: 18,
+      paddingBottom: 22,
       paddingHorizontal: 16,
-      paddingTop: 12,
+      paddingTop: 14,
     },
     pressed: {
       opacity: 0.92,
@@ -556,7 +683,7 @@ function createStyles(theme: Theme) {
     },
     primaryButton: {
       alignItems: 'center',
-      backgroundColor: theme.brand,
+      backgroundColor: theme.accent,
       borderRadius: 18,
       flexDirection: 'row',
       gap: 12,
@@ -569,26 +696,26 @@ function createStyles(theme: Theme) {
     },
     primaryIcon: {
       alignItems: 'center',
-      backgroundColor: alpha('#FFFFFF', 0.18),
+      backgroundColor: alpha('#06100C', 0.16),
       borderRadius: 12,
       height: 40,
       justifyContent: 'center',
       width: 40,
     },
     primarySub: {
-      color: alpha('#FFFFFF', 0.82),
+      color: alpha('#06100C', 0.7),
       fontSize: 12,
-      fontWeight: '600',
+      fontWeight: '700',
       marginTop: 2,
     },
     primaryTitle: {
-      color: theme.onBrand,
+      color: '#06100C',
       fontSize: 17,
       fontWeight: '900',
     },
     roleArrow: {
       alignItems: 'center',
-      backgroundColor: theme.brand,
+      backgroundColor: theme.accent,
       borderRadius: 26,
       height: 52,
       justifyContent: 'center',
