@@ -442,6 +442,16 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     width: kinetixTouchTargets.icon,
   },
+  clientHeaderMenuButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 141, 73, 0.12)',
+    borderColor: 'rgba(0, 141, 73, 0.24)',
+    borderRadius: kinetixRadii.mapPin,
+    borderWidth: 1,
+    height: kinetixTouchTargets.icon,
+    justifyContent: 'center',
+    width: kinetixTouchTargets.icon,
+  },
   clientHeaderLeft: {
     alignItems: 'center',
     flex: 1,

@@ -493,9 +493,9 @@ function ClientTopBar({
           accessibilityLabel="Открыть меню"
           accessibilityRole="button"
           onPress={onOpenMenu}
-          style={({ pressed }) => [styles.clientHeaderIconButton, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.clientHeaderMenuButton, pressed && styles.pressed]}
         >
-          <MenuIcon color={kinetixColors.textSecondary} size={24} strokeWidth={2.4} />
+          <MenuIcon color="#008D49" size={24} strokeWidth={2.6} />
         </Pressable>
         <View style={styles.clientHeaderAvatar}>
           <Text style={styles.clientHeaderAvatarText}>{initials}</Text>
