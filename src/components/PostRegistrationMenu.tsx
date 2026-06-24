@@ -243,8 +243,8 @@ export function PostRegistrationMenu({
     pageTransition.setValue(0);
     const animation = Animated.timing(pageTransition, {
       toValue: 1,
-      duration: reducedMotion ? 120 : 300,
-      easing: Easing.out(Easing.cubic),
+      duration: reducedMotion ? 160 : 460,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
       useNativeDriver: false,
     });
 
@@ -1578,8 +1578,8 @@ function SideDrawer({
 
     const animation = Animated.timing(progress, {
       toValue: open ? 1 : 0,
-      duration: reducedMotion ? 140 : 320,
-      easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      duration: reducedMotion ? 160 : open ? 460 : 340,
+      easing: open ? Easing.bezier(0.22, 1, 0.36, 1) : Easing.bezier(0.4, 0, 0.7, 1),
       useNativeDriver: false,
     });
 
