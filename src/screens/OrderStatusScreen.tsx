@@ -406,10 +406,10 @@ export function OrderStatusScreen({ navigation, route }: Props) {
           <View style={styles.liveCopy}>
             <Text style={styles.liveTitle}>
               {realtimeStatus === 'live'
-                ? 'Статус приходит с сервера'
+                ? 'Статус с сервера'
                 : realtimeStatus === 'polling'
-                  ? 'Статус сверяется каждые 5 секунд'
-                  : 'Подключаем серверный статус'}
+                  ? 'Сверяем каждые 5 сек'
+                  : 'Подключаем сервер'}
             </Text>
             <Text numberOfLines={2} style={styles.liveText}>
               {notifications.find((item) => item.orderId === order.id)?.title || realtimeMessage}
@@ -551,8 +551,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                   <Car color="#F4FAF6" size={28} strokeWidth={2.6} />
                 </View>
                 <View style={styles.goodRoadCopy}>
-                  <Text style={styles.goodRoadTitle}>Спасибо, что вы с Такси Салават</Text>
-                  <Text numberOfLines={2} style={styles.goodRoadText}>Добрая дорога завершена. Поездку можно повторить или сохранить водителя.</Text>
+                  <Text style={styles.goodRoadTitle}>Спасибо, что выбрали Kinetix</Text>
+                  <Text numberOfLines={2} style={styles.goodRoadText}>Повторите поездку или сохраните водителя.</Text>
                 </View>
                 <View style={styles.sparkRow}>
                   <View style={styles.spark} />
@@ -583,9 +583,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
             {isCompleted && role === 'client' ? (
               <View style={styles.reviewPanel}>
                 <SectionHeader title="Слепок поездки" />
-                <Text numberOfLines={3} style={styles.reviewIntro}>
-                  Не просто звезды: сохраните, чем именно водитель был хорош. Потом в истории можно
-                  добавить его в приоритет.
+                <Text numberOfLines={2} style={styles.reviewIntro}>
+                  Отметьте, чем водитель был хорош — добавите его в приоритет.
                 </Text>
 
                 {existingReview ? (
@@ -901,7 +900,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                         displayedOrder.paidAt ? `: ${new Date(displayedOrder.paidAt).toLocaleString('ru-RU')}` : ''
                       }.`
                     : paymentStatus === 'authorized'
-                    ? 'Средства авторизованы. После завершения поездки оплата закроется автоматически.'
+                    ? 'Средства авторизованы. Оплата закроется после поездки.'
                     : 'Оплата ожидает подтверждения.'}
                 </Text>
                 {paymentEvent?.note ? <Text style={styles.paymentStatusText}>{paymentEvent.note}</Text> : null}
