@@ -395,6 +395,44 @@ export const styles = StyleSheet.create({
   clientFocusPage: {
     gap: 14,
   },
+  activeOrderCard: {
+    alignItems: 'center',
+    backgroundColor: '#5CE6A0',
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 64,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  activeOrderIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 20, 13, 0.12)',
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  activeOrderCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  activeOrderLabel: {
+    color: 'rgba(6, 20, 13, 0.72)',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  activeOrderRoute: {
+    color: '#06140D',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  activeOrderArrow: {
+    color: '#06140D',
+    fontSize: 22,
+    fontWeight: '900',
+  },
   clientHeaderActions: {
     alignItems: 'center',
     flexDirection: 'row',

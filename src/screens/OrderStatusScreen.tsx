@@ -518,7 +518,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${progress}%` }]} />
               </View>
-              <Text style={styles.progressText}>Прогресс заказа: {progress}%</Text>
+              <Text style={styles.progressText}>{isCompleted ? config.completedTitle : activeStep.title}</Text>
 
               <View style={styles.actionRow}>
                 {isDriverRole ? (

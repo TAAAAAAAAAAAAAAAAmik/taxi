@@ -85,6 +85,7 @@ type PostRegistrationMenuProps = {
   onOpenOrderFlow: () => void;
   onOpenDriverDocuments: () => void;
   onOpenFleetDriverRegistration?: () => void;
+  onOpenActiveOrder?: () => void;
   onOpenOrderHistory: () => void;
   onOpenReferral: () => void;
   onOpenSavedPlace: () => void;
@@ -179,6 +180,7 @@ export function PostRegistrationMenu({
   onLogout,
   onToggleDriverLine,
   onToggleSimpleMode,
+  onOpenActiveOrder,
   onOpenOrderHistory,
   onOpenDriverDocuments,
   onOpenFleetDriverRegistration,
@@ -410,6 +412,7 @@ export function PostRegistrationMenu({
                 availableCarsCount={availableCarsCount}
                 displayName={displayName}
                 onDeleteAccount={onDeleteAccount}
+                onOpenActiveOrder={onOpenActiveOrder}
                 onOpenDelivery={onOpenDelivery}
                 onOpenOrderFlow={onOpenOrderFlow}
                 onOpenOrderHistory={onOpenOrderHistory}
@@ -540,6 +543,7 @@ type ClientPageViewProps = {
   orderSummary?: ClientOrderSummary;
   savedHomeAddressLabel?: string;
   onDeleteAccount: () => void;
+  onOpenActiveOrder?: () => void;
   onOpenDelivery: () => void;
   onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
@@ -552,6 +556,7 @@ function ClientPageView({
   availableCarsCount,
   displayName,
   onDeleteAccount,
+  onOpenActiveOrder,
   onOpenDelivery,
   onOpenOrderFlow,
   onOpenOrderHistory,
@@ -563,6 +568,7 @@ function ClientPageView({
   if (activeItemId === 'rides') {
     return (
       <ClientOrdersPage
+        onOpenActiveOrder={onOpenActiveOrder}
         onOpenOrderHistory={onOpenOrderHistory}
         orderSummary={orderSummary}
       />
@@ -590,6 +596,7 @@ function ClientPageView({
     <ClientHomePage
       availableCarsCount={availableCarsCount}
       displayName={displayName}
+      onOpenActiveOrder={onOpenActiveOrder}
       onOpenDelivery={onOpenDelivery}
       onOpenOrderFlow={onOpenOrderFlow}
       orderSummary={orderSummary}
@@ -600,6 +607,7 @@ function ClientPageView({
 function ClientHomePage({
   availableCarsCount,
   displayName,
+  onOpenActiveOrder,
   onOpenDelivery,
   onOpenOrderFlow,
   orderSummary,
@@ -607,11 +615,34 @@ function ClientHomePage({
   availableCarsCount: number;
   displayName: string;
   orderSummary?: ClientOrderSummary;
+  onOpenActiveOrder?: () => void;
   onOpenDelivery: () => void;
   onOpenOrderFlow: () => void;
 }) {
   return (
     <View style={styles.clientFocusPage}>
+      {onOpenActiveOrder && orderSummary?.activeOrder ? (
+        <Pressable
+          accessibilityLabel="Открыть текущий заказ"
+          accessibilityRole="button"
+          onPress={onOpenActiveOrder}
+          style={({ pressed }) => [styles.activeOrderCard, pressed && styles.pressed]}
+        >
+          <View style={styles.activeOrderIcon}>
+            <Route color="#06140D" size={20} strokeWidth={2.6} />
+          </View>
+          <View style={styles.activeOrderCopy}>
+            <Text numberOfLines={1} style={styles.activeOrderLabel}>
+              Текущий заказ · {orderSummary.activeOrder.statusLabel}
+            </Text>
+            <Text numberOfLines={1} style={styles.activeOrderRoute}>
+              {orderSummary.activeOrder.routeTitle ?? orderSummary.activeOrder.routeLabel}
+            </Text>
+          </View>
+          <Text style={styles.activeOrderArrow}>→</Text>
+        </Pressable>
+      ) : null}
+
       <View style={styles.clientWelcomePanel}>
         <Text style={styles.clientWelcomeTitle}>Здравствуйте, {displayName}!</Text>
         <Text numberOfLines={2} style={styles.clientWelcomeText}>
@@ -661,10 +692,12 @@ function ClientHomePage({
 }
 
 function ClientOrdersPage({
+  onOpenActiveOrder,
   onOpenOrderHistory,
   orderSummary,
 }: {
   orderSummary?: ClientOrderSummary;
+  onOpenActiveOrder?: () => void;
   onOpenOrderHistory: () => void;
 }) {
   const [statsOpen, setStatsOpen] = useState(false);
@@ -725,6 +758,28 @@ function ClientOrdersPage({
         <Text style={styles.clientSectionTitle}>Мои поездки</Text>
         <Text numberOfLines={1} style={styles.clientSectionText}>Активные и завершённые маршруты.</Text>
       </View>
+
+      {onOpenActiveOrder && summary.activeOrder ? (
+        <Pressable
+          accessibilityLabel="Открыть текущий заказ"
+          accessibilityRole="button"
+          onPress={onOpenActiveOrder}
+          style={({ pressed }) => [styles.activeOrderCard, pressed && styles.pressed]}
+        >
+          <View style={styles.activeOrderIcon}>
+            <Route color="#06140D" size={20} strokeWidth={2.6} />
+          </View>
+          <View style={styles.activeOrderCopy}>
+            <Text numberOfLines={1} style={styles.activeOrderLabel}>
+              Текущий заказ · {summary.activeOrder.statusLabel}
+            </Text>
+            <Text numberOfLines={1} style={styles.activeOrderRoute}>
+              {summary.activeOrder.routeTitle ?? summary.activeOrder.routeLabel}
+            </Text>
+          </View>
+          <Text style={styles.activeOrderArrow}>→</Text>
+        </Pressable>
+      ) : null}
 
       {tripItems.length ? (
         <View style={styles.clientTripsList}>

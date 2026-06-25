@@ -92,6 +92,20 @@ export function DashboardScreen({ navigation, route }: Props) {
     () => createClientOrderSummary(orders, role, currentUser?.id),
     [currentUser?.id, orders, role],
   );
+  const activeClientOrder = useMemo(() => {
+    if (role !== 'client') {
+      return undefined;
+    }
+
+    return orders
+      .filter(
+        (order) =>
+          order.role === 'client' &&
+          (!currentUser?.id || !order.userId || order.userId === currentUser.id) &&
+          !isFinalOrderStatus(order.status),
+      )
+      .sort((left, right) => Date.parse(right.createdAt || '') - Date.parse(left.createdAt || ''))[0];
+  }, [currentUser?.id, orders, role]);
 
   const handleAcceptDashboardOrder = async (orderId: string) => {
     if (!currentDriver) {
@@ -254,6 +268,11 @@ export function DashboardScreen({ navigation, route }: Props) {
             referralCode: fleetInviteCode,
             role: 'park_driver',
           })
+        }
+        onOpenActiveOrder={
+          activeClientOrder
+            ? () => navigation.navigate('OrderStatus', { firstName, order: activeClientOrder, role })
+            : undefined
         }
         onOpenOrderHistory={() => navigation.navigate('OrderHistory', { firstName, role })}
         onOpenReferral={() => navigation.navigate('Referral', { firstName, role })}
