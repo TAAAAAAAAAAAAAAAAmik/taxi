@@ -172,7 +172,6 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   }));
   const [selectedTariffId, setSelectedTariffId] = useState(config.tariffs[0].id);
   const [paymentMethod, setPaymentMethod] = useState(config.paymentMethods[0]);
-  const [safetyPinRequired, setSafetyPinRequired] = useState(true);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [serviceType, setServiceType] = useState<OrderServiceType>(initialServiceType ?? 'taxi');
   const [deliveryDetailsOpen, setDeliveryDetailsOpen] = useState(false);
@@ -671,7 +670,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       recipientPhone: isDeliveryOrder ? values.recipientPhone?.trim() || undefined : undefined,
       deliveryComment: isDeliveryOrder ? values.deliveryComment?.trim() || undefined : undefined,
       routeEstimate,
-      safetyPinRequired,
+      safetyPinRequired: false,
       scheduledAt: scheduledAt.trim() || undefined,
       stops: cleanExtraStops,
       tariff: selectedTariff.title,
@@ -1353,7 +1352,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                           </View>
                           <View style={styles.clientTariffConfidence}>
                             <Text style={styles.clientTariffConfidenceText}>Цена до заказа</Text>
-                            <Text style={styles.clientTariffConfidenceText}>PIN доступен</Text>
+                            <Text style={styles.clientTariffConfidenceText}>Статус онлайн</Text>
                             <Text style={styles.clientTariffConfidenceText}>{formatDistance(routeEstimate.distanceKm)}</Text>
                           </View>
                         </>
@@ -2115,36 +2114,6 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 ))}
               </View>
 
-              {!isDriverRole ? (
-                <View style={styles.paymentGroup}>
-                  <Text style={styles.groupLabel}>Безопасность</Text>
-                  <Pressable
-                    accessibilityRole="switch"
-                    accessibilityState={{ checked: safetyPinRequired }}
-                    onPress={() => setSafetyPinRequired((current) => !current)}
-                    style={({ pressed }) => [
-                      styles.paymentButton,
-                      safetyPinRequired && styles.paymentButtonActive,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <ShieldCheck
-                      color={safetyPinRequired ? '#F4FAF6' : '#008D49'}
-                      size={18}
-                      strokeWidth={2.4}
-                    />
-                    <Text
-                      style={[
-                        styles.paymentText,
-                        safetyPinRequired && styles.paymentTextActive,
-                      ]}
-                    >
-                      PIN начала поездки
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : null}
-
               <View style={styles.statusBox}>
                 <Clock3 color="#008D49" size={18} strokeWidth={2.4} />
                 <View style={styles.statusCopy}>
@@ -2559,7 +2528,7 @@ function ClientTariffSelector({
                 </View>
                 <View style={styles.clientTariffConfidence}>
                   <Text style={styles.clientTariffConfidenceText}>Цена до заказа</Text>
-                  <Text style={styles.clientTariffConfidenceText}>PIN доступен</Text>
+                  <Text style={styles.clientTariffConfidenceText}>Статус онлайн</Text>
                   <Text style={styles.clientTariffConfidenceText}>Маршрут виден</Text>
                 </View>
               </>

@@ -2406,7 +2406,7 @@ function makeOrder(payload) {
   const role = normalizeRole(payload.role);
   const serviceType = normalizeOrderServiceType(payload.serviceType || payload.orderType || payload.kind);
   const status = isDriverLikeRole(role) ? 'accepted' : isParkAdminRole(role) ? 'created' : 'searching';
-  const safetyPinRequired = payload.safetyPinRequired === false || payload.tripPinEnabled === false ? false : true;
+  const safetyPinRequired = payload.safetyPinRequired === true || payload.tripPinEnabled === true ? true : false;
   const paymentMethod = String(payload.paymentMethod || 'Наличные');
   const pickup = requireString(payload.pickup, 'pickup');
   const destination = requireString(payload.destination, 'destination');

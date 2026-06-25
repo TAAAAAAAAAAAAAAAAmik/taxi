@@ -82,8 +82,6 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const [reviewFacets, setReviewFacets] = useState<string[]>(['Подача']);
   const [reviewComment, setReviewComment] = useState('');
   const [favoriteAdded, setFavoriteAdded] = useState(false);
-  const [pinCode, setPinCode] = useState('');
-  const [pinError, setPinError] = useState('');
   const [shareResult, setShareResult] = useState('');
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [safetyResult, setSafetyResult] = useState('');
@@ -131,7 +129,6 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const paymentStatus = displayedOrder.paymentStatus ?? 'pending';
   const isPaid = paymentStatus === 'paid';
   const paymentEvent = displayedOrder.paymentEvents?.[0];
-  const requiresTripPin = Boolean(displayedOrder.safetyPinRequired && displayedOrder.tripPin);
   const progress = useMemo(
     () => Math.round(((activeStepIndex + 1) / config.steps.length) * 100),
     [activeStepIndex, config.steps.length],
@@ -266,23 +263,10 @@ export function OrderStatusScreen({ navigation, route }: Props) {
       return;
     }
 
-    const nextIndex = Math.min(activeStepIndex + 1, config.steps.length - 1);
-    const nextStatus = config.steps[nextIndex].id;
-
-    if (nextStatus === 'started' && requiresTripPin && pinCode.trim().length !== 4) {
-      setPinError('Введите 4-значный PIN клиента.');
-      return;
-    }
-
-    setPinError('');
     setActiveStepIndex((current) => {
       const calculatedNextIndex = Math.min(current + 1, config.steps.length - 1);
       const calculatedNextStatus = config.steps[calculatedNextIndex].id;
-      updateOrderStatus(
-        order.id,
-        calculatedNextStatus,
-        calculatedNextStatus === 'started' ? pinCode.trim() : undefined,
-      );
+      updateOrderStatus(order.id, calculatedNextStatus);
       return calculatedNextIndex;
     });
   };
@@ -488,7 +472,6 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               }}
               onSafety={() => setSafetyOpen(true)}
               onShare={shareTrip}
-              pinEnabled={requiresTripPin}
               viewerRole={isDriverRole ? 'driver' : 'client'}
             />
           </>
@@ -850,12 +833,6 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                       <Text numberOfLines={2} style={styles.safetyMiniText}>Маршрут и статус можно отправить близким.</Text>
                     </Pressable>
                     <View style={styles.safetyMiniCard}>
-                      <Text style={styles.safetyMiniTitle}>PIN</Text>
-                      <Text numberOfLines={2} style={styles.safetyMiniText}>
-                        {requiresTripPin ? 'Поездка начнется только после кода.' : 'Можно включить при заказе.'}
-                      </Text>
-                    </View>
-                    <View style={styles.safetyMiniCard}>
                       <Text style={styles.safetyMiniTitle}>Скрытый номер</Text>
                       <Text numberOfLines={2} style={styles.safetyMiniText}>Связь идет через чат или системный звонок.</Text>
                     </View>
@@ -1020,14 +997,12 @@ function TripSafetyBar({
   onChat,
   onSafety,
   onShare,
-  pinEnabled,
   viewerRole,
 }: {
   hiddenPhoneLabel: string;
   onChat: () => void;
   onSafety: () => void;
   onShare: () => void;
-  pinEnabled: boolean;
   viewerRole: 'client' | 'driver';
 }) {
   return (
@@ -1046,8 +1021,8 @@ function TripSafetyBar({
       <View style={styles.safetyBarAction}>
         <ShieldCheck color="#008D49" size={17} strokeWidth={2.4} />
         <View style={styles.safetyBarCopy}>
-          <Text numberOfLines={1} style={styles.safetyBarTitle}>PIN</Text>
-          <Text numberOfLines={1} style={styles.safetyBarText}>{pinEnabled ? 'Включен' : 'Не нужен'}</Text>
+          <Text numberOfLines={1} style={styles.safetyBarTitle}>{hiddenPhoneLabel}</Text>
+          <Text numberOfLines={1} style={styles.safetyBarText}>Связь в приложении</Text>
         </View>
       </View>
       <Pressable
@@ -1098,6 +1073,14 @@ function TripPulseMap({
   const pulseOpacity = pulseAnim.interpolate({
     inputRange: [0, 0.72, 1],
     outputRange: [0.55, 0.18, 0],
+  });
+  const carTranslateX = pulseAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [-118, 14, -118],
+  });
+  const carTranslateY = pulseAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [4, -4, 4],
   });
   const showDriver = viewerRole === 'client' && Boolean(driver?.id && status && !['searching', 'created'].includes(status));
   const isDelivery = serviceType === 'delivery';
@@ -1175,9 +1158,11 @@ function TripPulseMap({
           </Animated.Text>
         </View>
       </View>
-      <View style={styles.mapCarMarker}>
-        <Car color="#F4FAF6" size={20} strokeWidth={2.6} />
-      </View>
+      <Animated.View
+        style={[styles.mapCarMarker, { transform: [{ translateX: carTranslateX }, { translateY: carTranslateY }] }]}
+      >
+        <Car color="#F4FAF6" size={24} strokeWidth={2.6} />
+      </Animated.View>
       {showDriver ? (
         <View style={styles.driverSheet}>
           <View style={styles.driverAvatar}>
@@ -1537,21 +1522,21 @@ const styles = StyleSheet.create({
   driverAvatar: {
     alignItems: 'center',
     backgroundColor: '#008D49',
-    borderRadius: 8,
-    height: 44,
+    borderRadius: 15,
+    height: 52,
     justifyContent: 'center',
-    width: 44,
+    width: 52,
   },
   driverSheet: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: 'rgba(0, 141, 73, 0.28)',
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
-    marginTop: 14,
-    padding: 12,
+    marginTop: 16,
+    padding: 14,
   },
   driverSheetCopy: {
     flex: 1,
@@ -1570,7 +1555,8 @@ const styles = StyleSheet.create({
   },
   etaText: {
     color: '#008D49',
-    fontSize: 16,
+    fontSize: 18,
+    fontVariant: ['tabular-nums'],
     fontWeight: '900',
   },
   goodRoadCar: {
@@ -1711,14 +1697,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#008D49',
     borderColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 2,
-    height: 42,
+    borderRadius: 16,
+    borderWidth: 3,
+    bottom: 18,
+    elevation: 4,
+    height: 52,
     justifyContent: 'center',
     position: 'absolute',
-    right: 26,
-    top: 30,
-    width: 42,
+    right: 28,
+    shadowColor: 'rgba(0, 111, 58, 0.4)',
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    width: 52,
   },
   mapLine: {
     backgroundColor: '#00A855',
@@ -1729,16 +1720,17 @@ const styles = StyleSheet.create({
   mapPanel: {
     backgroundColor: '#DDECE3',
     borderColor: 'rgba(0, 141, 73, 0.22)',
-    borderRadius: 8,
+    borderRadius: 18,
     borderWidth: 1,
-    elevation: 2,
+    elevation: 3,
+    minHeight: 300,
     overflow: 'hidden',
-    padding: 12,
+    padding: 16,
     position: 'relative',
-    shadowColor: 'rgba(18, 56, 44, 0.18)',
-    shadowOffset: { height: 6, width: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowColor: 'rgba(18, 56, 44, 0.2)',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
   },
   tripMapBackdrop: {
     bottom: 0,
@@ -1814,8 +1806,9 @@ const styles = StyleSheet.create({
   },
   tripMapTitle: {
     color: '#12382C',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '900',
+    letterSpacing: -0.3,
   },
   mapPoint: {
     backgroundColor: '#008D49',
@@ -2108,17 +2101,17 @@ const styles = StyleSheet.create({
   },
   pulseRing: {
     borderColor: '#008D49',
-    borderRadius: 42,
+    borderRadius: 52,
     borderWidth: 2,
-    height: 84,
+    height: 104,
     position: 'absolute',
-    width: 84,
+    width: 104,
   },
   pulseStage: {
     alignItems: 'center',
-    height: 90,
+    height: 112,
     justifyContent: 'center',
-    width: 96,
+    width: 112,
   },
   receiptBox: {
     backgroundColor: '#E8F3EF',

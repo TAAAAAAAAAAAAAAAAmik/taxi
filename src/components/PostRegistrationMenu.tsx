@@ -1056,8 +1056,8 @@ function ClientPremiumTrustRail({
     },
     {
       Icon: RefreshCw,
-      title: 'Статус и PIN',
-      text: activeOrder?.statusLabel ?? 'Включим в заказ',
+      title: 'Статус заказа',
+      text: activeOrder?.statusLabel ?? 'Покажем в заказе',
     },
     {
       Icon: Phone,
