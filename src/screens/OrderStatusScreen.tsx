@@ -140,6 +140,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const isDriverRole = isDriverLikeRole(role);
   const reducedMotion = useReducedMotionPreference();
   const pulseAnim = useRef(new Animated.Value(0)).current;
+  const detailsAnim = useRef(new Animated.Value(0)).current;
+  const payAnim = useRef(new Animated.Value(0)).current;
   const etaFlickerAnim = useRef(new Animated.Value(1)).current;
   const tripChatTransition = useRef(new Animated.Value(0)).current;
   const [etaUpdatedAt, setEtaUpdatedAt] = useState(() => new Date());
@@ -156,6 +158,40 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   useEffect(() => {
     setActiveStepIndex(getStepIndex(config.steps, liveStatus));
   }, [config.steps, liveStatus]);
+
+  useEffect(() => {
+    if (!detailsOpen) {
+      return;
+    }
+
+    detailsAnim.setValue(0);
+    const animation = Animated.timing(detailsAnim, {
+      toValue: 1,
+      duration: reducedMotion ? 0 : 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    });
+    animation.start();
+
+    return () => animation.stop();
+  }, [detailsAnim, detailsOpen, reducedMotion]);
+
+  useEffect(() => {
+    if (!payOpen) {
+      return;
+    }
+
+    payAnim.setValue(0);
+    const animation = Animated.timing(payAnim, {
+      toValue: 1,
+      duration: reducedMotion ? 0 : 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    });
+    animation.start();
+
+    return () => animation.stop();
+  }, [payAnim, payOpen, reducedMotion]);
 
   useEffect(() => {
     const subscription = NativeAppState.addEventListener('change', (state) => {
@@ -366,6 +402,14 @@ export function OrderStatusScreen({ navigation, route }: Props) {
         }),
       },
     ],
+  };
+  const detailsAnimatedStyle = {
+    opacity: detailsAnim,
+    transform: [{ translateY: detailsAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
+  };
+  const payAnimatedStyle = {
+    opacity: payAnim,
+    transform: [{ translateY: payAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
   };
 
   return (
@@ -696,7 +740,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <InfoRow icon={<Clock3 color="#008D49" size={18} />} label="Тариф" value={displayedOrder.tariff} />
 
               {detailsOpen ? (
-                <>
+                <Animated.View style={[styles.detailsReveal, detailsAnimatedStyle]}>
                   {displayedOrder.serviceType === 'delivery' ? (
                     <>
                       <InfoRow
@@ -740,7 +784,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                     label="Опции"
                     value={displayedOrder.options.length > 0 ? displayedOrder.options.join(', ') : 'Без опций'}
                   />
-                </>
+                </Animated.View>
               ) : null}
             </View>
 
@@ -924,7 +968,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                   </Pressable>
 
                   {payOpen && !isDriverRole ? (
-                    <View style={styles.payPanel}>
+                    <Animated.View style={[styles.payPanel, payAnimatedStyle]}>
                       <View style={styles.payAmountRow}>
                         <Text style={styles.payAmountLabel}>К оплате водителю</Text>
                         <Text style={styles.payAmountValue}>{displayedOrder.total} ₽</Text>
@@ -940,7 +984,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                       >
                         <Text style={styles.payConfirmText}>Подтвердить оплату</Text>
                       </Pressable>
-                    </View>
+                    </Animated.View>
                   ) : null}
                   {paymentEvent?.note ? <Text style={styles.paymentStatusText}>{paymentEvent.note}</Text> : null}
                 </>
@@ -2198,6 +2242,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  detailsReveal: {
+    gap: 12,
   },
   infoButton: {
     alignItems: 'center',
