@@ -29,14 +29,17 @@ import {
   AppState as NativeAppState,
   Easing,
   Linking,
+  Platform,
   Text,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 
+import { TripDriverMap } from '../components/TripDriverMap';
 import { orderStatusConfig } from '../data/orderStatus';
 import { isDriverLikeRole, roleCopy } from '../data/registration';
+import type { GeoPoint } from '../data/salavatDistrict';
 import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
 import { RootStackParamList } from '../navigation/types';
 import { useAppState } from '../state/AppState';
@@ -458,6 +461,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               etaMinutes={etaMinutes}
               isCompleted={isCompleted}
               pickup={displayedOrder.pickup}
+              pickupPoint={displayedOrder.pickupPoint}
               pulseAnim={pulseAnim}
               serviceCompletedTitle={serviceCopy.completedTitle}
               serviceType={displayedOrder.serviceType === 'delivery' ? 'delivery' : 'taxi'}
@@ -985,6 +989,7 @@ type TripPulseMapProps = {
   etaMinutes: number;
   isCompleted: boolean;
   pickup: string;
+  pickupPoint?: GeoPoint;
   pulseAnim: Animated.Value;
   serviceCompletedTitle: string;
   serviceType: 'delivery' | 'taxi';
@@ -1060,12 +1065,14 @@ function TripPulseMap({
   etaMinutes,
   isCompleted,
   pickup,
+  pickupPoint,
   pulseAnim,
   serviceCompletedTitle,
   serviceType,
   status,
   viewerRole,
 }: TripPulseMapProps) {
+  const showRealMap = Platform.OS === 'web';
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.65, 1.9],
@@ -1096,6 +1103,41 @@ function TripPulseMap({
       : isDelivery
         ? 'Ищем водителя для доставки'
         : 'Ищем водителя';
+
+  if (showRealMap) {
+    return (
+      <View style={styles.mapPanel}>
+        <View style={styles.tripMapHeader}>
+          <Text style={styles.tripMapTitle}>{isCompleted ? serviceCompletedTitle : mapTitle}</Text>
+          <Text numberOfLines={1} style={styles.tripMapMeta}>
+            {viewerRole === 'client'
+              ? [driver.vehicle, driver.plate ? `номер ${driver.plate}` : null, `${etaMinutes} мин`]
+                  .filter(Boolean)
+                  .join(' · ')
+              : isDelivery
+                ? 'Получатель на карте'
+                : 'Пассажир на карте'}
+          </Text>
+        </View>
+        <TripDriverMap destination={destination} height={212} pickup={pickup} pickupPoint={pickupPoint} />
+        {showDriver ? (
+          <View style={styles.driverSheet}>
+            <View style={styles.driverAvatar}>
+              <Car color="#F4FAF6" size={22} strokeWidth={2.6} />
+            </View>
+            <View style={styles.driverSheetCopy}>
+              <Text style={styles.driverSheetTitle}>{driver.name}</Text>
+              <Text style={styles.driverSheetText}>
+                {[driver.rating ? `рейтинг ${driver.rating}` : null, driver.vehicle, driver.plate]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.mapPanel}>
