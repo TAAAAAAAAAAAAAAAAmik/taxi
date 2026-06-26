@@ -36,7 +36,7 @@ import {
   View,
 } from 'react-native';
 
-import { TripDriverMap } from '../components/TripDriverMap';
+import { TripDriverMap, type CarMode } from '../components/TripDriverMap';
 import { orderStatusConfig } from '../data/orderStatus';
 import { isDriverLikeRole, roleCopy } from '../data/registration';
 import type { GeoPoint } from '../data/salavatDistrict';
@@ -63,6 +63,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const {
     addFavoriteDriver,
     addOrderReview,
+    drivers,
     notifications,
     orders,
     refreshServerData,
@@ -138,6 +139,19 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   );
   const primaryActionLabel = getPrimaryActionLabel(role, activeStep.id, config.primaryAction);
   const isDriverRole = isDriverLikeRole(role);
+  const driverProfile = useMemo(
+    () => drivers.find((item) => item.id === driver?.id),
+    [drivers, driver?.id],
+  );
+  const carMode: CarMode = isDriverRole
+    ? 'hidden'
+    : isCompleted || ['completed', 'closed', 'cancelled', 'canceled'].includes(liveStatus ?? '')
+      ? 'static'
+      : ['searching', 'created'].includes(liveStatus ?? '')
+        ? 'hidden'
+        : liveStatus === 'arrived'
+          ? 'static'
+          : 'moving';
   const reducedMotion = useReducedMotionPreference();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const detailsAnim = useRef(new Animated.Value(0)).current;
@@ -455,11 +469,14 @@ export function OrderStatusScreen({ navigation, route }: Props) {
         {role === 'client' || isDriverRole ? (
           <>
             <TripPulseMap
+              carMode={carMode}
               destination={displayedOrder.destination}
               driver={driver}
+              driverPoint={driverProfile?.lastLocation}
               etaFlickerAnim={etaFlickerAnim}
               etaMinutes={etaMinutes}
               isCompleted={isCompleted}
+              mapHeight={width >= 820 ? 320 : 240}
               pickup={displayedOrder.pickup}
               pickupPoint={displayedOrder.pickupPoint}
               pulseAnim={pulseAnim}
@@ -983,11 +1000,14 @@ type SectionHeaderProps = {
 };
 
 type TripPulseMapProps = {
+  carMode: CarMode;
   destination: string;
   driver: OrderParticipant;
+  driverPoint?: GeoPoint;
   etaFlickerAnim: Animated.Value;
   etaMinutes: number;
   isCompleted: boolean;
+  mapHeight: number;
   pickup: string;
   pickupPoint?: GeoPoint;
   pulseAnim: Animated.Value;
@@ -1059,11 +1079,14 @@ function TripSafetyBar({
 }
 
 function TripPulseMap({
+  carMode,
   destination,
   driver,
+  driverPoint,
   etaFlickerAnim,
   etaMinutes,
   isCompleted,
+  mapHeight,
   pickup,
   pickupPoint,
   pulseAnim,
@@ -1119,7 +1142,14 @@ function TripPulseMap({
                 : 'Пассажир на карте'}
           </Text>
         </View>
-        <TripDriverMap destination={destination} height={212} pickup={pickup} pickupPoint={pickupPoint} />
+        <TripDriverMap
+          carMode={carMode}
+          destination={destination}
+          driverPoint={driverPoint}
+          height={mapHeight}
+          pickup={pickup}
+          pickupPoint={pickupPoint}
+        />
         {showDriver ? (
           <View style={styles.driverSheet}>
             <View style={styles.driverAvatar}>

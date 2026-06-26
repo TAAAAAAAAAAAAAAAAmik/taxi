@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Alert, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -70,6 +70,37 @@ export function DashboardScreen({ navigation, route }: Props) {
         : undefined,
     [currentUser, drivers, isDriverRole],
   );
+
+  // Пока водитель на линии — периодически шлём его координаты (живой GPS для клиента).
+  const onlineDriverId = currentDriver?.isOnline ? currentDriver.id : undefined;
+  useEffect(() => {
+    if (!onlineDriverId) {
+      return;
+    }
+
+    let cancelled = false;
+    const report = async () => {
+      const result = await requestUserLocation();
+
+      if (cancelled || result.status !== 'granted') {
+        return;
+      }
+
+      updateDriverAvailability(onlineDriverId, true, {
+        accuracy: result.accuracy,
+        latitude: result.point.latitude,
+        longitude: result.point.longitude,
+      });
+    };
+
+    const timer = setInterval(report, 25000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [onlineDriverId, updateDriverAvailability]);
+
   const hasActiveAccess =
     currentDriver?.subscriptionStatus === 'active' ||
     (!isSelfEmployedDriver && Boolean(currentDriver?.canReceiveOrders)) ||
