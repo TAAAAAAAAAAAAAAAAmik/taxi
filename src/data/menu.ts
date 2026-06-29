@@ -66,9 +66,9 @@ export type RoleMenuConfig = {
 export const roleMenuConfig: Record<string, RoleMenuConfig> = {
   client: {
     title: 'Меню клиента',
-    subtitle: 'Главная, вызов такси, адреса и поддержка в одном кабинете.',
+    subtitle: 'Заказы, адреса и поддержка.',
     statusTitle: 'Аккаунт почти готов',
-    statusText: 'После подтверждения телефона и почты клиент сможет заказать первую поездку.',
+    statusText: 'Подтвердите телефон и почту — и можно заказывать.',
     primaryAction: 'Заказать поездку',
     secondaryAction: 'Добавить адрес',
     menuItems: [
@@ -160,9 +160,9 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
   },
   driver: {
     title: 'Меню водителя',
-    subtitle: 'Доступ к линии, заказы, документы и профиль водителя-партнера.',
+    subtitle: 'Линия, заказы, документы и профиль.',
     statusTitle: 'Доступ к заказам',
-    statusText: 'Клиент платит водителю напрямую, сервис не удерживает процент с поездок.',
+    statusText: 'Клиент платит водителю напрямую, без процента сервиса.',
     primaryAction: 'Открыть тариф',
     secondaryAction: 'Посмотреть заказы',
     menuItems: [
@@ -265,9 +265,9 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
   },
   fleet: {
     title: 'Меню таксопарка',
-    subtitle: 'ИП, водители, автомобили, документы и ручная сверка.',
+    subtitle: 'Водители, авто, документы и сверка.',
     statusTitle: 'Проверка партнера',
-    statusText: 'После проверки ИП откроется подключение водителей и автомобилей.',
+    statusText: 'После проверки ИП добавите водителей и авто.',
     primaryAction: 'Добавить водителя',
     secondaryAction: 'Добавить автомобиль',
     menuItems: [
@@ -358,7 +358,7 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
 roleMenuConfig.client = {
   ...roleMenuConfig.client,
   title: 'Клиент',
-  subtitle: 'Заказ всегда под рукой, а история, оплата, рефералы, поддержка и профиль остаются в отдельных разделах.',
+  subtitle: 'Заказ под рукой. Остальное — в разделах.',
   primaryAction: 'Заказать поездку',
   secondaryAction: 'История',
   menuItems: [
@@ -405,7 +405,7 @@ roleMenuConfig.client = {
 roleMenuConfig.driver = {
   ...roleMenuConfig.driver,
   title: 'Водитель',
-  subtitle: 'Главное как в водительском приложении: линия, заказы, доход, тариф, документы и поддержка в отдельных разделах.',
+  subtitle: 'Линия и заказы. Остальное — в разделах.',
   primaryAction: 'Смотреть заказы',
   secondaryAction: 'Доход',
   menuItems: [
@@ -473,9 +473,9 @@ roleMenuConfig.park_admin = roleMenuConfig.fleet;
 roleMenuConfig.park_driver = {
   ...roleMenuConfig.driver,
   title: 'Меню водителя таксопарка',
-  subtitle: 'Заказы, документы, выплаты и связь с вашим таксопарком.',
+  subtitle: 'Заказы, документы, выплаты и парк.',
   statusTitle: 'Доступ зависит от таксопарка',
-  statusText: 'Заказы доступны, если таксопарк активирован вручную, водитель активен и документы валидны.',
+  statusText: 'Нужны активный парк, статус «активен» и валидные документы.',
   primaryAction: 'Посмотреть заказы',
   secondaryAction: 'Мой таксопарк',
   menuItems: [

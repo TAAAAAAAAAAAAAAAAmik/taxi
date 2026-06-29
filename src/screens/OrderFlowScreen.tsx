@@ -1276,7 +1276,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 <View style={styles.deliveryDetailsHint}>
                   <Package color="#008D49" size={19} strokeWidth={2.4} />
                   <Text style={styles.deliveryDetailsHintText}>
-                    Детали не обязательны. Тип посылки уже достаточно для следующего шага.
+                    Детали не обязательны — типа посылки достаточно.
                   </Text>
                   <Pressable
                     accessibilityRole="button"
@@ -1692,9 +1692,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 description={
                   driverCannotReceiveOrders
                     ? driverNeedsApproval
-                      ? 'После одобрения администратора лента откроется автоматически.'
-                      : 'Проверьте документы, договор, разрешение авто, реестр и налоговый профиль.'
-                    : 'Лента обновляется автоматически. Можно обновить вручную кнопкой сверху.'
+                      ? 'После одобрения лента откроется сама.'
+                      : 'Нужны документы, договор и проверка авто.'
+                    : 'Лента обновляется сама. Можно обновить вручную.'
                 }
                 icon={<Route color="#008D49" size={21} strokeWidth={2.4} />}
                 title={driverCannotReceiveOrders ? 'Доступ закрыт' : 'Заказов рядом нет'}
@@ -1859,10 +1859,10 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   </Text>
                   <Text numberOfLines={3} style={styles.searchCarsText}>
                     {availableCarsState === 'none'
-                      ? 'Сейчас в зоне нет активных водителей. Заказ можно создать, админ и водители увидят его после выхода на смену.'
+                      ? 'Сейчас водителей нет. Заказ создадим — увидят, когда выйдут на смену.'
                       : availableCarsState === 'low'
-                      ? 'Машин мало, поэтому время принятия может быть выше. Показываем доступных водителей в зоне Салаватского района.'
-                      : 'Есть активные водители в зоне Салаватского района. Точное “рядом” включим после координат водителей.'}
+                      ? 'Машин мало — принятие может занять дольше.'
+                      : 'Водители на линии в районе есть.'}
                   </Text>
                 </View>
               ) : null}
@@ -1878,9 +1878,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                     <Text style={styles.regionTitle}>Лента заказов</Text>
                     <Text numberOfLines={2} style={styles.regionText}>
                       {driverNeedsApproval
-                        ? 'Заявка водителя создана. Администратор должен проверить автомобиль и открыть доступ.'
+                        ? 'Заявка создана. Админ проверит авто и откроет доступ.'
                         : driverCannotReceiveOrders
-                        ? 'Доступ к заказам закрыт. Нужны документы, договор, разрешение авто, реестр и налоговый профиль.'
+                        ? 'Доступ закрыт. Нужны документы, договор и проверка авто.'
                         : exclusiveDriverOrdersCount > 0
                         ? `Эксклюзив: ${selectedFeedOrderExclusiveSeconds} сек.`
                         : availableDriverOrders.length > 0

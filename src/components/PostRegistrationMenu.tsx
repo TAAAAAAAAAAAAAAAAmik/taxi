@@ -960,7 +960,7 @@ function ClientAboutPage({ onOpenSupportChat }: { onOpenSupportChat: () => void 
       <View style={styles.clientSectionHeader}>
         <Text style={styles.clientSectionTitle}>О приложении</Text>
         <Text numberOfLines={3} style={styles.clientSectionText}>
-          Kinetix собирает заказ такси, статусы поездки, домашний адрес, историю и поддержку в одном спокойном интерфейсе.
+          Kinetix: заказ, статусы, адреса, история и поддержка в одном месте.
         </Text>
       </View>
       <View style={styles.accountPanel}>
@@ -1273,7 +1273,7 @@ function ClientCommandCenter({
         </View>
         <View style={styles.routePreviewCopy}>
           <Text style={styles.routePreviewTitle}>Водитель, ETA и оплата будут тут</Text>
-          <Text style={styles.routePreviewText}>После заказа экран покажет только главное: кто едет, сколько ждать, что дальше.</Text>
+          <Text style={styles.routePreviewText}>После заказа: кто едет, сколько ждать, что дальше.</Text>
         </View>
       </View>
 
@@ -2147,7 +2147,7 @@ function FleetInvitePanel({
         </View>
         <View style={styles.fleetInviteCopy}>
           <Text style={styles.fleetInviteTitle}>Подключить водителя</Text>
-          <Text style={styles.fleetInviteText}>Откройте анкету, водитель заполнит ее как сотрудник вашего парка.</Text>
+          <Text style={styles.fleetInviteText}>Откройте анкету — водитель заполнит её сам.</Text>
         </View>
       </View>
       <View style={styles.fleetInviteCodeBox}>

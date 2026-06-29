@@ -44,21 +44,21 @@ const baseTariffs: OrderTariff[] = [
   {
     id: 'economy',
     title: 'Эконом',
-    subtitle: 'Фиксированная цена по Малоязу',
+    subtitle: 'Фиксированная цена',
     price: 120,
     eta: '4 мин',
   },
   {
     id: 'comfort',
     title: 'Комфорт',
-    subtitle: 'Просторнее салон и выше рейтинг',
+    subtitle: 'Просторный салон',
     price: 590,
     eta: '6 мин',
   },
   {
     id: 'business',
     title: 'Бизнес',
-    subtitle: 'Премиальный автомобиль и водитель',
+    subtitle: 'Премиум-авто',
     price: 980,
     eta: '9 мин',
   },
@@ -68,35 +68,35 @@ const clientTariffs: OrderTariff[] = [baseTariffs[0]];
 
 export const orderFlowConfig: Record<string, OrderFlowConfig> = {
   client: {
-    title: 'Оформление поездки',
-    subtitle: 'Маршрут по Салаватскому району, тариф, опции и расчет с водителем на одном экране.',
+    title: 'Поездка',
+    subtitle: 'Маршрут, тариф и оплата на одном экране.',
     routeTitle: 'Маршрут',
     tariffTitle: 'Тариф',
-    detailsTitle: 'Опции поездки',
-    summaryTitle: 'Итог заказа',
+    detailsTitle: 'Опции',
+    summaryTitle: 'Итог',
     primaryAction: 'Вызвать',
-    secondaryAction: 'Сохранить черновик',
-    statusTitle: 'Заказ готов к подтверждению',
-    statusText: 'После подтверждения система начнет искать ближайшего подходящего водителя.',
+    secondaryAction: 'Сохранить',
+    statusTitle: 'Готово к подтверждению',
+    statusText: 'Найдём ближайшего водителя.',
     fields: [
       {
         id: 'pickup',
         label: 'Откуда',
-        placeholder: 'Начните вводить: Малояз, Янгантау, Кургазак...',
-        helper: 'Можно указать подъезд, ориентир или комментарий.',
+        placeholder: 'Малояз, Янгантау, Кургазак…',
+        helper: 'Можно добавить подъезд или ориентир.',
       },
       {
         id: 'destination',
-        label: 'Куда едем?',
-        placeholder: 'Например: санаторий Янгантау или источник Кургазак',
-        helper: 'Цена пересчитается после выбора точки назначения.',
+        label: 'Куда',
+        placeholder: 'Санаторий Янгантау, Кургазак…',
+        helper: 'Цена — после выбора точки.',
       },
     ],
     detailFields: [
       {
         id: 'entrance',
         label: 'Подъезд или ориентир',
-        placeholder: 'Подъезд 3, ждать у шлагбаума',
+        placeholder: 'Подъезд 3, у шлагбаума',
       },
       {
         id: 'comment',
@@ -115,28 +115,28 @@ export const orderFlowConfig: Record<string, OrderFlowConfig> = {
     suggestions: ['Малояз', 'Янгантау', 'Кургазак', 'Мурсалимкино'],
   },
   driver: {
-    title: 'Карточка заказа',
-    subtitle: 'Водитель видит только важное: подача по Салаватскому району, маршрут, тариф, расчет с клиентом и действия.',
+    title: 'Заказ',
+    subtitle: 'Подача, маршрут, тариф и действия.',
     routeTitle: 'Заказ от клиента',
     tariffTitle: 'Условия',
-    detailsTitle: 'Что важно перед принятием',
+    detailsTitle: 'Перед принятием',
     summaryTitle: 'Доход и маршрут',
-    primaryAction: 'Принять заказ',
+    primaryAction: 'Принять',
     secondaryAction: 'Пропустить',
     statusTitle: 'Заказ доступен',
-    statusText: 'После принятия водитель получит точный маршрут до клиента и кнопку статуса.',
+    statusText: 'После принятия — маршрут до клиента и статусы.',
     fields: [
       {
         id: 'pickup',
         label: 'Точка подачи',
         placeholder: 'Центр Малояза',
-        helper: 'Показываем расстояние до клиента и время подачи.',
+        helper: 'Расстояние и время до клиента.',
       },
       {
         id: 'destination',
         label: 'Куда едет клиент',
         placeholder: 'Санаторий Янгантау',
-        helper: 'Полный адрес можно показывать после принятия, если так решит сервис.',
+        helper: 'Полный адрес — после принятия.',
       },
     ],
     detailFields: [
@@ -160,14 +160,14 @@ export const orderFlowConfig: Record<string, OrderFlowConfig> = {
       {
         id: 'current',
         title: 'Комфорт',
-        subtitle: 'Заказ подходит под класс автомобиля',
+        subtitle: 'Подходит под класс авто',
         price: 590,
         eta: '6 мин до клиента',
       },
       {
         id: 'nearby',
         title: 'Ближайший',
-        subtitle: 'Короткая подача, средний чек',
+        subtitle: 'Короткая подача',
         price: 420,
         eta: '3 мин до клиента',
       },
@@ -185,22 +185,22 @@ export const orderFlowConfig: Record<string, OrderFlowConfig> = {
   },
   fleet: {
     title: 'Диспетчерский заказ',
-    subtitle: 'Автопарк создает заказ, назначает водителя и контролирует выполнение.',
-    routeTitle: 'Данные клиента и маршрут',
+    subtitle: 'Создать заказ, назначить водителя, контроль.',
+    routeTitle: 'Клиент и маршрут',
     tariffTitle: 'Тариф и назначение',
     detailsTitle: 'Назначение водителя',
     summaryTitle: 'Контроль заказа',
     primaryAction: 'Создать и назначить',
-    secondaryAction: 'Сохранить заявку',
-    statusTitle: 'Заказ готов к диспетчеризации',
-    statusText: 'После создания заказ можно отправить конкретному водителю или в очередь автопарка.',
+    secondaryAction: 'Сохранить',
+    statusTitle: 'Готово к назначению',
+    statusText: 'Можно отправить водителю или в очередь.',
     fields: [
       {
         id: 'clientPhone',
         label: 'Телефон клиента',
         placeholder: '+7 900 000-00-00',
         keyboardType: 'phone-pad',
-        helper: 'Нужен для связи и истории заказов.',
+        helper: 'Для связи и истории.',
       },
       {
         id: 'pickup',
@@ -217,7 +217,7 @@ export const orderFlowConfig: Record<string, OrderFlowConfig> = {
       {
         id: 'driver',
         label: 'Водитель',
-        placeholder: 'Выберите водителя автопарка',
+        placeholder: 'Выберите водителя',
       },
       {
         id: 'vehicle',
@@ -227,7 +227,7 @@ export const orderFlowConfig: Record<string, OrderFlowConfig> = {
       {
         id: 'dispatcherComment',
         label: 'Комментарий диспетчера',
-        placeholder: 'Особые условия заказа',
+        placeholder: 'Особые условия',
       },
     ],
     options: [
@@ -246,8 +246,6 @@ orderFlowConfig.self_employed_driver = orderFlowConfig.driver;
 orderFlowConfig.park_admin = orderFlowConfig.fleet;
 orderFlowConfig.park_driver = {
   ...orderFlowConfig.driver,
-  subtitle:
-    'Водитель таксопарка видит заказы, доступные через активный таксопарк, свой автомобиль и условия подачи.',
-  statusText:
-    'После принятия заказа в API будет передан park_id для статистики и финансов таксопарка.',
+  subtitle: 'Заказы через активный таксопарк.',
+  statusText: 'После принятия учитывается в финансах парка.',
 };

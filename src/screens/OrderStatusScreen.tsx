@@ -317,7 +317,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   };
 
   const openEmergencyCall = async () => {
-    setSafetyResult('Открываем экстренный вызов 112. Если связи нет, оставайтесь на месте и сообщите оператору.');
+    setSafetyResult('Открываем вызов 112. Если связи нет — оставайтесь на месте.');
 
     try {
       await Linking.openURL('tel:112');
@@ -327,7 +327,7 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   };
 
   const sendSafetySignal = () => {
-    setSafetyResult('Сигнал безопасности сохранен в поездке. Следующий шаг — подключить серверную эскалацию оператору.');
+    setSafetyResult('Сигнал безопасности сохранён в поездке.');
   };
 
   const chooseContact = async (mode: 'call' | 'chat') => {
