@@ -12,8 +12,74 @@ import {
 } from 'react-native';
 import { X } from 'lucide-react-native';
 
-import { kinetixColors, kinetixRadii, kinetixSpacing } from '../theme/kinetixTokens';
+import { kinetixColors, kinetixEasing, kinetixMotion, kinetixRadii, kinetixSpacing } from '../theme/kinetixTokens';
 import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// Плавный отклик нажатия по фреймворку Emil Kowalski: кнопка должна
+// «слышать» палец. scale(0.97) на нажатии, быстрый вход, чуть медленнее
+// возврат; ease-out; useNativeDriver:false для надёжности на web.
+export function usePressScale(targetScale = 0.97, disabled = false) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const animateTo = (toValue: number, duration: number) => {
+    if (disabled) {
+      return;
+    }
+    Animated.timing(scale, {
+      toValue,
+      duration,
+      easing: kinetixEasing.easeOut,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  return {
+    scale,
+    onPressIn: () => animateTo(targetScale, kinetixMotion.duration.tap),
+    onPressOut: () => animateTo(1, kinetixMotion.duration.tap + 40),
+  };
+}
+
+type PressableScaleProps = {
+  children: ReactNode;
+  onPress?: () => void;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+  targetScale?: number;
+  accessibilityLabel?: string;
+  accessibilityRole?: 'button' | 'link' | 'none';
+};
+
+// Переиспользуемая тап-цель с плавным press-feedback. Для карточек, строк
+// меню и быстрых действий вместо моментального `pressed`-стиля.
+export function PressableScale({
+  children,
+  onPress,
+  disabled,
+  style,
+  targetScale = 0.97,
+  accessibilityLabel,
+  accessibilityRole = 'button',
+}: PressableScaleProps) {
+  const reducedMotion = useReducedMotionPreference();
+  const { scale, onPressIn, onPressOut } = usePressScale(targetScale, disabled || reducedMotion);
+
+  return (
+    <AnimatedPressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
+      disabled={disabled}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={[style, { transform: [{ scale }] }]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+}
 
 type KinetixCardProps = {
   children: ReactNode;
@@ -44,24 +110,28 @@ export function KinetixButton({
 }: KinetixButtonProps) {
   const textStyle =
     tone === 'primary' ? styles.buttonTextPrimary : tone === 'danger' ? styles.buttonTextDanger : styles.buttonTextSecondary;
+  const reducedMotion = useReducedMotionPreference();
+  const { scale, onPressIn, onPressOut } = usePressScale(0.97, disabled || reducedMotion);
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={[
         styles.button,
         tone === 'secondary' && styles.buttonSecondary,
         tone === 'danger' && styles.buttonDanger,
         disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
+        { transform: [{ scale }] },
         style,
       ]}
     >
       {children}
       <Text numberOfLines={1} style={textStyle}>{label}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

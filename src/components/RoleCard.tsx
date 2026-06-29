@@ -1,8 +1,9 @@
 import { ComponentType } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { LucideProps } from 'lucide-react-native';
 
 import { kx } from '../theme/kinetixTheme';
+import { PressableScale } from './KinetixUI';
 
 type RoleCardProps = {
   title: string;
@@ -14,15 +15,10 @@ type RoleCardProps = {
 
 export function RoleCard({ title, subtitle, active, Icon, onPress }: RoleCardProps) {
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
-      accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        active && styles.activeCard,
-        pressed && styles.pressedCard,
-      ]}
+      style={[styles.card, active && styles.activeCard]}
     >
       <View style={[styles.iconWrap, active && styles.activeIconWrap]}>
         <Icon color={active ? '#FFFFFF' : kx.color.amber} size={20} strokeWidth={2.2} />
@@ -31,7 +27,7 @@ export function RoleCard({ title, subtitle, active, Icon, onPress }: RoleCardPro
         <Text style={[styles.title, active && styles.activeTitle]}>{title}</Text>
         <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -74,10 +70,6 @@ const styles = StyleSheet.create({
     height: 38,
     justifyContent: 'center',
     width: 38,
-  },
-  pressedCard: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
   },
   subtitle: {
     color: kx.text.secondary,
