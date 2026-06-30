@@ -28,6 +28,7 @@ import {
   Plus,
   RefreshCw,
   Route,
+  Search,
   Settings,
   ShieldCheck,
   Star,
@@ -44,6 +45,8 @@ import {
   roleCopy,
 } from '../data/registration';
 import { KinetixEmptyState, KinetixStatus, PressableScale, StaggerView } from './KinetixUI';
+import { NearbyCarsMap } from './NearbyCarsMap';
+import { useAppState } from '../state/AppState';
 import {
   MenuActionTarget,
   MenuIconName,
@@ -576,8 +579,11 @@ function ClientPageView({
     return (
       <ClientOrdersPage
         onOpenActiveOrder={onOpenActiveOrder}
+        onOpenOrderFlow={onOpenOrderFlow}
         onOpenOrderHistory={onOpenOrderHistory}
+        onOpenSavedPlace={onOpenSavedPlace}
         orderSummary={orderSummary}
+        savedHomeAddressLabel={savedHomeAddressLabel}
       />
     );
   }
@@ -607,9 +613,7 @@ function ClientPageView({
       onOpenDelivery={onOpenDelivery}
       onOpenMenu={onOpenMenu}
       onOpenOrderFlow={onOpenOrderFlow}
-      onOpenSavedPlace={onOpenSavedPlace}
       orderSummary={orderSummary}
-      savedHomeAddressLabel={savedHomeAddressLabel}
     />
   );
 }
@@ -621,20 +625,25 @@ function ClientHomePage({
   onOpenDelivery,
   onOpenMenu,
   onOpenOrderFlow,
-  onOpenSavedPlace,
   orderSummary,
-  savedHomeAddressLabel,
 }: {
   availableCarsCount: number;
   displayName: string;
   orderSummary?: ClientOrderSummary;
-  savedHomeAddressLabel?: string;
   onOpenActiveOrder?: () => void;
   onOpenDelivery: () => void;
   onOpenMenu: () => void;
   onOpenOrderFlow: () => void;
-  onOpenSavedPlace: () => void;
 }) {
+  const { drivers } = useAppState();
+  const carPoints = drivers
+    .filter((driver) => driver.isOnline && driver.lastLocation)
+    .map((driver) => ({
+      latitude: driver.lastLocation!.latitude,
+      longitude: driver.lastLocation!.longitude,
+    }))
+    .slice(0, 12);
+
   const carsLabel =
     availableCarsCount > 0
       ? `${availableCarsCount} ${formatCarsWord(availableCarsCount)} рядом · подача ~4 мин`
@@ -725,36 +734,28 @@ function ClientHomePage({
           </PressableScale>
         </StaggerView>
 
-        <StaggerView index={4} style={styles.clientFavSection}>
-          <Text style={styles.clientFavTitle}>Частые адреса</Text>
-          {savedHomeAddressLabel ? (
+        <StaggerView index={4}>
+          <View style={styles.clientMapCard}>
+            <NearbyCarsMap cars={carPoints} height={206} />
+            <View style={styles.clientMapChip}>
+              <View style={styles.clientMapChipDot} />
+              <Text numberOfLines={1} style={styles.clientMapChipText}>
+                {availableCarsCount > 0 ? `${availableCarsCount} ${formatCarsWord(availableCarsCount)} рядом` : 'Ищем машины рядом'}
+              </Text>
+            </View>
             <PressableScale
-              accessibilityLabel="Поездка домой"
+              accessibilityLabel="Выбрать, куда едем"
               accessibilityRole="button"
               onPress={onOpenOrderFlow}
-              style={styles.clientFavRow}
+              style={styles.clientMapWhere}
             >
-              <View style={styles.clientFavIcon}>
-                <Home color={kinetixColors.amber} size={20} strokeWidth={2.3} />
+              <View style={styles.clientMapSearchIcon}>
+                <Search color={kinetixColors.lime} size={18} strokeWidth={2.3} />
               </View>
-              <View style={styles.clientActionCopy}>
-                <Text numberOfLines={1} style={styles.clientFavName}>Домой</Text>
-                <Text numberOfLines={1} style={styles.clientFavAddr}>{savedHomeAddressLabel}</Text>
-              </View>
-              <ChevronRight color="#C2D2C9" size={20} strokeWidth={2.4} />
+              <Text style={styles.clientMapWhereText}>Куда едем?</Text>
+              <ChevronRight color="#B7C8BF" size={22} strokeWidth={2.4} />
             </PressableScale>
-          ) : null}
-          <PressableScale
-            accessibilityLabel={savedHomeAddressLabel ? 'Изменить адрес' : 'Добавить адрес'}
-            accessibilityRole="button"
-            onPress={onOpenSavedPlace}
-            style={styles.clientFavAdd}
-          >
-            <Plus color={kinetixColors.amber} size={18} strokeWidth={2.6} />
-            <Text style={styles.clientFavAddText}>
-              {savedHomeAddressLabel ? 'Изменить адрес' : 'Добавить адрес'}
-            </Text>
-          </PressableScale>
+          </View>
         </StaggerView>
       </View>
     </View>
@@ -763,12 +764,18 @@ function ClientHomePage({
 
 function ClientOrdersPage({
   onOpenActiveOrder,
+  onOpenOrderFlow,
   onOpenOrderHistory,
+  onOpenSavedPlace,
   orderSummary,
+  savedHomeAddressLabel,
 }: {
   orderSummary?: ClientOrderSummary;
+  savedHomeAddressLabel?: string;
   onOpenActiveOrder?: () => void;
+  onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
+  onOpenSavedPlace: () => void;
 }) {
   const [statsOpen, setStatsOpen] = useState(false);
   const summary = orderSummary ?? {
@@ -827,6 +834,38 @@ function ClientOrdersPage({
       <View style={styles.clientSectionHeader}>
         <Text style={styles.clientSectionTitle}>Мои поездки</Text>
         <Text numberOfLines={1} style={styles.clientSectionText}>Активные и завершённые маршруты.</Text>
+      </View>
+
+      <View style={styles.clientFavSection}>
+        <Text style={styles.clientFavTitle}>Частые адреса</Text>
+        {savedHomeAddressLabel ? (
+          <PressableScale
+            accessibilityLabel="Поездка домой"
+            accessibilityRole="button"
+            onPress={onOpenOrderFlow}
+            style={styles.clientFavRow}
+          >
+            <View style={styles.clientFavIcon}>
+              <Home color={kinetixColors.amber} size={20} strokeWidth={2.3} />
+            </View>
+            <View style={styles.clientActionCopy}>
+              <Text numberOfLines={1} style={styles.clientFavName}>Домой</Text>
+              <Text numberOfLines={1} style={styles.clientFavAddr}>{savedHomeAddressLabel}</Text>
+            </View>
+            <ChevronRight color="#C2D2C9" size={20} strokeWidth={2.4} />
+          </PressableScale>
+        ) : null}
+        <PressableScale
+          accessibilityLabel={savedHomeAddressLabel ? 'Изменить адрес' : 'Добавить адрес'}
+          accessibilityRole="button"
+          onPress={onOpenSavedPlace}
+          style={styles.clientFavAdd}
+        >
+          <Plus color={kinetixColors.amber} size={18} strokeWidth={2.6} />
+          <Text style={styles.clientFavAddText}>
+            {savedHomeAddressLabel ? 'Изменить адрес' : 'Добавить адрес'}
+          </Text>
+        </PressableScale>
       </View>
 
       {onOpenActiveOrder && summary.activeOrder ? (
