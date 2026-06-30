@@ -2400,6 +2400,11 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
+  quickGridItem: {
+    flex: 1,
+    flexDirection: 'row',
+    minWidth: 150,
+  },
   quickIconWrap: {
     alignItems: 'center',
     backgroundColor: '#E8F3EF',

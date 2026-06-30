@@ -84,6 +84,54 @@ export function PressableScale({
   );
 }
 
+// Каскадное появление блоков (Emil: stagger 30–80мс, старт с лёгкого
+// translateY + opacity:0, не со scale(0); ≤300мс; уважает reduced-motion).
+// Каждый элемент задерживается на index*55мс. Декоративно — не блокирует ввод.
+export function StaggerView({
+  children,
+  index = 0,
+  style,
+}: {
+  children: ReactNode;
+  index?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const reducedMotion = useReducedMotionPreference();
+  const progress = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      progress.setValue(1);
+      return;
+    }
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: 280,
+      delay: Math.min(index, 6) * 55,
+      easing: kinetixEasing.easeOut,
+      useNativeDriver: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [index, progress, reducedMotion]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: progress,
+          transform: [
+            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 type KinetixCardProps = {
   children: ReactNode;
   tone?: 'plain' | 'accent' | 'soft';

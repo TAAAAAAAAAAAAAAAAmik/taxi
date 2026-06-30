@@ -41,7 +41,7 @@ import {
   isSelfEmployedDriverRole,
   roleCopy,
 } from '../data/registration';
-import { KinetixEmptyState, KinetixStatus, PressableScale } from './KinetixUI';
+import { KinetixEmptyState, KinetixStatus, PressableScale, StaggerView } from './KinetixUI';
 import {
   MenuActionTarget,
   MenuIconName,
@@ -622,35 +622,37 @@ function ClientHomePage({
   return (
     <View style={styles.clientFocusPage}>
       {onOpenActiveOrder && orderSummary?.activeOrder ? (
-        <PressableScale
-          accessibilityLabel="Открыть текущий заказ"
-          accessibilityRole="button"
-          onPress={onOpenActiveOrder}
-          style={styles.activeOrderCard}
-        >
-          <View style={styles.activeOrderIcon}>
-            <Route color="#06140D" size={20} strokeWidth={2.6} />
-          </View>
-          <View style={styles.activeOrderCopy}>
-            <Text numberOfLines={1} style={styles.activeOrderLabel}>
-              Текущий заказ · {orderSummary.activeOrder.statusLabel}
-            </Text>
-            <Text numberOfLines={1} style={styles.activeOrderRoute}>
-              {orderSummary.activeOrder.routeTitle ?? orderSummary.activeOrder.routeLabel}
-            </Text>
-          </View>
-          <Text style={styles.activeOrderArrow}>→</Text>
-        </PressableScale>
+        <StaggerView index={0}>
+          <PressableScale
+            accessibilityLabel="Открыть текущий заказ"
+            accessibilityRole="button"
+            onPress={onOpenActiveOrder}
+            style={styles.activeOrderCard}
+          >
+            <View style={styles.activeOrderIcon}>
+              <Route color="#06140D" size={20} strokeWidth={2.6} />
+            </View>
+            <View style={styles.activeOrderCopy}>
+              <Text numberOfLines={1} style={styles.activeOrderLabel}>
+                Текущий заказ · {orderSummary.activeOrder.statusLabel}
+              </Text>
+              <Text numberOfLines={1} style={styles.activeOrderRoute}>
+                {orderSummary.activeOrder.routeTitle ?? orderSummary.activeOrder.routeLabel}
+              </Text>
+            </View>
+            <Text style={styles.activeOrderArrow}>→</Text>
+          </PressableScale>
+        </StaggerView>
       ) : null}
 
-      <View style={styles.clientWelcomePanel}>
+      <StaggerView index={1} style={styles.clientWelcomePanel}>
         <Text style={styles.clientWelcomeTitle}>Здравствуйте, {displayName}!</Text>
         <Text numberOfLines={2} style={styles.clientWelcomeText}>
           Нужна поездка или доставка в Салавате?
         </Text>
-      </View>
+      </StaggerView>
 
-      <View style={styles.clientServiceRow}>
+      <StaggerView index={2} style={styles.clientServiceRow}>
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel="Заказать такси"
@@ -676,17 +678,21 @@ function ClientHomePage({
           <Text style={styles.clientServiceTitle}>Доставка</Text>
           <Text numberOfLines={1} style={styles.clientServiceText}>Привезём и передадим</Text>
         </PressableScale>
-      </View>
+      </StaggerView>
 
-      <ClientPremiumTrustRail
-        activeOrder={orderSummary?.activeOrder}
-        availableCarsCount={availableCarsCount}
-      />
+      <StaggerView index={3}>
+        <ClientPremiumTrustRail
+          activeOrder={orderSummary?.activeOrder}
+          availableCarsCount={availableCarsCount}
+        />
+      </StaggerView>
 
-      <ClientMapPreview
-        activeOrder={orderSummary?.activeOrder}
-        availableCarsCount={availableCarsCount}
-      />
+      <StaggerView index={4}>
+        <ClientMapPreview
+          activeOrder={orderSummary?.activeOrder}
+          availableCarsCount={availableCarsCount}
+        />
+      </StaggerView>
     </View>
   );
 }
@@ -1756,24 +1762,27 @@ function DrawerMenuItem({ active, index, item, onPress, progress }: DrawerMenuIt
 
 type QuickActionCardProps = {
   action: QuickAction;
+  actionIndex?: number;
   onActionTarget: (target?: MenuActionTarget) => void;
 };
 
-function QuickActionCard({ action, onActionTarget }: QuickActionCardProps) {
+function QuickActionCard({ action, actionIndex = 0, onActionTarget }: QuickActionCardProps) {
   const Icon = iconMap[action.icon];
 
   return (
-    <PressableScale
-      accessibilityRole="button"
-      onPress={() => onActionTarget(action.target)}
-      style={styles.quickCard}
-    >
-      <View style={styles.quickIconWrap}>
-        <Icon color="#008D49" size={21} strokeWidth={2.3} />
-      </View>
-      <Text numberOfLines={2} style={styles.quickTitle}>{action.title}</Text>
-      <Text numberOfLines={2} style={styles.quickSubtitle}>{action.subtitle}</Text>
-    </PressableScale>
+    <StaggerView index={actionIndex} style={styles.quickGridItem}>
+      <PressableScale
+        accessibilityRole="button"
+        onPress={() => onActionTarget(action.target)}
+        style={styles.quickCard}
+      >
+        <View style={styles.quickIconWrap}>
+          <Icon color="#008D49" size={21} strokeWidth={2.3} />
+        </View>
+        <Text numberOfLines={2} style={styles.quickTitle}>{action.title}</Text>
+        <Text numberOfLines={2} style={styles.quickSubtitle}>{action.subtitle}</Text>
+      </PressableScale>
+    </StaggerView>
   );
 }
 
@@ -2107,8 +2116,13 @@ function SectionPageView({
         <Text style={styles.panelTitle}>Быстрые действия</Text>
         <Text numberOfLines={1} style={styles.panelSubtitle}>Основные операции этого раздела.</Text>
         <View style={styles.quickGrid}>
-          {page.quickActions.map((action) => (
-            <QuickActionCard action={action} key={action.id} onActionTarget={onActionTarget} />
+          {page.quickActions.map((action, actionIndex) => (
+            <QuickActionCard
+              action={action}
+              actionIndex={actionIndex}
+              key={action.id}
+              onActionTarget={onActionTarget}
+            />
           ))}
         </View>
       </View>
