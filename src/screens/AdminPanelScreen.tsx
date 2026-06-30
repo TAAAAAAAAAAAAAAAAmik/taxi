@@ -1762,8 +1762,10 @@ function AdminSideDrawer({
 
     const animation = Animated.timing(progress, {
       toValue: open ? 1 : 0,
-      duration: reducedMotion ? 0 : 285,
-      easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      // Emil: ease-out на вход и на выход (ease-in ощущается вяло); выход
+      // чуть быстрее входа — система отвечает мгновенно.
+      duration: reducedMotion ? 0 : open ? 285 : 200,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     });
 
