@@ -67,9 +67,9 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 14,
     shadowColor: kx.color.shadow,
-    shadowOffset: { height: 6, width: 0 },
+    shadowOffset: { height: 3, width: 0 },
     shadowOpacity: 0.06,
-    shadowRadius: 14,
+    shadowRadius: 8,
   },
   title: {
     color: kx.text.primary,
