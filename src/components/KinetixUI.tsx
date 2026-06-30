@@ -49,7 +49,8 @@ type PressableScaleProps = {
   style?: StyleProp<ViewStyle>;
   targetScale?: number;
   accessibilityLabel?: string;
-  accessibilityRole?: 'button' | 'link' | 'none';
+  accessibilityRole?: 'button' | 'link' | 'none' | 'switch';
+  accessibilityState?: { selected?: boolean; checked?: boolean; disabled?: boolean };
 };
 
 // Переиспользуемая тап-цель с плавным press-feedback. Для карточек, строк
@@ -62,6 +63,7 @@ export function PressableScale({
   targetScale = 0.97,
   accessibilityLabel,
   accessibilityRole = 'button',
+  accessibilityState,
 }: PressableScaleProps) {
   const reducedMotion = useReducedMotionPreference();
   const { scale, onPressIn, onPressOut } = usePressScale(targetScale, disabled || reducedMotion);
@@ -70,6 +72,7 @@ export function PressableScale({
     <AnimatedPressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityRole}
+      accessibilityState={accessibilityState}
       disabled={disabled}
       onPress={onPress}
       onPressIn={onPressIn}

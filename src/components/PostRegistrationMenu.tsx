@@ -41,7 +41,7 @@ import {
   isSelfEmployedDriverRole,
   roleCopy,
 } from '../data/registration';
-import { KinetixEmptyState, KinetixStatus } from './KinetixUI';
+import { KinetixEmptyState, KinetixStatus, PressableScale } from './KinetixUI';
 import {
   MenuActionTarget,
   MenuIconName,
@@ -622,11 +622,11 @@ function ClientHomePage({
   return (
     <View style={styles.clientFocusPage}>
       {onOpenActiveOrder && orderSummary?.activeOrder ? (
-        <Pressable
+        <PressableScale
           accessibilityLabel="Открыть текущий заказ"
           accessibilityRole="button"
           onPress={onOpenActiveOrder}
-          style={({ pressed }) => [styles.activeOrderCard, pressed && styles.pressed]}
+          style={styles.activeOrderCard}
         >
           <View style={styles.activeOrderIcon}>
             <Route color="#06140D" size={20} strokeWidth={2.6} />
@@ -640,7 +640,7 @@ function ClientHomePage({
             </Text>
           </View>
           <Text style={styles.activeOrderArrow}>→</Text>
-        </Pressable>
+        </PressableScale>
       ) : null}
 
       <View style={styles.clientWelcomePanel}>
@@ -651,31 +651,31 @@ function ClientHomePage({
       </View>
 
       <View style={styles.clientServiceRow}>
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel="Заказать такси"
           onPress={onOpenOrderFlow}
-          style={({ pressed }) => [styles.clientServiceTile, pressed && styles.pressed]}
+          style={styles.clientServiceTile}
         >
           <View style={styles.clientMainOrderIcon}>
             <MapPinned color="#F4FAF6" size={26} strokeWidth={2.6} />
           </View>
           <Text style={styles.clientServiceTitle}>Такси</Text>
           <Text numberOfLines={1} style={styles.clientServiceText}>Поездка по адресу</Text>
-        </Pressable>
+        </PressableScale>
 
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel="Заказать доставку"
           onPress={onOpenDelivery}
-          style={({ pressed }) => [styles.clientServiceTile, pressed && styles.pressed]}
+          style={styles.clientServiceTile}
         >
           <View style={styles.clientMainOrderIcon}>
             <Package color="#F4FAF6" size={26} strokeWidth={2.6} />
           </View>
           <Text style={styles.clientServiceTitle}>Доставка</Text>
           <Text numberOfLines={1} style={styles.clientServiceText}>Привезём и передадим</Text>
-        </Pressable>
+        </PressableScale>
       </View>
 
       <ClientPremiumTrustRail
@@ -760,11 +760,11 @@ function ClientOrdersPage({
       </View>
 
       {onOpenActiveOrder && summary.activeOrder ? (
-        <Pressable
+        <PressableScale
           accessibilityLabel="Открыть текущий заказ"
           accessibilityRole="button"
           onPress={onOpenActiveOrder}
-          style={({ pressed }) => [styles.activeOrderCard, pressed && styles.pressed]}
+          style={styles.activeOrderCard}
         >
           <View style={styles.activeOrderIcon}>
             <Route color="#06140D" size={20} strokeWidth={2.6} />
@@ -778,7 +778,7 @@ function ClientOrdersPage({
             </Text>
           </View>
           <Text style={styles.activeOrderArrow}>→</Text>
-        </Pressable>
+        </PressableScale>
       ) : null}
 
       {tripItems.length ? (
@@ -997,10 +997,10 @@ function ClientAccountRoundButton({
   const Icon = icon === 'support' ? Headphones : icon === 'settings' ? ShieldCheck : UsersRound;
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.accountRoundButton, pressed && styles.pressed]}
+      style={styles.accountRoundButton}
     >
       <View style={[styles.accountRoundIcon, active && styles.accountRoundIconActive]}>
         <Icon color={active ? '#F4FAF6' : '#008D49'} size={24} strokeWidth={2.5} />
@@ -1008,7 +1008,7 @@ function ClientAccountRoundButton({
       <Text numberOfLines={1} style={[styles.accountRoundText, active && styles.accountRoundTextActive]}>
         {title}
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -1239,14 +1239,14 @@ function ClientCommandCenter({
         </View>
       </View>
 
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         onPress={onOpenOrderFlow}
-        style={({ pressed }) => [styles.commandPrimaryButton, pressed && styles.pressed]}
+        style={styles.commandPrimaryButton}
       >
         <Text style={styles.commandPrimaryButtonText}>Заказать поездку</Text>
         <Route color="#F4FAF6" size={19} strokeWidth={2.4} />
-      </Pressable>
+      </PressableScale>
 
       <View style={styles.commandMetaStrip}>
         <View style={styles.commandMetaItem}>
@@ -1363,15 +1363,14 @@ function DriverCommandCenter({
         </View>
       </View>
 
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         disabled={!driverLine.canToggle}
         onPress={onToggleDriverLine}
-        style={({ pressed }) => [
+        style={[
           styles.commandPrimaryButton,
           driverLine.isOnline && styles.commandPrimaryButtonOnline,
           !driverLine.canToggle && styles.commandPrimaryButtonDisabled,
-          pressed && styles.pressed,
         ]}
       >
         <Text
@@ -1387,7 +1386,7 @@ function DriverCommandCenter({
           size={19}
           strokeWidth={2.4}
         />
-      </Pressable>
+      </PressableScale>
 
       <View style={styles.commandMetaStrip}>
         <View style={styles.commandMetaItem}>
@@ -1556,15 +1555,14 @@ function BottomTabButton({ active, clientMode = false, item, onPress }: BottomTa
       : kinetixColors.amber;
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.bottomTab,
         clientMode && styles.clientBottomTab,
         active && (clientMode ? styles.clientBottomTabActive : styles.bottomTabActive),
-        pressed && styles.pressed,
       ]}
     >
       {clientMode ? null : <View style={[styles.bottomTabIndicator, active && styles.bottomTabIndicatorActive]} />}
@@ -1584,7 +1582,7 @@ function BottomTabButton({ active, clientMode = false, item, onPress }: BottomTa
       <Text numberOfLines={1} style={[styles.bottomTabText, active && styles.bottomTabTextActive]}>
         {title}
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -1736,11 +1734,11 @@ function DrawerMenuItem({ active, index, item, onPress, progress }: DrawerMenuIt
 
   return (
     <Animated.View style={cascadeStyle}>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityState={{ selected: active }}
         onPress={onPress}
-        style={({ pressed }) => [styles.drawerItem, active && styles.drawerItemActive, pressed && styles.pressed]}
+        style={[styles.drawerItem, active && styles.drawerItemActive]}
       >
         <View style={[styles.drawerIconWrap, active && styles.drawerIconWrapActive]}>
           <Icon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.4} />
@@ -1751,7 +1749,7 @@ function DrawerMenuItem({ active, index, item, onPress, progress }: DrawerMenuIt
           </Text>
           <Text numberOfLines={1} style={styles.drawerItemSubtitle}>{item.subtitle}</Text>
         </View>
-      </Pressable>
+      </PressableScale>
     </Animated.View>
   );
 }
@@ -1765,17 +1763,17 @@ function QuickActionCard({ action, onActionTarget }: QuickActionCardProps) {
   const Icon = iconMap[action.icon];
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       onPress={() => onActionTarget(action.target)}
-      style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}
+      style={styles.quickCard}
     >
       <View style={styles.quickIconWrap}>
         <Icon color="#008D49" size={21} strokeWidth={2.3} />
       </View>
       <Text numberOfLines={2} style={styles.quickTitle}>{action.title}</Text>
       <Text numberOfLines={2} style={styles.quickSubtitle}>{action.subtitle}</Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
