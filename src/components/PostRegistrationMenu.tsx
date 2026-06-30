@@ -14,6 +14,7 @@ import {
   Bell,
   BriefcaseBusiness,
   Car,
+  ChevronRight,
   Clock,
   CreditCard,
   FileText,
@@ -24,6 +25,7 @@ import {
   Menu as MenuIcon,
   Package,
   Phone,
+  Plus,
   RefreshCw,
   Route,
   Settings,
@@ -347,11 +349,13 @@ export function PostRegistrationMenu({
     <View style={styles.shell}>
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
         {isClientRole ? (
-          <ClientTopBar
-            displayName={displayName}
-            onOpenMenu={() => setDrawerOpen(true)}
-            onOpenSettings={handleClientSettingsPress}
-          />
+          activeItem.id === 'home' ? null : (
+            <ClientTopBar
+              displayName={displayName}
+              onOpenMenu={() => setDrawerOpen(true)}
+              onOpenSettings={handleClientSettingsPress}
+            />
+          )
         ) : (
           <View style={styles.topBar}>
             <Pressable
@@ -414,6 +418,7 @@ export function PostRegistrationMenu({
                 onDeleteAccount={onDeleteAccount}
                 onOpenActiveOrder={onOpenActiveOrder}
                 onOpenDelivery={onOpenDelivery}
+                onOpenMenu={() => setDrawerOpen(true)}
                 onOpenOrderFlow={onOpenOrderFlow}
                 onOpenOrderHistory={onOpenOrderHistory}
                 onOpenSavedPlace={onOpenSavedPlace}
@@ -545,6 +550,7 @@ type ClientPageViewProps = {
   onDeleteAccount: () => void;
   onOpenActiveOrder?: () => void;
   onOpenDelivery: () => void;
+  onOpenMenu: () => void;
   onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
   onOpenSavedPlace: () => void;
@@ -558,6 +564,7 @@ function ClientPageView({
   onDeleteAccount,
   onOpenActiveOrder,
   onOpenDelivery,
+  onOpenMenu,
   onOpenOrderFlow,
   onOpenOrderHistory,
   onOpenSavedPlace,
@@ -598,8 +605,11 @@ function ClientPageView({
       displayName={displayName}
       onOpenActiveOrder={onOpenActiveOrder}
       onOpenDelivery={onOpenDelivery}
+      onOpenMenu={onOpenMenu}
       onOpenOrderFlow={onOpenOrderFlow}
+      onOpenSavedPlace={onOpenSavedPlace}
       orderSummary={orderSummary}
+      savedHomeAddressLabel={savedHomeAddressLabel}
     />
   );
 }
@@ -609,90 +619,144 @@ function ClientHomePage({
   displayName,
   onOpenActiveOrder,
   onOpenDelivery,
+  onOpenMenu,
   onOpenOrderFlow,
+  onOpenSavedPlace,
   orderSummary,
+  savedHomeAddressLabel,
 }: {
   availableCarsCount: number;
   displayName: string;
   orderSummary?: ClientOrderSummary;
+  savedHomeAddressLabel?: string;
   onOpenActiveOrder?: () => void;
   onOpenDelivery: () => void;
+  onOpenMenu: () => void;
   onOpenOrderFlow: () => void;
+  onOpenSavedPlace: () => void;
 }) {
+  const carsLabel =
+    availableCarsCount > 0
+      ? `${availableCarsCount} ${formatCarsWord(availableCarsCount)} рядом · подача ~4 мин`
+      : 'Ищем ближайшую машину';
+
   return (
-    <View style={styles.clientFocusPage}>
-      {onOpenActiveOrder && orderSummary?.activeOrder ? (
-        <StaggerView index={0}>
+    <View style={styles.clientHome}>
+      <StaggerView index={0} style={styles.clientHero}>
+        <View style={styles.clientHeroGlow} />
+        <View style={styles.clientHeroRow}>
+          <View style={styles.clientHeroCopy}>
+            <Text numberOfLines={1} style={styles.clientHeroGreeting}>Здравствуйте, {displayName}</Text>
+            <Text numberOfLines={1} style={styles.clientHeroSub}>Куда поедем сегодня?</Text>
+          </View>
           <PressableScale
-            accessibilityLabel="Открыть текущий заказ"
+            accessibilityLabel="Открыть меню"
             accessibilityRole="button"
-            onPress={onOpenActiveOrder}
-            style={styles.activeOrderCard}
+            onPress={onOpenMenu}
+            style={styles.clientHeroMenu}
           >
-            <View style={styles.activeOrderIcon}>
-              <Route color="#06140D" size={20} strokeWidth={2.6} />
+            <MenuIcon color={kinetixColors.lime} size={24} strokeWidth={2.4} />
+          </PressableScale>
+        </View>
+        <View style={styles.clientHeroPill}>
+          <View style={styles.clientHeroDot} />
+          <Text numberOfLines={1} style={styles.clientHeroPillText}>{carsLabel}</Text>
+        </View>
+      </StaggerView>
+
+      <View style={styles.clientHomeBody}>
+        {onOpenActiveOrder && orderSummary?.activeOrder ? (
+          <StaggerView index={1}>
+            <PressableScale
+              accessibilityLabel="Открыть текущий заказ"
+              accessibilityRole="button"
+              onPress={onOpenActiveOrder}
+              style={styles.activeOrderCard}
+            >
+              <View style={styles.activeOrderIcon}>
+                <Route color="#06140D" size={20} strokeWidth={2.6} />
+              </View>
+              <View style={styles.activeOrderCopy}>
+                <Text numberOfLines={1} style={styles.activeOrderLabel}>
+                  Текущий заказ · {orderSummary.activeOrder.statusLabel}
+                </Text>
+                <Text numberOfLines={1} style={styles.activeOrderRoute}>
+                  {orderSummary.activeOrder.routeTitle ?? orderSummary.activeOrder.routeLabel}
+                </Text>
+              </View>
+              <Text style={styles.activeOrderArrow}>→</Text>
+            </PressableScale>
+          </StaggerView>
+        ) : null}
+
+        <StaggerView index={2}>
+          <PressableScale
+            accessibilityLabel="Вызвать такси"
+            accessibilityRole="button"
+            onPress={onOpenOrderFlow}
+            style={styles.clientActionPrimary}
+          >
+            <View style={styles.clientActionIconPrimary}>
+              <Car color="#F4FAF6" size={26} strokeWidth={2.4} />
             </View>
-            <View style={styles.activeOrderCopy}>
-              <Text numberOfLines={1} style={styles.activeOrderLabel}>
-                Текущий заказ · {orderSummary.activeOrder.statusLabel}
-              </Text>
-              <Text numberOfLines={1} style={styles.activeOrderRoute}>
-                {orderSummary.activeOrder.routeTitle ?? orderSummary.activeOrder.routeLabel}
-              </Text>
+            <View style={styles.clientActionCopy}>
+              <Text numberOfLines={1} style={styles.clientActionTitle}>Вызвать такси</Text>
+              <Text numberOfLines={1} style={styles.clientActionSub}>По адресу или домой</Text>
             </View>
-            <Text style={styles.activeOrderArrow}>→</Text>
+            <ChevronRight color="#B7C8BF" size={22} strokeWidth={2.4} />
           </PressableScale>
         </StaggerView>
-      ) : null}
 
-      <StaggerView index={1} style={styles.clientWelcomePanel}>
-        <Text style={styles.clientWelcomeTitle}>Здравствуйте, {displayName}!</Text>
-        <Text numberOfLines={2} style={styles.clientWelcomeText}>
-          Нужна поездка или доставка в Салавате?
-        </Text>
-      </StaggerView>
+        <StaggerView index={3}>
+          <PressableScale
+            accessibilityLabel="Доставка"
+            accessibilityRole="button"
+            onPress={onOpenDelivery}
+            style={styles.clientActionSecondary}
+          >
+            <View style={styles.clientActionIconSecondary}>
+              <Package color={kinetixColors.amber} size={23} strokeWidth={2.4} />
+            </View>
+            <View style={styles.clientActionCopy}>
+              <Text numberOfLines={1} style={styles.clientActionTitleSm}>Доставка</Text>
+              <Text numberOfLines={1} style={styles.clientActionSub}>Привезём и передадим</Text>
+            </View>
+            <ChevronRight color="#B7C8BF" size={22} strokeWidth={2.4} />
+          </PressableScale>
+        </StaggerView>
 
-      <StaggerView index={2} style={styles.clientServiceRow}>
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel="Заказать такси"
-          onPress={onOpenOrderFlow}
-          style={styles.clientServiceTile}
-        >
-          <View style={styles.clientMainOrderIcon}>
-            <MapPinned color="#F4FAF6" size={26} strokeWidth={2.6} />
-          </View>
-          <Text style={styles.clientServiceTitle}>Такси</Text>
-          <Text numberOfLines={1} style={styles.clientServiceText}>Поездка по адресу</Text>
-        </PressableScale>
-
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel="Заказать доставку"
-          onPress={onOpenDelivery}
-          style={styles.clientServiceTile}
-        >
-          <View style={styles.clientMainOrderIcon}>
-            <Package color="#F4FAF6" size={26} strokeWidth={2.6} />
-          </View>
-          <Text style={styles.clientServiceTitle}>Доставка</Text>
-          <Text numberOfLines={1} style={styles.clientServiceText}>Привезём и передадим</Text>
-        </PressableScale>
-      </StaggerView>
-
-      <StaggerView index={3}>
-        <ClientPremiumTrustRail
-          activeOrder={orderSummary?.activeOrder}
-          availableCarsCount={availableCarsCount}
-        />
-      </StaggerView>
-
-      <StaggerView index={4}>
-        <ClientMapPreview
-          activeOrder={orderSummary?.activeOrder}
-          availableCarsCount={availableCarsCount}
-        />
-      </StaggerView>
+        <StaggerView index={4} style={styles.clientFavSection}>
+          <Text style={styles.clientFavTitle}>Частые адреса</Text>
+          {savedHomeAddressLabel ? (
+            <PressableScale
+              accessibilityLabel="Поездка домой"
+              accessibilityRole="button"
+              onPress={onOpenOrderFlow}
+              style={styles.clientFavRow}
+            >
+              <View style={styles.clientFavIcon}>
+                <Home color={kinetixColors.amber} size={20} strokeWidth={2.3} />
+              </View>
+              <View style={styles.clientActionCopy}>
+                <Text numberOfLines={1} style={styles.clientFavName}>Домой</Text>
+                <Text numberOfLines={1} style={styles.clientFavAddr}>{savedHomeAddressLabel}</Text>
+              </View>
+              <ChevronRight color="#C2D2C9" size={20} strokeWidth={2.4} />
+            </PressableScale>
+          ) : null}
+          <PressableScale
+            accessibilityLabel={savedHomeAddressLabel ? 'Изменить адрес' : 'Добавить адрес'}
+            accessibilityRole="button"
+            onPress={onOpenSavedPlace}
+            style={styles.clientFavAdd}
+          >
+            <Plus color={kinetixColors.amber} size={18} strokeWidth={2.6} />
+            <Text style={styles.clientFavAddText}>
+              {savedHomeAddressLabel ? 'Изменить адрес' : 'Добавить адрес'}
+            </Text>
+          </PressableScale>
+        </StaggerView>
+      </View>
     </View>
   );
 }
