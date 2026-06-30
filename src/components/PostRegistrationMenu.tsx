@@ -2082,9 +2082,8 @@ function SectionPageView({
       <View style={styles.metricsGrid}>
         {page.metrics.map((metric) => (
           <View key={metric.label} style={styles.metricCard}>
-            <Text style={styles.metricLabel}>{metric.label}</Text>
             <Text style={styles.metricValue}>{metric.value}</Text>
-            <Text style={styles.metricHelper}>{metric.helper}</Text>
+            <Text numberOfLines={2} style={styles.metricLabel}>{metric.label}</Text>
           </View>
         ))}
       </View>
@@ -2403,8 +2402,8 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.metricCard}>
-      <Text style={styles.metricLabel}>{label}</Text>
       <Text style={styles.metricValue}>{value}</Text>
+      <Text numberOfLines={2} style={styles.metricLabel}>{label}</Text>
     </View>
   );
 }
