@@ -66,28 +66,21 @@ export function SupportChatScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-        <View style={styles.topBar}>
+        <View style={styles.header}>
           <Pressable
+            accessibilityLabel="Назад"
             accessibilityRole="button"
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
-            <Text style={styles.backButtonText}>Назад</Text>
+            <ArrowLeft color="#12382C" size={22} strokeWidth={2.3} />
           </Pressable>
-          <Text style={styles.roleText}>{roleCopy[role].title}</Text>
-        </View>
-
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Headphones color="#008D49" size={30} strokeWidth={2.4} />
+          <View style={styles.headerCopy}>
+            <Text style={styles.title}>Поддержка</Text>
+            <Text numberOfLines={1} style={styles.subtitle}>Поможем с поездкой и оплатой</Text>
           </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.title}>Чат поддержки</Text>
-            <Text style={styles.subtitle}>
-              Поможем с поездкой, оплатой или профилем.
-            </Text>
-            <Text style={styles.metaLine}>{firstName?.trim() || 'Пользователь'}</Text>
+          <View style={styles.headerIcon}>
+            <Headphones color="#008D49" size={22} strokeWidth={2.3} />
           </View>
         </View>
 
@@ -188,31 +181,27 @@ function MessageBubble({ message }: { message: SupportMessage }) {
   );
 }
 
+const LINE = 'rgba(11, 47, 37, 0.10)';
+
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: LINE,
+    borderRadius: 14,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    minHeight: 42,
-    paddingHorizontal: 12,
-  },
-  backButtonText: {
-    color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
   },
   categoryButton: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    backgroundColor: '#F7FBF8',
+    borderColor: LINE,
+    borderRadius: 999,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 11,
+    minHeight: 38,
+    paddingHorizontal: 15,
   },
   categoryButtonActive: {
     backgroundColor: '#008D49',
@@ -221,7 +210,7 @@ const styles = StyleSheet.create({
   categoryButtonText: {
     color: '#12382C',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '600',
   },
   categoryButtonTextActive: {
     color: '#F4FAF6',
@@ -233,8 +222,8 @@ const styles = StyleSheet.create({
   },
   chatPanel: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: LINE,
+    borderRadius: 18,
     borderWidth: 1,
     gap: 14,
     padding: 16,
@@ -245,64 +234,63 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   compactSection: {
-    gap: 8,
+    gap: 9,
   },
-  hero: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
+  header: {
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: 14,
-    padding: 16,
+    gap: 12,
+    paddingHorizontal: 2,
+    paddingTop: 2,
   },
-  heroCopy: {
+  headerCopy: {
     flex: 1,
-    gap: 7,
     minWidth: 0,
   },
-  heroIcon: {
+  headerIcon: {
     alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    height: 58,
+    backgroundColor: '#F7FBF8',
+    borderColor: 'rgba(0, 141, 73, 0.2)',
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 44,
     justifyContent: 'center',
-    width: 58,
+    width: 44,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#557669',
-    borderRadius: 8,
+    backgroundColor: '#F7FBF8',
+    borderColor: LINE,
+    borderRadius: 14,
     borderWidth: 1,
     color: '#12382C',
     flex: 1,
     fontSize: 15,
-    minHeight: 56,
+    minHeight: 52,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   messageAuthor: {
-    color: '#557669',
+    color: '#6E8579',
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   messageAuthorUser: {
-    color: '#E8F3EF',
+    color: 'rgba(255, 255, 255, 0.75)',
   },
   messageBubble: {
     alignSelf: 'flex-start',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    backgroundColor: '#F1F7F3',
+    borderColor: LINE,
+    borderRadius: 14,
     borderWidth: 1,
     gap: 4,
-    maxWidth: '92%',
-    padding: 11,
+    maxWidth: '88%',
+    paddingHorizontal: 13,
+    paddingVertical: 11,
   },
   messageBubbleSupport: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
+    borderColor: LINE,
   },
   messageBubbleUser: {
     alignSelf: 'flex-end',
@@ -314,91 +302,76 @@ const styles = StyleSheet.create({
   },
   messageText: {
     color: '#12382C',
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
   },
   messageTextUser: {
     color: '#F4FAF6',
   },
-  metaLine: {
-    color: '#008D49',
-    fontSize: 13,
-    fontWeight: '900',
-  },
   page: {
-    backgroundColor: '#F4FAF6',
+    backgroundColor: '#EEF4F0',
     gap: 16,
     minHeight: '100%',
     padding: 16,
   },
   panel: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: LINE,
+    borderRadius: 18,
     borderWidth: 1,
     gap: 14,
-    padding: 14,
+    padding: 16,
   },
   pressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.95 }],
+    opacity: 0.9,
+    transform: [{ scale: 0.97 }],
   },
   quickButton: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#F7FBF8',
+    borderColor: LINE,
+    borderRadius: 12,
     borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 46,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
   },
   quickButtonText: {
     color: '#12382C',
-    fontSize: 13,
-    fontWeight: '900',
+    fontSize: 13.5,
+    fontWeight: '600',
   },
   quickList: {
     gap: 8,
   },
-  roleText: {
-    color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
-  },
   safeArea: {
-    backgroundColor: '#F4FAF6',
+    backgroundColor: '#EEF4F0',
     flex: 1,
   },
   sectionTitle: {
     color: '#12382C',
-    fontSize: 15,
-    fontWeight: '900',
+    fontSize: 14,
+    fontWeight: '700',
   },
   sendButton: {
     alignItems: 'center',
     backgroundColor: '#008D49',
-    borderRadius: 8,
-    height: 50,
+    borderRadius: 14,
+    height: 52,
     justifyContent: 'center',
-    width: 50,
+    width: 52,
   },
   subtitle: {
-    color: '#557669',
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#6E8579',
+    fontSize: 13,
+    marginTop: 2,
   },
   title: {
     color: '#12382C',
-    fontSize: 26,
-    fontWeight: '900',
-    lineHeight: 32,
-  },
-  topBar: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
 });
