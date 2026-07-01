@@ -1,6 +1,17 @@
 import { useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, Headphones, Send } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  FileText,
+  Headphones,
+  Route,
+  Send,
+  ShieldCheck,
+  User,
+  Wallet,
+  type LucideProps,
+} from 'lucide-react-native';
+import type { ComponentType } from 'react';
 import {
   Pressable,
   SafeAreaView,
@@ -18,6 +29,13 @@ import { SupportMessage, useAppState } from '../state/AppState';
 type Props = NativeStackScreenProps<RootStackParamList, 'SupportChat'>;
 
 const categories = ['Поездка', 'Оплата', 'Профиль', 'Безопасность', 'Документы'];
+const categoryIcon: Record<string, ComponentType<LucideProps>> = {
+  Безопасность: ShieldCheck,
+  Документы: FileText,
+  Оплата: Wallet,
+  Поездка: Route,
+  Профиль: User,
+};
 const quickMessages = [
   'Текущая поездка',
   'Стоимость и чек',
@@ -66,21 +84,30 @@ export function SupportChatScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Pressable
-            accessibilityLabel="Назад"
-            accessibilityRole="button"
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          >
-            <ArrowLeft color="#12382C" size={22} strokeWidth={2.3} />
-          </Pressable>
-          <View style={styles.headerCopy}>
-            <Text style={styles.title}>Поддержка</Text>
-            <Text numberOfLines={1} style={styles.subtitle}>Поможем с поездкой и оплатой</Text>
+        <View style={styles.hero}>
+          <View style={styles.heroGlow} />
+          <View style={styles.heroTop}>
+            <Pressable
+              accessibilityLabel="Назад"
+              accessibilityRole="button"
+              onPress={() => navigation.goBack()}
+              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+            >
+              <ArrowLeft color="#EAF6EF" size={21} strokeWidth={2.3} />
+            </Pressable>
+            <View style={styles.heroOnline}>
+              <View style={styles.heroDot} />
+              <Text style={styles.heroOnlineText}>На связи</Text>
+            </View>
           </View>
-          <View style={styles.headerIcon}>
-            <Headphones color="#008D49" size={22} strokeWidth={2.3} />
+          <View style={styles.heroMain}>
+            <View style={styles.heroIcon}>
+              <Headphones color="#5CE6A0" size={24} strokeWidth={2.3} />
+            </View>
+            <View style={styles.headerCopy}>
+              <Text style={styles.title}>Поддержка</Text>
+              <Text numberOfLines={1} style={styles.subtitle}>Обычно отвечаем за ~5 минут</Text>
+            </View>
           </View>
         </View>
 
@@ -88,28 +115,34 @@ export function SupportChatScreen({ navigation, route }: Props) {
           <View style={styles.compactSection}>
             <Text style={styles.sectionTitle}>Категория</Text>
             <View style={styles.categoryRow}>
-              {categories.map((item) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: item === category }}
-                  key={item}
-                  onPress={() => setCategory(item)}
-                  style={({ pressed }) => [
-                    styles.categoryButton,
-                    item === category && styles.categoryButtonActive,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.categoryButtonText,
-                      item === category && styles.categoryButtonTextActive,
+              {categories.map((item) => {
+                const active = item === category;
+                const Icon = categoryIcon[item] ?? Route;
+
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    key={item}
+                    onPress={() => setCategory(item)}
+                    style={({ pressed }) => [
+                      styles.categoryButton,
+                      active && styles.categoryButtonActive,
+                      pressed && styles.pressed,
                     ]}
                   >
-                    {item}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Icon color={active ? '#F4FAF6' : '#008D49'} size={15} strokeWidth={2.3} />
+                    <Text
+                      style={[
+                        styles.categoryButtonText,
+                        active && styles.categoryButtonTextActive,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
 
@@ -165,18 +198,24 @@ function MessageBubble({ message }: { message: SupportMessage }) {
   const isUser = message.author === 'user';
   const isSupport = message.author === 'support';
 
+  if (isUser) {
+    return (
+      <View style={[styles.messageBubble, styles.messageBubbleUser]}>
+        <Text style={[styles.messageAuthor, styles.messageAuthorUser]}>Вы</Text>
+        <Text style={[styles.messageText, styles.messageTextUser]}>{message.text}</Text>
+      </View>
+    );
+  }
+
   return (
-    <View
-      style={[
-        styles.messageBubble,
-        isUser && styles.messageBubbleUser,
-        isSupport && styles.messageBubbleSupport,
-      ]}
-    >
-      <Text style={[styles.messageAuthor, isUser && styles.messageAuthorUser]}>
-        {isUser ? 'Вы' : isSupport ? 'Поддержка' : 'Система'}
-      </Text>
-      <Text style={[styles.messageText, isUser && styles.messageTextUser]}>{message.text}</Text>
+    <View style={styles.supportRow}>
+      <View style={styles.supportAvatar}>
+        <Headphones color="#5CE6A0" size={15} strokeWidth={2.3} />
+      </View>
+      <View style={[styles.messageBubble, isSupport && styles.messageBubbleSupport]}>
+        <Text style={styles.messageAuthor}>{isSupport ? 'Поддержка' : 'Система'}</Text>
+        <Text style={styles.messageText}>{message.text}</Text>
+      </View>
     </View>
   );
 }
@@ -186,22 +225,24 @@ const LINE = 'rgba(11, 47, 37, 0.10)';
 const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: LINE,
-    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(92, 230, 160, 0.22)',
+    borderRadius: 13,
     borderWidth: 1,
-    height: 44,
+    height: 42,
     justifyContent: 'center',
-    width: 44,
+    width: 42,
   },
   categoryButton: {
+    alignItems: 'center',
     backgroundColor: '#F7FBF8',
     borderColor: LINE,
     borderRadius: 999,
     borderWidth: 1,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 7,
     minHeight: 38,
-    paddingHorizontal: 15,
+    paddingHorizontal: 14,
   },
   categoryButtonActive: {
     backgroundColor: '#008D49',
@@ -236,26 +277,77 @@ const styles = StyleSheet.create({
   compactSection: {
     gap: 9,
   },
-  header: {
+  hero: {
+    backgroundColor: '#0A1411',
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
+    marginHorizontal: -16,
+    marginTop: -16,
+    overflow: 'hidden',
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    position: 'relative',
+  },
+  heroGlow: {
+    backgroundColor: 'rgba(92, 230, 160, 0.10)',
+    borderRadius: 90,
+    height: 180,
+    position: 'absolute',
+    right: -40,
+    top: -30,
+    width: 180,
+  },
+  heroTop: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 2,
-    paddingTop: 2,
+    justifyContent: 'space-between',
+    position: 'relative',
+    zIndex: 1,
+  },
+  heroOnline: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(92, 230, 160, 0.12)',
+    borderColor: 'rgba(92, 230, 160, 0.30)',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  heroDot: {
+    backgroundColor: '#B7F46A',
+    borderRadius: 4,
+    height: 7,
+    width: 7,
+  },
+  heroOnlineText: {
+    color: '#5CE6A0',
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  heroMain: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 14,
+    marginTop: 18,
+    position: 'relative',
+    zIndex: 1,
+  },
+  heroIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(92, 230, 160, 0.12)',
+    borderColor: 'rgba(92, 230, 160, 0.22)',
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
   },
   headerCopy: {
     flex: 1,
     minWidth: 0,
-  },
-  headerIcon: {
-    alignItems: 'center',
-    backgroundColor: '#F7FBF8',
-    borderColor: 'rgba(0, 141, 73, 0.2)',
-    borderRadius: 14,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
   },
   input: {
     backgroundColor: '#F7FBF8',
@@ -283,8 +375,8 @@ const styles = StyleSheet.create({
     borderColor: LINE,
     borderRadius: 14,
     borderWidth: 1,
+    flexShrink: 1,
     gap: 4,
-    maxWidth: '88%',
     paddingHorizontal: 13,
     paddingVertical: 11,
   },
@@ -296,6 +388,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     backgroundColor: '#008D49',
     borderColor: '#008D49',
+    maxWidth: '86%',
   },
   messages: {
     gap: 9,
@@ -364,13 +457,29 @@ const styles = StyleSheet.create({
     width: 52,
   },
   subtitle: {
-    color: '#6E8579',
+    color: '#93BAA8',
     fontSize: 13,
+    marginTop: 3,
+  },
+  supportAvatar: {
+    alignItems: 'center',
+    backgroundColor: '#0A1411',
+    borderRadius: 11,
+    height: 30,
+    justifyContent: 'center',
     marginTop: 2,
+    width: 30,
+  },
+  supportRow: {
+    alignItems: 'flex-end',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+    maxWidth: '92%',
   },
   title: {
-    color: '#12382C',
-    fontSize: 24,
+    color: '#F2FBF6',
+    fontSize: 23,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
