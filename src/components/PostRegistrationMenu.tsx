@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import {
+  BarChart3,
   Bell,
   BriefcaseBusiness,
   Car,
@@ -1492,7 +1493,6 @@ type DriverCommandCenterProps = {
 };
 
 function DriverHomePage({
-  appTitle,
   driverLine,
   driverStats,
   isSelfEmployedDriver,
@@ -1501,12 +1501,7 @@ function DriverHomePage({
   onToggleDriverLine,
 }: DriverCommandCenterProps & { appTitle: string }) {
   return (
-    <>
-      <View style={styles.routeRow}>
-        <Text style={styles.routeText}>{appTitle}</Text>
-        <Text style={styles.routeDivider}>/</Text>
-        <Text style={styles.routeTextActive}>Главная</Text>
-      </View>
+    <View style={styles.driverHome}>
       <DriverCommandCenter
         driverLine={driverLine}
         driverStats={driverStats}
@@ -1515,7 +1510,7 @@ function DriverHomePage({
         onOpenSubscription={onOpenSubscription}
         onToggleDriverLine={onToggleDriverLine}
       />
-    </>
+    </View>
   );
 }
 
@@ -1527,122 +1522,130 @@ function DriverCommandCenter({
   onOpenSubscription,
   onToggleDriverLine,
 }: DriverCommandCenterProps) {
-  const lineLabel = driverLine.isOnline ? 'На линии' : 'Не на линии';
+  const online = driverLine.isOnline;
+  const lineLabel = online ? 'Вы на линии' : 'Вы не на линии';
   const lineHint = driverLine.canToggle
-    ? driverLine.isOnline
-      ? 'Смена активна'
-      : 'Готов к заказам'
+    ? online
+      ? 'Смена активна — заказы придут в ленту'
+      : 'Готовы принимать заказы'
     : `Доступ: ${driverLine.status}`;
   const blockers = formatDriverBlockers(driverLine.accessBlockers ?? []);
   const [statsOpen, setStatsOpen] = useState(false);
 
-  return (
-    <View style={[styles.commandPanel, driverLine.isOnline && styles.commandPanelOnline]}>
-      <View style={styles.commandHeader}>
-        <View style={[styles.commandIconPrimary, driverLine.isOnline && styles.commandIconOnline]}>
-          <Car color={driverLine.isOnline ? '#008D49' : '#12382C'} size={30} strokeWidth={2.5} />
-        </View>
-        <View style={styles.commandCopy}>
-          <Text style={styles.commandEyebrow}>{isSelfEmployedDriver ? 'Смена' : 'Линия'}</Text>
-          <Text style={styles.commandTitle}>{lineLabel}</Text>
-          <Text style={styles.commandText}>{lineHint}</Text>
-        </View>
-      </View>
+  const stats = [
+    { Icon: BriefcaseBusiness, label: 'заказы', value: String(driverStats?.todayOrders ?? 0) },
+    { Icon: Wallet, label: 'сегодня', value: `${driverStats?.grossToday ?? 0} ₽` },
+    {
+      Icon: ShieldCheck,
+      label: formatDriverAccessUntil(driverStats),
+      value: formatDriverAccessLabel(driverStats),
+    },
+  ];
 
-      <PressableScale
-        accessibilityRole="button"
-        disabled={!driverLine.canToggle}
-        onPress={onToggleDriverLine}
-        style={[
-          styles.commandPrimaryButton,
-          driverLine.isOnline && styles.commandPrimaryButtonOnline,
-          !driverLine.canToggle && styles.commandPrimaryButtonDisabled,
-        ]}
-      >
-        <Text
+  return (
+    <>
+      <StaggerView index={0} style={styles.driverHero}>
+        <View style={styles.driverHeroGlow} />
+        <View style={styles.driverHeroTop}>
+          <Text style={styles.driverHeroEyebrow}>{isSelfEmployedDriver ? 'Смена' : 'Линия'}</Text>
+          <View style={[styles.driverHeroPill, online && styles.driverHeroPillOn]}>
+            <View style={[styles.driverHeroDot, online && styles.driverHeroDotOn]} />
+            <Text style={[styles.driverHeroPillText, online && styles.driverHeroPillTextOn]}>
+              {online ? 'В сети' : 'Не в сети'}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.driverHeroTitle}>{lineLabel}</Text>
+        <Text numberOfLines={2} style={styles.driverHeroSub}>{lineHint}</Text>
+        <PressableScale
+          accessibilityRole="button"
+          disabled={!driverLine.canToggle}
+          onPress={onToggleDriverLine}
           style={[
-            styles.commandPrimaryButtonText,
-            driverLine.isOnline && styles.commandPrimaryButtonTextOnline,
+            styles.driverHeroCta,
+            online && styles.driverHeroCtaStop,
+            !driverLine.canToggle && styles.driverHeroCtaDisabled,
           ]}
         >
-          {driverLine.isOnline ? 'Завершить смену' : 'Выйти на линию'}
-        </Text>
-        <Route
-          color={driverLine.isOnline ? '#008D49' : '#F4FAF6'}
-          size={19}
-          strokeWidth={2.4}
-        />
-      </PressableScale>
-
-      <View style={styles.commandMetaStrip}>
-        <View style={styles.commandMetaItem}>
-          <Text style={styles.commandMetaValue}>{driverStats?.todayOrders ?? 0}</Text>
-          <Text numberOfLines={1} style={styles.commandMetaLabel}>заказы</Text>
-        </View>
-        <View style={styles.commandMetaDivider} />
-        <View style={styles.commandMetaItem}>
-          <Text style={styles.commandMetaValue}>{driverStats?.grossToday ?? 0} ₽</Text>
-          <Text numberOfLines={1} style={styles.commandMetaLabel}>сегодня</Text>
-        </View>
-        <View style={styles.commandMetaDivider} />
-        <View style={styles.commandMetaItem}>
-          <Text style={styles.commandMetaValue}>{formatDriverAccessLabel(driverStats)}</Text>
-          <Text numberOfLines={1} style={styles.commandMetaLabel}>{formatDriverAccessUntil(driverStats)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.driverAccessStrip}>
-        <View style={styles.driverAccessIcon}>
-          <ShieldCheck color="#008D49" size={18} strokeWidth={2.4} />
-        </View>
-        <View style={styles.driverAccessCopy}>
-          <Text style={styles.driverAccessTitle}>
-            {driverLine.canToggle ? 'Допуск готов' : 'Нужны действия'}
+          <Route color={online ? '#F2FBF6' : '#0A1411'} size={19} strokeWidth={2.5} />
+          <Text style={[styles.driverHeroCtaText, online && styles.driverHeroCtaTextStop]}>
+            {online ? 'Завершить смену' : 'Выйти на линию'}
           </Text>
-          <Text numberOfLines={2} style={styles.driverAccessText}>
-            {driverLine.canToggle
-              ? 'Можно принимать заказы.'
-              : `Не закрыто: ${blockers}`}
-          </Text>
-        </View>
-      </View>
+        </PressableScale>
+      </StaggerView>
 
-      <View style={styles.commandSecondaryRow}>
-        <Pressable
+      <StaggerView index={1} style={styles.driverStatsRow}>
+        {stats.map(({ Icon, label, value }) => (
+          <View key={label} style={styles.driverStatCard}>
+            <View style={styles.driverStatIcon}>
+              <Icon color={kinetixColors.amber} size={17} strokeWidth={2.35} />
+            </View>
+            <Text numberOfLines={1} style={styles.driverStatValue}>{value}</Text>
+            <Text numberOfLines={1} style={styles.driverStatLabel}>{label}</Text>
+          </View>
+        ))}
+      </StaggerView>
+
+      <StaggerView index={2}>
+        <View style={[styles.driverAccessCard, !driverLine.canToggle && styles.driverAccessCardWarn]}>
+          <View style={[styles.driverAccessCardIcon, !driverLine.canToggle && styles.driverAccessCardIconWarn]}>
+            <ShieldCheck
+              color={driverLine.canToggle ? kinetixColors.amber : '#C0890F'}
+              size={18}
+              strokeWidth={2.4}
+            />
+          </View>
+          <View style={styles.driverAccessCardCopy}>
+            <Text style={styles.driverAccessCardTitle}>
+              {driverLine.canToggle ? 'Допуск готов' : 'Нужны действия'}
+            </Text>
+            <Text numberOfLines={2} style={styles.driverAccessCardText}>
+              {driverLine.canToggle ? 'Можно принимать заказы.' : `Не закрыто: ${blockers}`}
+            </Text>
+          </View>
+        </View>
+      </StaggerView>
+
+      <StaggerView index={3} style={styles.driverActionRow}>
+        <PressableScale
           accessibilityRole="button"
           onPress={onOpenOrderFlow}
-          style={({ pressed }) => [styles.commandSecondaryButton, pressed && styles.pressed]}
+          style={styles.driverActionBtn}
         >
-          <BriefcaseBusiness color="#008D49" size={16} strokeWidth={2.4} />
-          <Text style={styles.commandSecondaryButtonText}>Заказы</Text>
-        </Pressable>
-        <Pressable
+          <BriefcaseBusiness color={kinetixColors.amber} size={18} strokeWidth={2.4} />
+          <Text style={styles.driverActionText}>Заказы</Text>
+        </PressableScale>
+        <PressableScale
           accessibilityRole="button"
           onPress={onOpenSubscription}
-          style={({ pressed }) => [styles.commandSecondaryButton, pressed && styles.pressed]}
+          style={styles.driverActionBtn}
         >
-          <Wallet color="#008D49" size={17} strokeWidth={2.4} />
-          <Text style={styles.commandSecondaryButtonText}>Оплата</Text>
-        </Pressable>
-        <Pressable
+          <Wallet color={kinetixColors.amber} size={18} strokeWidth={2.4} />
+          <Text style={styles.driverActionText}>Оплата</Text>
+        </PressableScale>
+        <PressableScale
+          accessibilityLabel="Статистика"
           accessibilityRole="button"
-          accessibilityState={{ expanded: statsOpen }}
           onPress={() => setStatsOpen((current) => !current)}
-          style={({ pressed }) => [
-            styles.commandSecondaryButton,
-            statsOpen && styles.commandSecondaryButtonActive,
-            pressed && styles.pressed,
-          ]}
+          style={[styles.driverActionBtn, statsOpen && styles.driverActionBtnActive]}
         >
-          <Text style={[styles.commandSecondaryButtonText, statsOpen && styles.commandSecondaryButtonTextActive]}>
-            Статистика
+          <BarChart3
+            color={statsOpen ? '#0A1411' : kinetixColors.amber}
+            size={18}
+            strokeWidth={2.4}
+          />
+          <Text style={[styles.driverActionText, statsOpen && styles.driverActionTextActive]}>
+            Статы
           </Text>
-        </Pressable>
-      </View>
+        </PressableScale>
+      </StaggerView>
 
-      {statsOpen && driverStats ? <DriverStatsPanel stats={driverStats} /> : null}
-
-    </View>
+      {statsOpen && driverStats ? (
+        <StaggerView index={4}>
+          <DriverStatsPanel stats={driverStats} />
+        </StaggerView>
+      ) : null}
+    </>
   );
 }
 
