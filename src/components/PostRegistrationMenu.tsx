@@ -354,15 +354,7 @@ export function PostRegistrationMenu({
   return (
     <View style={styles.shell}>
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
-        {isClientRole ? (
-          activeItem.id === 'home' ? null : (
-            <ClientTopBar
-              displayName={displayName}
-              onOpenMenu={() => setDrawerOpen(true)}
-              onOpenSettings={handleClientSettingsPress}
-            />
-          )
-        ) : (
+        {isClientRole ? null : (
           <View style={styles.topBar}>
             <Pressable
               accessibilityLabel="Открыть меню"
@@ -585,6 +577,7 @@ function ClientPageView({
     return (
       <ClientOrdersPage
         onOpenActiveOrder={onOpenActiveOrder}
+        onOpenMenu={onOpenMenu}
         onOpenOrderHistory={onOpenOrderHistory}
         onOpenSavedPlace={onOpenSavedPlace}
         onOrderHome={onOrderHome}
@@ -604,6 +597,7 @@ function ClientPageView({
         displayName={displayName}
         initialPanel={activeItemId === 'settings' ? 'settings' : 'profile'}
         onDeleteAccount={onDeleteAccount}
+        onOpenMenu={onOpenMenu}
         onOpenSavedPlace={onOpenSavedPlace}
         onOpenSupportChat={onOpenSupportChat}
         savedHomeAddressLabel={savedHomeAddressLabel}
@@ -768,8 +762,38 @@ function ClientHomePage({
   );
 }
 
+function ClientPageHeader({
+  title,
+  subtitle,
+  onOpenMenu,
+}: {
+  title: string;
+  subtitle?: string;
+  onOpenMenu: () => void;
+}) {
+  return (
+    <View style={styles.clientPageHeader}>
+      <View style={styles.clientPageHeaderCopy}>
+        <Text style={styles.clientSectionTitle}>{title}</Text>
+        {subtitle ? (
+          <Text numberOfLines={1} style={styles.clientSectionText}>{subtitle}</Text>
+        ) : null}
+      </View>
+      <PressableScale
+        accessibilityLabel="Открыть меню"
+        accessibilityRole="button"
+        onPress={onOpenMenu}
+        style={styles.clientHeaderMenuBtn}
+      >
+        <MenuIcon color="#008D49" size={22} strokeWidth={2.5} />
+      </PressableScale>
+    </View>
+  );
+}
+
 function ClientOrdersPage({
   onOpenActiveOrder,
+  onOpenMenu,
   onOpenOrderHistory,
   onOpenSavedPlace,
   onOrderHome,
@@ -779,6 +803,7 @@ function ClientOrdersPage({
   orderSummary?: ClientOrderSummary;
   savedHomeAddressLabel?: string;
   onOpenActiveOrder?: () => void;
+  onOpenMenu: () => void;
   onOpenOrderHistory: () => void;
   onOpenSavedPlace: () => void;
   onOrderHome: () => void;
@@ -837,10 +862,11 @@ function ClientOrdersPage({
 
   return (
     <View style={styles.clientFocusPage}>
-      <View style={styles.clientSectionHeader}>
-        <Text style={styles.clientSectionTitle}>Заказы</Text>
-        <Text numberOfLines={1} style={styles.clientSectionText}>Адреса, активные и завершённые</Text>
-      </View>
+      <ClientPageHeader
+        onOpenMenu={onOpenMenu}
+        subtitle="Адреса, активные и завершённые"
+        title="Заказы"
+      />
 
       <View style={styles.clientFavSection}>
         <Text style={styles.clientFavTitle}>Частые адреса</Text>
@@ -967,6 +993,7 @@ function ClientOrdersPage({
 function ClientAccountPage({
   displayName,
   onDeleteAccount,
+  onOpenMenu,
   onOpenSavedPlace,
   onOpenSupportChat,
   savedHomeAddressLabel,
@@ -975,6 +1002,7 @@ function ClientAccountPage({
   initialPanel: 'settings' | 'profile';
   savedHomeAddressLabel?: string;
   onDeleteAccount: () => void;
+  onOpenMenu: () => void;
   onOpenSavedPlace: () => void;
   onOpenSupportChat: () => void;
 }) {
@@ -984,9 +1012,7 @@ function ClientAccountPage({
 
   return (
     <View style={styles.clientFocusPage}>
-      <View style={styles.clientSectionHeader}>
-        <Text style={styles.clientSectionTitle}>Аккаунт</Text>
-      </View>
+      <ClientPageHeader onOpenMenu={onOpenMenu} title="Аккаунт" />
 
       <View style={styles.accountProfileCard}>
         <View style={styles.accountProfileAvatar}>
