@@ -1,10 +1,11 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  ArrowLeft,
   Car,
+  Check,
   Copy,
   Gift,
+  Link2,
   Send,
   Share2,
   UserRound,
@@ -23,6 +24,9 @@ import { getPublicEnv, normalizePublicOrigin } from '../utils/runtimeFlags';
 type Props = NativeStackScreenProps<RootStackParamList, 'Referral'>;
 type InviteRole = 'client' | 'self_employed_driver';
 
+const LINE = 'rgba(11, 47, 37, 0.10)';
+const LIME = '#B7F46A';
+
 const referralStatusLabels = {
   blocked: 'Отклонён',
   qualified: 'Готов к начислению',
@@ -31,7 +35,7 @@ const referralStatusLabels = {
 };
 
 export function ReferralScreen({ navigation, route }: Props) {
-  const { firstName, role } = route.params;
+  const { role } = route.params;
   const {
     currentUser,
     referralDashboard,
@@ -67,20 +71,20 @@ export function ReferralScreen({ navigation, route }: Props) {
   const activeRule =
     activeInviteRole === 'self_employed_driver'
       ? {
-          icon: <Car color="#008D49" size={20} strokeWidth={2.4} />,
+          icon: <Car color="#008D49" size={19} strokeWidth={2.4} />,
           reward: rewards?.driverReward ?? 200,
           title: 'Пригласить водителя',
           text: `Вы получите ${rewards?.driverReward ?? 200} ₽ после ${
             rewards?.driverQualificationOrders ?? 10
-          } реальных завершенных поездок водителя. Бонус начисляет администратор после проверки.`,
+          } реальных завершённых поездок водителя. Бонус начисляет администратор после проверки.`,
         }
       : {
-          icon: <UserRound color="#008D49" size={20} strokeWidth={2.4} />,
+          icon: <UserRound color="#008D49" size={19} strokeWidth={2.4} />,
           reward: rewards?.clientReward ?? 60,
           title: 'Пригласить клиента',
           text: `Вы получите ${rewards?.clientReward ?? 60} ₽ после первых ${
             rewards?.clientQualificationOrders ?? 5
-          } завершенных поездок клиента.`,
+          } завершённых поездок клиента.`,
         };
 
   const handleCopy = async (label: string, text: string) => {
@@ -110,44 +114,57 @@ export function ReferralScreen({ navigation, route }: Props) {
         />
 
         <View style={styles.codeCard}>
-          <Text style={styles.codeLabel}>Ваш личный код</Text>
+          <View style={styles.codeGlow} />
+          <View style={styles.codeHead}>
+            <View style={styles.codeChip}>
+              <Gift color={LIME} size={14} strokeWidth={2.6} />
+              <Text style={styles.codeChipText}>Личный код</Text>
+            </View>
+            <Text style={styles.codeReward}>+{activeRule.reward} ₽ за друга</Text>
+          </View>
           <Text style={styles.codeValue}>{inviteCodeLabel}</Text>
-          <Text style={styles.linkText}>{inviteUrl}</Text>
+          <View style={styles.linkBox}>
+            <Link2 color={LIME} size={15} strokeWidth={2.4} />
+            <Text numberOfLines={1} style={styles.linkText}>
+              {inviteUrl}
+            </Text>
+          </View>
           <View style={styles.codeActions}>
             <ActionButton
-              icon={<Copy color="#12382C" size={16} strokeWidth={2.4} />}
+              icon={<Copy color={LIME} size={15} strokeWidth={2.4} />}
               label="Код"
               onPress={() => handleCopy('Код', inviteCode ?? 'Код появится после входа')}
             />
             <ActionButton
-              icon={<Copy color="#12382C" size={16} strokeWidth={2.4} />}
+              icon={<Link2 color={LIME} size={15} strokeWidth={2.4} />}
               label="Ссылка"
               onPress={() => handleCopy('Ссылка', inviteUrl)}
             />
             <ActionButton
-              icon={<Send color="#12382C" size={16} strokeWidth={2.4} />}
+              filled
+              icon={<Send color="#0A1411" size={15} strokeWidth={2.4} />}
               label="Поделиться"
               onPress={handleShare}
             />
           </View>
-          {copyStatus ? <Text style={styles.copyStatus}>{copyStatus}</Text> : null}
+          {copyStatus ? (
+            <View style={styles.copyStatus}>
+              <Check color={LIME} size={13} strokeWidth={3} />
+              <Text style={styles.copyStatusText}>{copyStatus}</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.statsGrid}>
           <StatCard
-            icon={<Wallet color="#008D49" size={20} strokeWidth={2.4} />}
+            icon={<Wallet color="#008D49" size={18} strokeWidth={2.4} />}
             label="Бонусный баланс"
             value={`${referralDashboard?.bonusBalance ?? currentUser?.bonusBalance ?? 0} ₽`}
           />
           <StatCard
-            icon={<UsersRound color="#008D49" size={20} strokeWidth={2.4} />}
+            icon={<UsersRound color="#008D49" size={18} strokeWidth={2.4} />}
             label="Приглашения"
             value={String(referralDashboard?.referrals.length ?? 0)}
-          />
-          <StatCard
-            icon={<Gift color="#008D49" size={20} strokeWidth={2.4} />}
-            label="Выбрано"
-            value={`${activeRule.reward} ₽`}
           />
         </View>
 
@@ -166,11 +183,11 @@ export function ReferralScreen({ navigation, route }: Props) {
             />
           </View>
           <View style={styles.ruleRow}>
-            <View style={styles.ruleHeader}>
-              {activeRule.icon}
+            <View style={styles.ruleIcon}>{activeRule.icon}</View>
+            <View style={styles.ruleCopy}>
               <Text style={styles.ruleTitle}>{activeRule.title}</Text>
+              <Text style={styles.ruleText}>{activeRule.text}</Text>
             </View>
-            <Text style={styles.ruleText}>{activeRule.text}</Text>
           </View>
         </View>
 
@@ -181,10 +198,13 @@ export function ReferralScreen({ navigation, route }: Props) {
               <ReferralProgressRow key={referral.id} referral={referral} />
             ))
           ) : (
-            <Text style={styles.emptyText}>
-              По этому типу приглашений пока нет. Отправьте код или ссылку, а прогресс появится
-              после регистрации приглашенного пользователя.
-            </Text>
+            <View style={styles.emptyBox}>
+              <UsersRound color="#71877D" size={20} strokeWidth={2.2} />
+              <Text style={styles.emptyText}>
+                По этому типу приглашений пока пусто. Отправьте код или ссылку — прогресс появится
+                после регистрации друга.
+              </Text>
+            </View>
           )}
         </View>
 
@@ -193,12 +213,20 @@ export function ReferralScreen({ navigation, route }: Props) {
           {referralDashboard?.walletLedger.length ? (
             referralDashboard.walletLedger.map((entry) => (
               <View key={entry.id} style={styles.ledgerRow}>
+                <View style={styles.ledgerIcon}>
+                  <Gift color="#008D49" size={16} strokeWidth={2.4} />
+                </View>
                 <Text style={styles.ledgerReason}>{entry.reason}</Text>
                 <Text style={styles.ledgerAmount}>+{entry.amount} ₽</Text>
               </View>
             ))
           ) : (
-            <Text style={styles.emptyText}>Начисления появятся после квалифицированных приглашений.</Text>
+            <View style={styles.emptyBox}>
+              <Gift color="#71877D" size={20} strokeWidth={2.2} />
+              <Text style={styles.emptyText}>
+                Начисления появятся после квалифицированных приглашений.
+              </Text>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -256,22 +284,36 @@ function createFallbackInviteUrl(inviteCode: string) {
 function StatCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <View style={styles.statCard}>
-      {icon}
-      <Text style={styles.statLabel}>{label}</Text>
+      <View style={styles.statIcon}>{icon}</View>
       <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
-function ActionButton({ icon, label, onPress }: { icon: ReactNode; label: string; onPress: () => void }) {
+function ActionButton({
+  icon,
+  label,
+  onPress,
+  filled,
+}: {
+  icon: ReactNode;
+  label: string;
+  onPress: () => void;
+  filled?: boolean;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.actionButton,
+        filled && styles.actionButtonFilled,
+        pressed && styles.pressed,
+      ]}
     >
       {icon}
-      <Text style={styles.actionButtonText}>{label}</Text>
+      <Text style={[styles.actionButtonText, filled && styles.actionButtonTextFilled]}>{label}</Text>
     </Pressable>
   );
 }
@@ -299,6 +341,7 @@ function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
   const required = progress?.requiredOrders ?? (isDriverReferral ? 10 : 5);
   const percent = progress?.percent ?? 0;
   const relation = referral.viewerRelation === 'invitee' ? 'Вас пригласили' : 'Вы пригласили';
+  const isRewarded = referral.status === 'rewarded';
 
   return (
     <View style={styles.referralRow}>
@@ -308,23 +351,25 @@ function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
             {relation}: {referral.inviteeName ?? (isDriverReferral ? 'водитель' : 'клиент')}
           </Text>
           <Text style={styles.referralText}>
-              {isDriverReferral ? 'Водитель' : 'Клиент'} · {referral.code}
+            {isDriverReferral ? 'Водитель' : 'Клиент'} · {referral.code}
           </Text>
         </View>
         <View style={styles.referralMeta}>
           <Text style={styles.referralAmount}>{referral.rewardAmount} ₽</Text>
-          <Text style={styles.referralStatus}>{referralStatusLabels[referral.status]}</Text>
+          <Text style={[styles.referralStatus, isRewarded && styles.referralStatusDone]}>
+            {referralStatusLabels[referral.status]}
+          </Text>
         </View>
       </View>
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${percent}%` }]} />
       </View>
       <Text style={styles.progressText}>
-        {referral.status === 'rewarded'
+        {isRewarded
           ? `Готово: ${required} из ${required} поездок`
           : `Прогресс: ${completed} из ${required} поездок`}
       </Text>
-      <Text style={styles.referralText}>{referral.note}</Text>
+      {referral.note ? <Text style={styles.referralNote}>{referral.note}</Text> : null}
     </View>
   );
 }
@@ -332,144 +377,176 @@ function ReferralProgressRow({ referral }: { referral: ReferralRecord }) {
 const styles = StyleSheet.create({
   actionButton: {
     alignItems: 'center',
-    borderColor: '#12382C',
-    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(183, 244, 106, 0.24)',
+    borderRadius: 13,
     borderWidth: 1,
+    flex: 1,
     flexDirection: 'row',
     gap: 6,
     justifyContent: 'center',
-    minHeight: 38,
-    paddingHorizontal: 10,
+    minHeight: 44,
+    paddingHorizontal: 8,
+  },
+  actionButtonFilled: {
+    backgroundColor: LIME,
+    borderColor: LIME,
   },
   actionButtonText: {
-    color: '#F4FAF6',
-    fontSize: 12,
-    fontWeight: '900',
+    color: '#F2FBF6',
+    fontSize: 13,
+    fontWeight: '800',
   },
-  backButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    minHeight: 42,
-    paddingHorizontal: 12,
-  },
-  backButtonText: {
-    color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
+  actionButtonTextFilled: {
+    color: '#0A1411',
   },
   codeActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
-    marginTop: 8,
+    marginTop: 14,
   },
   codeCard: {
-    backgroundColor: '#008D49',
-    borderRadius: 8,
-    gap: 6,
-    padding: 18,
+    backgroundColor: '#0A1411',
+    borderRadius: 22,
+    overflow: 'hidden',
+    padding: 20,
+    position: 'relative',
   },
-  codeLabel: {
-    color: '#12382C',
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  codeValue: {
-    color: '#12382C',
-    fontSize: 36,
-    fontWeight: '900',
-    lineHeight: 42,
-  },
-  copyStatus: {
-    color: '#12382C',
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 17,
-  },
-  emptyText: {
-    color: '#557669',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  hero: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+  codeChip: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(183, 244, 106, 0.12)',
+    borderColor: 'rgba(183, 244, 106, 0.22)',
+    borderRadius: 999,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 14,
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  codeChipText: {
+    color: LIME,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  codeGlow: {
+    backgroundColor: 'rgba(92, 230, 160, 0.10)',
+    borderRadius: 90,
+    height: 180,
+    position: 'absolute',
+    right: -50,
+    top: -40,
+    width: 180,
+  },
+  codeHead: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    position: 'relative',
+    zIndex: 1,
+  },
+  codeReward: {
+    color: '#93BAA8',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  codeValue: {
+    color: '#F2FBF6',
+    fontSize: 38,
+    fontWeight: '800',
+    letterSpacing: 2,
+    lineHeight: 44,
+    marginTop: 14,
+  },
+  linkBox: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  linkText: {
+    color: '#B5D6C7',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  copyStatus: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 12,
+  },
+  copyStatusText: {
+    color: '#B5D6C7',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  emptyBox: {
+    alignItems: 'center',
+    backgroundColor: '#F7FBF8',
+    borderRadius: 16,
+    gap: 8,
     padding: 18,
   },
-  heroCopy: {
-    flex: 1,
-    gap: 7,
-    minWidth: 0,
-  },
-  heroIcon: {
-    alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    height: 58,
-    justifyContent: 'center',
-    width: 58,
+  emptyText: {
+    color: '#71877D',
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
   },
   ledgerAmount: {
     color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  ledgerIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 141, 73, 0.10)',
+    borderRadius: 11,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
   },
   ledgerReason: {
     color: '#12382C',
     flex: 1,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: 18,
   },
   ledgerRow: {
     alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
     flexDirection: 'row',
-    gap: 10,
-    padding: 12,
-  },
-  linkText: {
-    color: '#12382C',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  metaLine: {
-    color: '#008D49',
-    fontSize: 13,
-    fontWeight: '900',
+    gap: 12,
+    paddingVertical: 6,
   },
   page: {
     backgroundColor: '#F4FAF6',
-    gap: 16,
+    gap: 14,
     minHeight: '100%',
     padding: 16,
   },
   panel: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: LINE,
+    borderRadius: 20,
     borderWidth: 1,
-    gap: 12,
-    padding: 16,
+    gap: 14,
+    padding: 18,
+    shadowColor: '#0B2F25',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
   },
   pressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.95 }],
+    opacity: 0.9,
+    transform: [{ scale: 0.97 }],
   },
   progressFill: {
     backgroundColor: '#008D49',
@@ -479,18 +556,18 @@ const styles = StyleSheet.create({
   progressText: {
     color: '#12382C',
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   progressTrack: {
-    backgroundColor: '#E8F3EF',
+    backgroundColor: 'rgba(0, 141, 73, 0.12)',
     borderRadius: 999,
     height: 8,
     overflow: 'hidden',
   },
   referralAmount: {
     color: '#12382C',
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '800',
     textAlign: 'right',
   },
   referralCopy: {
@@ -500,68 +577,79 @@ const styles = StyleSheet.create({
   },
   referralMeta: {
     alignItems: 'flex-end',
-    gap: 5,
+    gap: 6,
+  },
+  referralNote: {
+    color: '#71877D',
+    fontSize: 12,
+    lineHeight: 17,
   },
   referralRow: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    backgroundColor: '#F7FBF8',
+    borderColor: LINE,
+    borderRadius: 16,
     borderWidth: 1,
     gap: 10,
-    padding: 12,
+    padding: 14,
   },
   referralStatus: {
-    backgroundColor: '#E8F3EF',
-    borderRadius: 6,
+    backgroundColor: 'rgba(0, 141, 73, 0.10)',
+    borderRadius: 8,
     color: '#008D49',
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '800',
     overflow: 'hidden',
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 4,
   },
+  referralStatusDone: {
+    backgroundColor: 'rgba(0, 141, 73, 0.16)',
+  },
   referralText: {
-    color: '#557669',
+    color: '#71877D',
     fontSize: 12,
     lineHeight: 17,
   },
   referralTitle: {
     color: '#12382C',
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   referralTop: {
     alignItems: 'flex-start',
     flexDirection: 'row',
     gap: 10,
   },
-  roleText: {
-    color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
+  ruleCopy: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
   },
-  ruleHeader: {
+  ruleIcon: {
     alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
+    backgroundColor: 'rgba(0, 141, 73, 0.10)',
+    borderRadius: 13,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
   },
   ruleRow: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 7,
-    padding: 12,
+    alignItems: 'center',
+    backgroundColor: '#F7FBF8',
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
   },
   ruleText: {
-    color: '#557669',
+    color: '#71877D',
     fontSize: 13,
     lineHeight: 19,
   },
   ruleTitle: {
     color: '#12382C',
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   safeArea: {
     backgroundColor: '#F4FAF6',
@@ -569,76 +657,75 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: '#12382C',
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   segment: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    backgroundColor: '#EEF5F0',
+    borderRadius: 14,
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
     padding: 4,
   },
   segmentButton: {
     alignItems: 'center',
-    borderRadius: 7,
+    borderRadius: 11,
     flex: 1,
     justifyContent: 'center',
-    minHeight: 40,
+    minHeight: 42,
     paddingHorizontal: 10,
   },
   segmentButtonActive: {
-    backgroundColor: '#008D49',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0B2F25',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
   segmentButtonText: {
-    color: '#008D49',
-    fontSize: 13,
-    fontWeight: '900',
+    color: '#71877D',
+    fontSize: 14,
+    fontWeight: '800',
   },
   segmentButtonTextActive: {
-    color: '#F4FAF6',
+    color: '#12382C',
   },
   statCard: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: LINE,
+    borderRadius: 20,
     borderWidth: 1,
     flex: 1,
-    gap: 6,
+    gap: 8,
     minWidth: 150,
-    padding: 14,
+    padding: 16,
+    shadowColor: '#0B2F25',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+  },
+  statIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 141, 73, 0.10)',
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   statLabel: {
-    color: '#557669',
+    color: '#71877D',
     fontSize: 12,
-    fontWeight: '800',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    fontWeight: '700',
   },
   statValue: {
     color: '#12382C',
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  subtitle: {
-    color: '#557669',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  title: {
-    color: '#12382C',
-    fontSize: 30,
-    fontWeight: '900',
-    lineHeight: 36,
-  },
-  topBar: {
-    alignItems: 'center',
+  statsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
+    gap: 12,
   },
 });
