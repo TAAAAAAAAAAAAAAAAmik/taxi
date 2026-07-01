@@ -794,6 +794,36 @@ function ClientPageHeader({
   );
 }
 
+// Единый тёмный заголовок для водительских вложенных вкладок (Лента, Доход,
+// Профиль) — тот же язык, что и на клиентских экранах, только без меню:
+// водитель переключается нижними табами.
+function DriverPageHero({
+  Icon,
+  subtitle,
+  title,
+}: {
+  Icon: ComponentType<LucideProps>;
+  subtitle?: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.clientPageHero}>
+      <View style={styles.clientHeroGlow} />
+      <View style={styles.clientPageHeroRow}>
+        <View style={styles.clientPageHeroIcon}>
+          <Icon color={kinetixColors.lime} size={22} strokeWidth={2.3} />
+        </View>
+        <View style={styles.clientPageHeroCopy}>
+          <Text style={styles.clientPageHeroTitle}>{title}</Text>
+          {subtitle ? (
+            <Text numberOfLines={1} style={styles.clientPageHeroSub}>{subtitle}</Text>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function ClientOrdersPage({
   onOpenActiveOrder,
   onOpenMenu,
@@ -2197,7 +2227,6 @@ type SectionPageViewProps = {
 
 function SectionPageView({
   activeItemId,
-  appTitle,
   displayName,
   driverFeedBusyId,
   driverFeedLockedReason,
@@ -2213,11 +2242,11 @@ function SectionPageView({
   if (activeItemId === 'payouts') {
     return (
       <>
-        <View style={styles.routeRow}>
-          <Text style={styles.routeText}>{appTitle}</Text>
-          <Text style={styles.routeDivider}>/</Text>
-          <Text style={styles.routeTextActive}>Доход</Text>
-        </View>
+        <DriverPageHero
+          Icon={Wallet}
+          subtitle="Оплата доступа и статистика — без процента с заказов"
+          title="Доход"
+        />
 
         <DriverPayoutsPage onActionTarget={onActionTarget} stats={driverStats} />
       </>
@@ -2227,11 +2256,11 @@ function SectionPageView({
   if (activeItemId === 'profile') {
     return (
       <>
-        <View style={styles.routeRow}>
-          <Text style={styles.routeText}>{appTitle}</Text>
-          <Text style={styles.routeDivider}>/</Text>
-          <Text style={styles.routeTextActive}>Профиль</Text>
-        </View>
+        <DriverPageHero
+          Icon={User}
+          subtitle="Данные, документы и настройки водителя"
+          title="Профиль"
+        />
 
         <DriverProfilePage
           displayName={displayName}
@@ -2245,11 +2274,11 @@ function SectionPageView({
   if (showDriverFeed) {
     return (
       <>
-        <View style={styles.routeRow}>
-          <Text style={styles.routeText}>{appTitle}</Text>
-          <Text style={styles.routeDivider}>/</Text>
-          <Text style={styles.routeTextActive}>Лента заказов</Text>
-        </View>
+        <DriverPageHero
+          Icon={Route}
+          subtitle="Заказы рядом — расстояние, адрес и цена"
+          title="Лента заказов"
+        />
 
         <DriverFeedPreview
           busyId={driverFeedBusyId}
@@ -2264,21 +2293,7 @@ function SectionPageView({
 
   return (
     <>
-      <View style={styles.routeRow}>
-        <Text style={styles.routeText}>{appTitle}</Text>
-        <Text style={styles.routeDivider}>/</Text>
-        <Text style={styles.routeTextActive}>{page.title}</Text>
-      </View>
-
-      <View style={styles.heroPanel}>
-        <View style={styles.heroIcon}>
-          <Icon color="#008D49" size={28} strokeWidth={2.4} />
-        </View>
-        <View style={styles.heroCopy}>
-          <Text numberOfLines={2} style={styles.heroTitle}>{page.title}</Text>
-          <Text numberOfLines={3} style={styles.heroText}>{page.subtitle}</Text>
-        </View>
-      </View>
+      <DriverPageHero Icon={Icon} subtitle={page.subtitle} title={page.title} />
 
       <View style={styles.metricsGrid}>
         {page.metrics.map((metric) => (
@@ -2401,9 +2416,9 @@ function DriverFeedPreview({
     <View style={styles.driverFeedPanel}>
       <View style={styles.driverFeedHeader}>
         <View>
-          <Text style={styles.driverFeedTitle}>Лента заказов</Text>
+          <Text style={styles.driverFeedTitle}>Заказы рядом</Text>
           <Text numberOfLines={1} style={styles.driverFeedSubtitle}>
-            Расстояние, адрес, цена
+            Обновляется в реальном времени
           </Text>
         </View>
         <Text style={styles.driverFeedCount}>{orders.length}</Text>
