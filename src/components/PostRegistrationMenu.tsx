@@ -32,6 +32,7 @@ import {
   Settings,
   ShieldCheck,
   Star,
+  Trash2,
   User,
   UsersRound,
   Wallet,
@@ -837,8 +838,8 @@ function ClientOrdersPage({
   return (
     <View style={styles.clientFocusPage}>
       <View style={styles.clientSectionHeader}>
-        <Text style={styles.clientSectionTitle}>Мои поездки</Text>
-        <Text numberOfLines={1} style={styles.clientSectionText}>Активные и завершённые маршруты.</Text>
+        <Text style={styles.clientSectionTitle}>Заказы</Text>
+        <Text numberOfLines={1} style={styles.clientSectionText}>Адреса, активные и завершённые</Text>
       </View>
 
       <View style={styles.clientFavSection}>
@@ -894,6 +895,8 @@ function ClientOrdersPage({
           <Text style={styles.activeOrderArrow}>→</Text>
         </PressableScale>
       ) : null}
+
+      <Text style={styles.clientFavTitle}>Мои поездки</Text>
 
       {tripItems.length ? (
         <View style={styles.clientTripsList}>
@@ -963,7 +966,6 @@ function ClientOrdersPage({
 
 function ClientAccountPage({
   displayName,
-  initialPanel,
   onDeleteAccount,
   onOpenSavedPlace,
   onOpenSupportChat,
@@ -976,94 +978,90 @@ function ClientAccountPage({
   onOpenSavedPlace: () => void;
   onOpenSupportChat: () => void;
 }) {
-  const [activePanel, setActivePanel] = useState<'settings' | 'profile'>(initialPanel);
   const [doNotCall, setDoNotCall] = useState(false);
   const [shareLocation, setShareLocation] = useState(true);
-
-  useEffect(() => {
-    setActivePanel(initialPanel);
-  }, [initialPanel]);
-
   const initials = getInitials(displayName);
 
   return (
     <View style={styles.clientFocusPage}>
-      <View style={styles.accountHeroCard}>
-        <View style={styles.accountHeroAvatar}>
-          <Text style={styles.accountHeroAvatarText}>{initials}</Text>
+      <View style={styles.clientSectionHeader}>
+        <Text style={styles.clientSectionTitle}>Аккаунт</Text>
+      </View>
+
+      <View style={styles.accountProfileCard}>
+        <View style={styles.accountProfileAvatar}>
+          <Text style={styles.accountProfileAvatarText}>{initials}</Text>
         </View>
-        <View style={styles.accountHeroCopy}>
-          <Text numberOfLines={1} style={styles.accountHeroName}>{displayName}</Text>
-          <Text numberOfLines={1} style={styles.accountHeroMeta}>Клиент Kinetix</Text>
-          <Text numberOfLines={1} style={styles.accountHeroBadge}>
-            {savedHomeAddressLabel ?? 'Дом не указан'}
+        <View style={styles.clientActionCopy}>
+          <Text numberOfLines={1} style={styles.accountProfileName}>{displayName}</Text>
+          <Text numberOfLines={1} style={styles.accountProfileMeta}>Клиент · Салаватский район</Text>
+        </View>
+      </View>
+
+      <PressableScale
+        accessibilityLabel="Сохранённые адреса"
+        accessibilityRole="button"
+        onPress={onOpenSavedPlace}
+        style={styles.clientFavRow}
+      >
+        <View style={styles.clientFavIcon}>
+          <Home color={kinetixColors.amber} size={20} strokeWidth={2.3} />
+        </View>
+        <View style={styles.clientActionCopy}>
+          <Text numberOfLines={1} style={styles.clientFavName}>Сохранённые адреса</Text>
+          <Text numberOfLines={1} style={styles.clientFavAddr}>
+            {savedHomeAddressLabel ?? 'Дом и частые точки'}
           </Text>
         </View>
+        <ChevronRight color="#C2D2C9" size={20} strokeWidth={2.4} />
+      </PressableScale>
+
+      <PressableScale
+        accessibilityLabel="Поддержка"
+        accessibilityRole="button"
+        onPress={onOpenSupportChat}
+        style={styles.clientFavRow}
+      >
+        <View style={styles.clientFavIcon}>
+          <Headphones color={kinetixColors.amber} size={20} strokeWidth={2.3} />
+        </View>
+        <View style={styles.clientActionCopy}>
+          <Text numberOfLines={1} style={styles.clientFavName}>Поддержка</Text>
+          <Text numberOfLines={1} style={styles.clientFavAddr}>Вопросы по поездкам</Text>
+        </View>
+        <ChevronRight color="#C2D2C9" size={20} strokeWidth={2.4} />
+      </PressableScale>
+
+      <View style={styles.accountPanel}>
+        <Text style={styles.accountPanelTitle}>Настройки</Text>
+        <ClientSettingToggle
+          enabled={doNotCall}
+          onPress={() => setDoNotCall((current) => !current)}
+          text="Звонок только по важному."
+          title="Не звонить"
+        />
+        <ClientSettingToggle
+          enabled={shareLocation}
+          onPress={() => setShareLocation((current) => !current)}
+          text="Пока водитель едет к вам."
+          title="Геопозиция"
+        />
       </View>
 
-      <View style={styles.accountRoundRow}>
-        <ClientAccountRoundButton icon="support" title="Поддержка" onPress={onOpenSupportChat} />
-        <ClientAccountRoundButton
-          active={activePanel === 'settings'}
-          icon="settings"
-          title="Настройки"
-          onPress={() => setActivePanel('settings')}
-        />
-        <ClientAccountRoundButton
-          active={activePanel === 'profile'}
-          icon="profile"
-          title="Профиль"
-          onPress={() => setActivePanel('profile')}
-        />
-      </View>
-
-      {activePanel === 'settings' ? (
-        <View style={styles.accountPanel}>
-          <Text style={styles.accountPanelTitle}>Настройки</Text>
-          <ClientSettingToggle
-            enabled={doNotCall}
-            onPress={() => setDoNotCall((current) => !current)}
-            text="Звонок только по важному."
-            title="Не звонить"
-          />
-          <ClientSettingToggle
-            enabled={shareLocation}
-            onPress={() => setShareLocation((current) => !current)}
-            text="Пока водитель едет к вам."
-            title="Геопозиция"
-          />
+      <PressableScale
+        accessibilityLabel="Удалить аккаунт"
+        accessibilityRole="button"
+        onPress={onDeleteAccount}
+        style={styles.accountDangerRow}
+      >
+        <View style={styles.accountDangerIcon}>
+          <Trash2 color="#FF3B30" size={19} strokeWidth={2.2} />
         </View>
-      ) : (
-        <View style={styles.accountPanel}>
-          <Text style={styles.accountPanelTitle}>Профиль</Text>
-          <View style={styles.accountProfileRow}>
-            <Text style={styles.accountProfileLabel}>Имя</Text>
-            <Text style={styles.accountProfileValue}>{displayName}</Text>
-          </View>
-          <View style={styles.accountProfileRow}>
-            <Text style={styles.accountProfileLabel}>Дом</Text>
-            <Text numberOfLines={1} style={styles.accountProfileValue}>
-              {savedHomeAddressLabel ?? 'Не указан'}
-            </Text>
-          </View>
-          <View style={styles.accountProfileActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onOpenSavedPlace}
-              style={({ pressed }) => [styles.accountSecondaryButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.accountSecondaryButtonText}>Домашний адрес</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onDeleteAccount}
-              style={({ pressed }) => [styles.accountDangerButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.accountDangerButtonText}>Удалить аккаунт</Text>
-            </Pressable>
-          </View>
+        <View style={styles.clientActionCopy}>
+          <Text numberOfLines={1} style={styles.accountDangerName}>Удалить аккаунт</Text>
+          <Text numberOfLines={1} style={styles.clientFavAddr}>Стирает профиль и данные</Text>
         </View>
-      )}
+      </PressableScale>
     </View>
   );
 }
