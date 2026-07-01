@@ -81,6 +81,7 @@ type PostRegistrationMenuProps = {
     accessBlockers?: string[];
     canToggle: boolean;
     isOnline: boolean;
+    requiresPayment?: boolean;
     status: string;
   };
   onBackToRegistration: () => void;
@@ -1523,14 +1524,27 @@ function DriverCommandCenter({
   onToggleDriverLine,
 }: DriverCommandCenterProps) {
   const online = driverLine.isOnline;
+  const requiresPayment = !online && !driverLine.canToggle && Boolean(driverLine.requiresPayment);
+  const ctaActionable = online || driverLine.canToggle || requiresPayment;
   const lineLabel = online ? 'Вы на линии' : 'Вы не на линии';
   const lineHint = driverLine.canToggle
     ? online
       ? 'Смена активна — заказы придут в ленту'
       : 'Готовы принимать заказы'
-    : `Доступ: ${driverLine.status}`;
+    : requiresPayment
+      ? 'Смена платная — оплатите доступ, чтобы выйти на линию'
+      : `Доступ: ${driverLine.status}`;
   const blockers = formatDriverBlockers(driverLine.accessBlockers ?? []);
   const [statsOpen, setStatsOpen] = useState(false);
+
+  const handleCtaPress = () => {
+    if (requiresPayment) {
+      onOpenSubscription();
+      return;
+    }
+
+    onToggleDriverLine?.();
+  };
 
   const stats = [
     { Icon: BriefcaseBusiness, label: 'заказы', value: String(driverStats?.todayOrders ?? 0) },
@@ -1559,17 +1573,21 @@ function DriverCommandCenter({
         <Text numberOfLines={2} style={styles.driverHeroSub}>{lineHint}</Text>
         <PressableScale
           accessibilityRole="button"
-          disabled={!driverLine.canToggle}
-          onPress={onToggleDriverLine}
+          disabled={!ctaActionable}
+          onPress={handleCtaPress}
           style={[
             styles.driverHeroCta,
             online && styles.driverHeroCtaStop,
-            !driverLine.canToggle && styles.driverHeroCtaDisabled,
+            !ctaActionable && styles.driverHeroCtaDisabled,
           ]}
         >
-          <Route color={online ? '#F2FBF6' : '#0A1411'} size={19} strokeWidth={2.5} />
+          {requiresPayment ? (
+            <CreditCard color="#0A1411" size={19} strokeWidth={2.5} />
+          ) : (
+            <Route color={online ? '#F2FBF6' : '#0A1411'} size={19} strokeWidth={2.5} />
+          )}
           <Text style={[styles.driverHeroCtaText, online && styles.driverHeroCtaTextStop]}>
-            {online ? 'Завершить смену' : 'Выйти на линию'}
+            {online ? 'Завершить смену' : requiresPayment ? 'Оплатить и выйти на линию' : 'Выйти на линию'}
           </Text>
         </PressableScale>
       </StaggerView>

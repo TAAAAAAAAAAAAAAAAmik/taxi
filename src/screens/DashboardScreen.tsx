@@ -106,6 +106,14 @@ export function DashboardScreen({ navigation, route }: Props) {
     (!isSelfEmployedDriver && Boolean(currentDriver?.canReceiveOrders)) ||
     driverSubscription.status === 'active';
   const canToggleLine = Boolean(currentDriver?.canReceiveOrders && hasActiveAccess);
+  const driverAccessBlockers = currentDriver?.accessBlockers ?? [];
+  // Смена платная: если единственное, что мешает выйти на линию, — не оплачен
+  // доступ (дневной доступ истёк ровно через 24 часа), кнопка ведёт к оплате.
+  const driverNeedsPayment =
+    isDriverRole &&
+    isSelfEmployedDriver &&
+    !hasActiveAccess &&
+    driverAccessBlockers.filter((blocker) => blocker !== 'paid_access').length === 0;
   const driverStats = useMemo(
     () =>
       currentDriver
@@ -246,8 +254,9 @@ export function DashboardScreen({ navigation, route }: Props) {
           isDriverRole
             ? {
                 canToggle: canToggleLine,
-                accessBlockers: currentDriver?.accessBlockers ?? [],
+                accessBlockers: driverAccessBlockers,
                 isOnline: Boolean(currentDriver?.isOnline),
+                requiresPayment: driverNeedsPayment,
                 status: currentDriver?.canReceiveOrders
                   ? 'Допущен к заказам'
                   : formatDriverAccessStatus(currentDriver),
