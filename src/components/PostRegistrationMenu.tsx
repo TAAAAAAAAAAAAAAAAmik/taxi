@@ -88,6 +88,7 @@ type PostRegistrationMenuProps = {
   onToggleSimpleMode?: () => void;
   onOpenDelivery: () => void;
   onOpenOrderFlow: () => void;
+  onOrderHome: () => void;
   onOpenDriverDocuments: () => void;
   onOpenFleetDriverRegistration?: () => void;
   onOpenActiveOrder?: () => void;
@@ -191,6 +192,7 @@ export function PostRegistrationMenu({
   onOpenFleetDriverRegistration,
   onOpenDelivery,
   onOpenOrderFlow,
+  onOrderHome,
   onOpenReferral,
   onOpenSavedPlace,
   onOpenSubscription,
@@ -426,6 +428,7 @@ export function PostRegistrationMenu({
                 onOpenOrderHistory={onOpenOrderHistory}
                 onOpenSavedPlace={onOpenSavedPlace}
                 onOpenSupportChat={onOpenSupportChat}
+                onOrderHome={onOrderHome}
                 orderSummary={clientOrderSummary}
                 savedHomeAddressLabel={savedHomeAddressLabel}
               />
@@ -558,6 +561,7 @@ type ClientPageViewProps = {
   onOpenOrderHistory: () => void;
   onOpenSavedPlace: () => void;
   onOpenSupportChat: () => void;
+  onOrderHome: () => void;
 };
 
 function ClientPageView({
@@ -572,6 +576,7 @@ function ClientPageView({
   onOpenOrderHistory,
   onOpenSavedPlace,
   onOpenSupportChat,
+  onOrderHome,
   orderSummary,
   savedHomeAddressLabel,
 }: ClientPageViewProps) {
@@ -579,9 +584,9 @@ function ClientPageView({
     return (
       <ClientOrdersPage
         onOpenActiveOrder={onOpenActiveOrder}
-        onOpenOrderFlow={onOpenOrderFlow}
         onOpenOrderHistory={onOpenOrderHistory}
         onOpenSavedPlace={onOpenSavedPlace}
+        onOrderHome={onOrderHome}
         orderSummary={orderSummary}
         savedHomeAddressLabel={savedHomeAddressLabel}
       />
@@ -764,18 +769,18 @@ function ClientHomePage({
 
 function ClientOrdersPage({
   onOpenActiveOrder,
-  onOpenOrderFlow,
   onOpenOrderHistory,
   onOpenSavedPlace,
+  onOrderHome,
   orderSummary,
   savedHomeAddressLabel,
 }: {
   orderSummary?: ClientOrderSummary;
   savedHomeAddressLabel?: string;
   onOpenActiveOrder?: () => void;
-  onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
   onOpenSavedPlace: () => void;
+  onOrderHome: () => void;
 }) {
   const [statsOpen, setStatsOpen] = useState(false);
   const summary = orderSummary ?? {
@@ -842,7 +847,7 @@ function ClientOrdersPage({
           <PressableScale
             accessibilityLabel="Поездка домой"
             accessibilityRole="button"
-            onPress={onOpenOrderFlow}
+            onPress={onOrderHome}
             style={styles.clientFavRow}
           >
             <View style={styles.clientFavIcon}>

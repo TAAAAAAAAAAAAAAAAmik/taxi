@@ -293,6 +293,13 @@ export function DashboardScreen({ navigation, route }: Props) {
         }}
         onOpenDelivery={() => navigation.navigate('OrderFlow', { firstName, role, serviceType: 'delivery' })}
         onOpenOrderFlow={() => navigation.navigate('OrderFlow', { firstName, role })}
+        onOrderHome={() =>
+          navigation.navigate('OrderFlow', {
+            firstName,
+            role,
+            ...(savedHomeAddress?.address ? { presetDestination: savedHomeAddress.address } : {}),
+          })
+        }
         onOpenDriverDocuments={() => navigation.navigate('DriverDocuments', { firstName, role })}
         onOpenFleetDriverRegistration={() =>
           navigation.navigate('Registration', {
