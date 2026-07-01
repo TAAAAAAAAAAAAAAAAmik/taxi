@@ -19,6 +19,7 @@ import {
   DriverSubscriptionPayment,
   driverAccessPlans,
 } from '../data/subscription';
+import { ScreenHero } from '../components/ScreenHero';
 import { RootStackParamList } from '../navigation/types';
 import { DriverPaymentSettings, fetchDriverPaymentSettings } from '../services/apiClient';
 import { useAppState } from '../state/AppState';
@@ -110,25 +111,12 @@ export function SubscriptionScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-        >
-          <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
-          <Text style={styles.backButtonText}>Назад</Text>
-        </Pressable>
-
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <WalletCards color="#008D49" size={30} strokeWidth={2.4} />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.title}>Доступ к заказам</Text>
-            <Text style={styles.subtitle}>100 ₽ за день или Партнёр PRO на месяц.</Text>
-            <Text style={styles.metaLine}>{firstName?.trim() || 'Водитель-партнер'}</Text>
-          </View>
-        </View>
+        <ScreenHero
+          Icon={WalletCards}
+          onBack={() => navigation.goBack()}
+          subtitle="100 ₽ за день или Партнёр PRO на месяц"
+          title="Доступ к заказам"
+        />
 
         {isTrialChoice ? (
           <View style={styles.trialChoiceCard}>

@@ -13,7 +13,8 @@ import {
 } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
-import { AccountRole, isDriverLikeRole, roleCopy } from '../data/registration';
+import { ScreenHero } from '../components/ScreenHero';
+import { AccountRole, isDriverLikeRole } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { ReferralDashboard, ReferralRecord } from '../services/apiClient';
 import { useAppState } from '../state/AppState';
@@ -101,31 +102,12 @@ export function ReferralScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page}>
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          >
-            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
-            <Text style={styles.backButtonText}>Назад</Text>
-          </Pressable>
-          <Text style={styles.roleText}>{roleCopy[role].title}</Text>
-        </View>
-
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Share2 color="#008D49" size={30} strokeWidth={2.4} />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.title}>Пригласить в Такси Салават</Text>
-            <Text style={styles.subtitle}>
-              Одна ссылка подходит для клиентов и водителей. Бонус становится доступен только
-              после нужного количества завершенных поездок.
-            </Text>
-            <Text style={styles.metaLine}>{firstName?.trim() || currentUser?.firstName || 'Пользователь'}</Text>
-          </View>
-        </View>
+        <ScreenHero
+          Icon={Share2}
+          onBack={() => navigation.goBack()}
+          subtitle="Одна ссылка для клиентов и водителей. Бонус — после завершённых поездок."
+          title="Пригласить друзей"
+        />
 
         <View style={styles.codeCard}>
           <Text style={styles.codeLabel}>Ваш личный код</Text>

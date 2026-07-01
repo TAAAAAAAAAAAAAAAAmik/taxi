@@ -3,8 +3,10 @@ import { ArrowLeft, Heart, ReceiptText, Star, Wallet } from 'lucide-react-native
 import { useMemo } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { PressableScale } from '../components/KinetixUI';
+import { ScreenHero } from '../components/ScreenHero';
 import { TripCard, type TripCardServiceType } from '../components/TripCard';
-import { isDriverLikeRole, roleCopy } from '../data/registration';
+import { isDriverLikeRole } from '../data/registration';
 import { RootStackParamList } from '../navigation/types';
 import { AppOrder, PaymentStatus, useAppState } from '../state/AppState';
 
@@ -89,44 +91,22 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page}>
-        <View style={styles.topBar}>
-          <View style={styles.topActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.goBack()}
-              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            >
-              <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
-              <Text style={styles.backButtonText}>Назад</Text>
-            </Pressable>
-            <Pressable
+        <ScreenHero
+          Icon={ReceiptText}
+          onBack={() => navigation.goBack()}
+          right={
+            <PressableScale
+              accessibilityLabel={isDriverRole ? 'К ленте заказов' : 'Повторить маршрут'}
               accessibilityRole="button"
               onPress={() => navigation.navigate('OrderFlow', { firstName, role })}
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+              style={styles.heroAction}
             >
-              <Text style={styles.primaryButtonText}>
-                {isDriverRole ? 'К ленте заказов' : 'Повтор маршрута'}
-              </Text>
-            </Pressable>
-          </View>
-          <View style={styles.historyMeta}>
-            <Text style={styles.roleText}>{roleCopy[role].title}</Text>
-            <Text style={styles.completedText}>Завершено: {historySummary.completedCount}</Text>
-          </View>
-        </View>
-
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <ReceiptText color="#008D49" size={30} strokeWidth={2.4} />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.title}>История заказов</Text>
-            <Text style={styles.subtitle}>
-              Здесь сохраняются созданные поездки, принятые заказы и их текущие статусы.
-            </Text>
-            <Text style={styles.metaLine}>{firstName?.trim() || 'Пользователь'}</Text>
-          </View>
-        </View>
+              <Text style={styles.heroActionText}>{isDriverRole ? 'К ленте' : 'Повтор'}</Text>
+            </PressableScale>
+          }
+          subtitle="Созданные поездки, принятые заказы и их статусы"
+          title="История заказов"
+        />
 
         <View style={styles.statsGrid}>
           <StatCard label="Всего" value={String(visibleOrders.length)} />
@@ -680,6 +660,21 @@ const styles = StyleSheet.create({
     gap: 16,
     minHeight: '100%',
     padding: 16,
+  },
+  heroAction: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(92, 230, 160, 0.12)',
+    borderColor: 'rgba(92, 230, 160, 0.30)',
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  heroActionText: {
+    color: '#5CE6A0',
+    fontSize: 13,
+    fontWeight: '700',
   },
   pressed: {
     opacity: 0.92,

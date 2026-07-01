@@ -18,6 +18,7 @@ import {
   getCoverageTitle,
   GeoPoint,
 } from '../data/salavatDistrict';
+import { ScreenHero } from '../components/ScreenHero';
 import { RootStackParamList } from '../navigation/types';
 import { useAppState } from '../state/AppState';
 import { requestUserLocation, reverseGeocodePoint } from '../services/locationService';
@@ -76,30 +77,12 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          >
-            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
-            <Text style={styles.backButtonText}>Назад</Text>
-          </Pressable>
-          <Text style={styles.roleText}>{role === 'client' ? 'Клиент' : 'Профиль'}</Text>
-        </View>
-
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Home color="#008D49" size={30} strokeWidth={2.4} />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.title}>Домашний адрес</Text>
-            <Text style={styles.subtitle}>
-              Сохраните дом один раз, чтобы быстрый заказ сразу подставлял точку подачи.
-            </Text>
-            <Text style={styles.metaLine}>{firstName?.trim() || 'Пользователь'}</Text>
-          </View>
-        </View>
+        <ScreenHero
+          Icon={Home}
+          onBack={() => navigation.goBack()}
+          subtitle="Сохраните дом один раз — быстрый заказ подставит его сам."
+          title="Домашний адрес"
+        />
 
         <View style={styles.panel}>
           <View style={styles.coverageBox}>
