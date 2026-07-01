@@ -644,11 +644,6 @@ function ClientHomePage({
     }))
     .slice(0, 12);
 
-  const carsLabel =
-    availableCarsCount > 0
-      ? `${availableCarsCount} ${formatCarsWord(availableCarsCount)} рядом · подача ~4 мин`
-      : 'Ищем ближайшую машину';
-
   return (
     <View style={styles.clientHome}>
       <StaggerView index={0} style={styles.clientHero}>
@@ -666,10 +661,6 @@ function ClientHomePage({
           >
             <MenuIcon color={kinetixColors.lime} size={24} strokeWidth={2.4} />
           </PressableScale>
-        </View>
-        <View style={styles.clientHeroPill}>
-          <View style={styles.clientHeroDot} />
-          <Text numberOfLines={1} style={styles.clientHeroPillText}>{carsLabel}</Text>
         </View>
       </StaggerView>
 
