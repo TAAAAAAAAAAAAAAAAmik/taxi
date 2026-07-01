@@ -1110,6 +1110,13 @@ function ClientAboutPage({
   onOpenMenu: () => void;
   onOpenSupportChat: () => void;
 }) {
+  const features = [
+    { Icon: Car, title: 'Заказ такси', text: 'Машина по селу и району за пару касаний' },
+    { Icon: Package, title: 'Доставка', text: 'Привезём и передадим по адресу' },
+    { Icon: Wallet, title: 'Честная цена', text: 'Стоимость известна ещё до заказа' },
+    { Icon: ShieldCheck, title: 'Местные водители', text: 'Знают дороги Салаватского района' },
+  ];
+
   return (
     <View style={styles.clientFocusPage}>
       <ClientPageHeader
@@ -1118,14 +1125,45 @@ function ClientAboutPage({
         subtitle="Kinetix · Салаватский район"
         title="О приложении"
       />
-      <View style={styles.accountPanel}>
-        <Text style={styles.accountPanelTitle}>Что осталось доступно</Text>
-        <ClientHistoryActionChip title="Заказ поездки" />
-        <ClientHistoryActionChip title="История поездок" />
-        <ClientHistoryActionChip title="Рефералы" />
-        <ClientHistoryActionChip title="Поддержка" />
-        <ClientHistoryActionChip title="Смена роли и выход" />
+
+      <View style={styles.aboutBrandCard}>
+        <View style={styles.aboutBrandTile}>
+          <Text style={styles.aboutBrandMark}>K</Text>
+        </View>
+        <View style={styles.aboutBrandCopy}>
+          <Text style={styles.aboutBrandName}>Kinetix</Text>
+          <Text style={styles.aboutBrandSub}>Локальное такси и доставка</Text>
+        </View>
+        <View style={styles.aboutVersionPill}>
+          <Text style={styles.aboutVersionText}>v1.0.0</Text>
+        </View>
       </View>
+
+      <View style={styles.aboutSection}>
+        <Text style={styles.aboutSectionTitle}>Что умеет приложение</Text>
+        {features.map(({ Icon, text, title }) => (
+          <View key={title} style={styles.aboutRow}>
+            <View style={styles.aboutRowIcon}>
+              <Icon color={kinetixColors.amber} size={19} strokeWidth={2.35} />
+            </View>
+            <View style={styles.aboutRowCopy}>
+              <Text style={styles.aboutRowTitle}>{title}</Text>
+              <Text style={styles.aboutRowText}>{text}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.aboutHonestCard}>
+        <View style={styles.aboutHonestGlow} />
+        <View style={styles.aboutHonestIcon}>
+          <ShieldCheck color={kinetixColors.lime} size={18} strokeWidth={2.4} />
+        </View>
+        <Text style={styles.aboutHonestText}>
+          Цена известна до заказа, номер телефона скрыт, а водители — из Салаватского района.
+        </Text>
+      </View>
+
       <Pressable
         accessibilityRole="button"
         onPress={onOpenSupportChat}
@@ -1134,6 +1172,8 @@ function ClientAboutPage({
         <Headphones color="#F4FAF6" size={20} strokeWidth={2.5} />
         <Text style={styles.clientHistoryButtonText}>Поддержка</Text>
       </Pressable>
+
+      <Text style={styles.aboutMeta}>Версия 1.0.0 · Сделано для Салаватского района</Text>
     </View>
   );
 }
