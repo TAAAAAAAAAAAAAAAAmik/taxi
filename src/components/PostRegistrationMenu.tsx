@@ -588,7 +588,7 @@ function ClientPageView({
   }
 
   if (activeItemId === 'about') {
-    return <ClientAboutPage onOpenSupportChat={onOpenSupportChat} />;
+    return <ClientAboutPage onOpenMenu={onOpenMenu} onOpenSupportChat={onOpenSupportChat} />;
   }
 
   if (activeItemId === 'profile' || activeItemId === 'settings') {
@@ -766,27 +766,37 @@ function ClientPageHeader({
   title,
   subtitle,
   onOpenMenu,
+  Icon,
 }: {
   title: string;
   subtitle?: string;
   onOpenMenu: () => void;
+  Icon?: ComponentType<LucideProps>;
 }) {
   return (
-    <View style={styles.clientPageHeader}>
-      <View style={styles.clientPageHeaderCopy}>
-        <Text style={styles.clientSectionTitle}>{title}</Text>
-        {subtitle ? (
-          <Text numberOfLines={1} style={styles.clientSectionText}>{subtitle}</Text>
+    <View style={styles.clientPageHero}>
+      <View style={styles.clientHeroGlow} />
+      <View style={styles.clientPageHeroRow}>
+        {Icon ? (
+          <View style={styles.clientPageHeroIcon}>
+            <Icon color={kinetixColors.lime} size={22} strokeWidth={2.3} />
+          </View>
         ) : null}
+        <View style={styles.clientPageHeroCopy}>
+          <Text style={styles.clientPageHeroTitle}>{title}</Text>
+          {subtitle ? (
+            <Text numberOfLines={1} style={styles.clientPageHeroSub}>{subtitle}</Text>
+          ) : null}
+        </View>
+        <PressableScale
+          accessibilityLabel="Открыть меню"
+          accessibilityRole="button"
+          onPress={onOpenMenu}
+          style={styles.clientHeroMenu}
+        >
+          <MenuIcon color={kinetixColors.lime} size={22} strokeWidth={2.4} />
+        </PressableScale>
       </View>
-      <PressableScale
-        accessibilityLabel="Открыть меню"
-        accessibilityRole="button"
-        onPress={onOpenMenu}
-        style={styles.clientHeaderMenuBtn}
-      >
-        <MenuIcon color="#008D49" size={22} strokeWidth={2.5} />
-      </PressableScale>
     </View>
   );
 }
@@ -863,6 +873,7 @@ function ClientOrdersPage({
   return (
     <View style={styles.clientFocusPage}>
       <ClientPageHeader
+        Icon={Route}
         onOpenMenu={onOpenMenu}
         subtitle="Адреса, активные и завершённые"
         title="Заказы"
@@ -1012,7 +1023,7 @@ function ClientAccountPage({
 
   return (
     <View style={styles.clientFocusPage}>
-      <ClientPageHeader onOpenMenu={onOpenMenu} title="Аккаунт" />
+      <ClientPageHeader Icon={User} onOpenMenu={onOpenMenu} subtitle="Профиль и настройки" title="Аккаунт" />
 
       <View style={styles.accountProfileCard}>
         <View style={styles.accountProfileAvatar}>
@@ -1092,15 +1103,21 @@ function ClientAccountPage({
   );
 }
 
-function ClientAboutPage({ onOpenSupportChat }: { onOpenSupportChat: () => void }) {
+function ClientAboutPage({
+  onOpenMenu,
+  onOpenSupportChat,
+}: {
+  onOpenMenu: () => void;
+  onOpenSupportChat: () => void;
+}) {
   return (
     <View style={styles.clientFocusPage}>
-      <View style={styles.clientSectionHeader}>
-        <Text style={styles.clientSectionTitle}>О приложении</Text>
-        <Text numberOfLines={3} style={styles.clientSectionText}>
-          Kinetix: заказ, статусы, адреса, история и поддержка в одном месте.
-        </Text>
-      </View>
+      <ClientPageHeader
+        Icon={Star}
+        onOpenMenu={onOpenMenu}
+        subtitle="Kinetix · Салаватский район"
+        title="О приложении"
+      />
       <View style={styles.accountPanel}>
         <Text style={styles.accountPanelTitle}>Что осталось доступно</Text>
         <ClientHistoryActionChip title="Заказ поездки" />
