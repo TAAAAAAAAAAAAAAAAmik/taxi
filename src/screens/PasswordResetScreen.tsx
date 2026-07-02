@@ -205,7 +205,7 @@ export function PasswordResetScreen({ navigation }: Props) {
               pressed && styles.pressed,
             ]}
           >
-            <ShieldCheck color="#12382C" size={19} strokeWidth={2.4} />
+            <ShieldCheck color="#F4FAF6" size={19} strokeWidth={2.4} />
             <Text style={styles.primaryButtonText}>
               {isConfirming ? 'Проверяем...' : 'Сменить пароль'}
             </Text>
@@ -242,17 +242,21 @@ function formatTime(value?: string) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: 'rgba(11, 47, 37, 0.10)',
+    borderRadius: 20,
     borderWidth: 1,
     gap: 16,
-    padding: 18,
+    padding: 20,
+    shadowColor: '#0B2F25',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
   },
   deliveryButton: {
     alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    backgroundColor: 'rgba(0, 141, 73, 0.10)',
+    borderColor: 'rgba(11, 47, 37, 0.10)',
+    borderRadius: 12,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
@@ -280,8 +284,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   demoCode: {
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
+    backgroundColor: 'rgba(0, 141, 73, 0.10)',
+    borderRadius: 12,
     color: '#008D49',
     fontSize: 18,
     fontWeight: '900',
@@ -294,16 +298,16 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
+    backgroundColor: 'rgba(0, 141, 73, 0.10)',
+    borderRadius: 12,
     height: 58,
     justifyContent: 'center',
     width: 58,
   },
   input: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#557669',
-    borderRadius: 8,
+    borderColor: 'rgba(11, 47, 37, 0.16)',
+    borderRadius: 12,
     borderWidth: 1,
     color: '#12382C',
     fontSize: 16,
@@ -339,12 +343,16 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.92,
-    transform: [{ scale: 0.95 }],
+    transform: [{ scale: 0.97 }],
   },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: '#008D49',
-    borderRadius: 8,
+    borderRadius: 14,
+    shadowColor: 'rgba(0, 111, 58, 0.22)',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
@@ -366,8 +374,8 @@ const styles = StyleSheet.create({
   secondaryButton: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: 'rgba(11, 47, 37, 0.10)',
+    borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
