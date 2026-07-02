@@ -568,14 +568,24 @@ export type RealtimeSnapshot = {
   supportThreads?: SupportThread[];
 };
 
+export type RealtimeDriverLocation = {
+  accuracy?: number;
+  latitude: number;
+  longitude: number;
+  updatedAt?: string;
+};
+
 export type RealtimeEventPayload = {
   clientId?: string;
   driver?: DriverProfile;
+  // Лёгкое событие driver_location: точка без snapshot.
+  driverId?: string;
+  location?: RealtimeDriverLocation;
   notification?: RealtimeNotification;
   order?: AppOrder;
   offer?: unknown;
   sentAt: string;
-  snapshot: RealtimeSnapshot;
+  snapshot?: RealtimeSnapshot;
   type: string;
 };
 
@@ -816,6 +826,7 @@ export function subscribeRealtime({
         'driver_created',
         'driver_documents',
         'driver_documents_review',
+        'driver_location',
         'driver_payment',
         'driver_payment_refund',
         'driver_status',
@@ -1482,6 +1493,22 @@ export async function updateDriverAvailability(
     `/drivers/${encodeURIComponent(driverId)}/availability`,
     {
       body: JSON.stringify({ isOnline, location }),
+      method: 'PATCH',
+    },
+  );
+
+  return response.driver;
+}
+
+// Лёгкий периодический GPS-пинг: только точка, без смены статуса линии.
+export async function updateDriverLocation(
+  driverId: string,
+  location: ApiGeoPoint & { accuracy?: number },
+) {
+  const response = await request<{ driver: DriverProfile }>(
+    `/drivers/${encodeURIComponent(driverId)}/location`,
+    {
+      body: JSON.stringify({ location }),
       method: 'PATCH',
     },
   );

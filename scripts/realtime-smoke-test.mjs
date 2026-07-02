@@ -86,14 +86,48 @@ try {
   );
   assert(completedEvent.payload.order.receipt, 'Completed realtime order should include receipt');
 
+  // Лёгкий канал координат: PATCH /drivers/:id/location у водителя на линии
+  // рассылает событие driver_location с точкой и без полного snapshot.
+  await api(`/drivers/${encodeURIComponent(driver.id)}/availability`, {
+    body: { isOnline: true },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+  const pingLocation = { accuracy: 8, latitude: 55.4312, longitude: 58.1483 };
+  const locationResponse = await api(`/drivers/${encodeURIComponent(driver.id)}/location`, {
+    body: { location: pingLocation },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+
+  assert(
+    locationResponse.driver.lastLocation?.latitude === pingLocation.latitude,
+    'Location PATCH should persist driver lastLocation',
+  );
+
+  const locationEvent = await stream.waitFor(
+    (event) => event.event === 'driver_location' && event.payload.driverId === driver.id,
+    'driver_location event',
+  );
+
+  assert(
+    locationEvent.payload.location?.latitude === pingLocation.latitude &&
+      locationEvent.payload.location?.longitude === pingLocation.longitude,
+    'driver_location event should carry the pinged point',
+  );
+  assert(!locationEvent.payload.snapshot, 'driver_location event should be light (no snapshot)');
+
   await api(`/drivers/${encodeURIComponent(driver.id)}/availability`, {
     body: { isOnline: false },
     method: 'PATCH',
     token: admin.session.token,
   });
   const availabilityEvent = await stream.waitFor(
-    (event) => event.event === 'driver_availability' && event.payload.driver?.id === driver.id,
-    'driver_availability event',
+    (event) =>
+      event.event === 'driver_availability' &&
+      event.payload.driver?.id === driver.id &&
+      event.payload.driver?.isOnline === false,
+    'driver_availability offline event',
   );
   assert(availabilityEvent.payload.driver.isOnline === false, 'Driver availability event should carry offline state');
 

@@ -1184,6 +1184,33 @@ function broadcastRealtime(eventType, payload, db) {
   }
 }
 
+// Лёгкий канал координат: одна точка вместо полного snapshot, чтобы
+// периодические GPS-пинги водителей не гоняли всю базу всем клиентам.
+function broadcastDriverLocation(driver) {
+  if (realtimeClients.size === 0 && realtimeSocketClients.size === 0) {
+    return;
+  }
+
+  const payload = {
+    driverId: driver.id,
+    location: {
+      accuracy: driver.lastLocation?.accuracy,
+      latitude: driver.lastLocation?.latitude,
+      longitude: driver.lastLocation?.longitude,
+      updatedAt: driver.lastLocation?.updatedAt,
+    },
+    type: 'driver_location',
+  };
+
+  for (const client of realtimeClients.values()) {
+    sendRealtimeEvent(client, 'driver_location', payload);
+  }
+
+  for (const socket of realtimeSocketClients) {
+    sendRealtimeSocketEvent(socket, 'driver_location', payload);
+  }
+}
+
 function addRealtimeNotification(db, input) {
   const notification = normalizeRealtimeNotification({
     ...input,
@@ -8652,6 +8679,51 @@ async function handleRequest(request, response) {
         { driver: makeDriverResponse(db, driver, null), notification },
         db,
       );
+      sendJson(response, 200, { driver: makeDriverResponse(db, driver, sessionContext) });
+      return;
+    }
+
+    if (request.method === 'PATCH' && pathParts[0] === 'drivers' && pathParts[2] === 'location') {
+      const sessionContext = getSessionContext(db, request);
+      const payload = await readBody(request);
+      const driver = db.drivers.find((item) => item.id === pathParts[1]);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
+      if (!driver) {
+        sendJson(response, 404, { error: 'Driver not found' });
+        return;
+      }
+
+      if (!canAccessDriver(sessionContext, driver)) {
+        sendJson(response, 403, { error: 'Driver location access denied' });
+        return;
+      }
+
+      const locationPoint = readGeoPoint(payload.location || payload);
+
+      if (!locationPoint) {
+        sendJson(response, 400, { error: 'location with latitude and longitude is required' });
+        return;
+      }
+
+      driver.lastLocation = {
+        accuracy: readOptionalNumber(payload.accuracy ?? payload.location?.accuracy),
+        latitude: locationPoint.latitude,
+        longitude: locationPoint.longitude,
+        updatedAt: new Date().toISOString(),
+      };
+      driver.locationUpdatedAt = driver.lastLocation.updatedAt;
+      driver.updatedAt = driver.lastLocation.updatedAt;
+      await writeDb(db);
+
+      if (driver.isOnline) {
+        broadcastDriverLocation(driver);
+      }
+
       sendJson(response, 200, { driver: makeDriverResponse(db, driver, sessionContext) });
       return;
     }

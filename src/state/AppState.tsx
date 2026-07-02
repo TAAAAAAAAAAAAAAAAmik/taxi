@@ -53,6 +53,7 @@ import {
   syncDriverSubscriptionPayment as syncDriverSubscriptionPaymentApi,
   updateDriverAccess as updateDriverAccessApi,
   updateDriverAvailability as updateDriverAvailabilityApi,
+  updateDriverLocation as updateDriverLocationApi,
   updateDriverCompliance as updateDriverComplianceApi,
   updateDriverStatus as updateDriverStatusApi,
   updateOrderPaymentStatus as updateOrderPaymentStatusApi,
@@ -413,6 +414,10 @@ type AppStateValue = {
     isOnline: boolean,
     location?: { accuracy?: number; latitude: number; longitude: number },
   ) => Promise<void>;
+  updateDriverLocation: (
+    driverId: string,
+    location: { accuracy?: number; latitude: number; longitude: number },
+  ) => Promise<void>;
   updateDriverReviewStatus: (driverId: string, status: DriverProfile['status']) => Promise<void>;
   updateOrderPaymentStatus: (orderId: string, status: PaymentStatus, note?: string) => Promise<void>;
   updateOrderServiceShareStatus: (
@@ -509,7 +514,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const applyRealtimeSnapshot = useCallback((snapshot: RealtimeSnapshot) => {
+  const applyRealtimeSnapshot = useCallback((snapshot?: RealtimeSnapshot) => {
     if (
       !snapshot ||
       !Array.isArray(snapshot.orders) ||
@@ -558,6 +563,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setRealtimeMessage(formatRealtimeErrorMessage(error));
       },
       onMessage: (payload) => {
+        // Лёгкое событие координат: точечно патчим одного водителя,
+        // не трогая snapshot-ветку (у события snapshot нет).
+        if (payload.type === 'driver_location' && payload.driverId && payload.location) {
+          const { driverId, location } = payload;
+
+          setDrivers((current) =>
+            current.map((driver) =>
+              driver.id === driverId
+                ? {
+                    ...driver,
+                    lastLocation: location,
+                    locationUpdatedAt: location.updatedAt,
+                  }
+                : driver,
+            ),
+          );
+          setRealtimeUpdatedAt(payload.sentAt);
+          setRealtimeStatus((current) => (current === 'connecting' ? 'live' : current));
+          return;
+        }
+
         applyRealtimeSnapshot(payload.snapshot);
         setRealtimeStatus((current) => (current === 'connecting' ? 'live' : current));
         if (payload.notification) {
@@ -1441,6 +1467,38 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         } catch {
           setServerStatus('offline');
           setServerMessage('Backend не отвечает. Статус линии сохранен только локально.');
+        }
+      },
+      updateDriverLocation: async (driverId, location) => {
+        // Лёгкий GPS-пинг: оптимистичный локальный патч + узкий PATCH без
+        // смены статуса линии. Ошибки не шумят — следующий пинг догонит.
+        const updatedAt = new Date().toISOString();
+
+        setDrivers((current) =>
+          current.map((item) =>
+            item.id === driverId
+              ? {
+                  ...item,
+                  lastLocation: {
+                    accuracy: location.accuracy,
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    updatedAt,
+                  },
+                  locationUpdatedAt: updatedAt,
+                }
+              : item,
+          ),
+        );
+
+        try {
+          const serverDriver = await updateDriverLocationApi(driverId, location);
+          setDrivers((current) =>
+            current.map((item) => (item.id === serverDriver.id ? serverDriver : item)),
+          );
+        } catch {
+          // Локальная точка уже применена; статус сервера обновит
+          // следующий пинг или основной канал.
         }
       },
       updateDriverReviewStatus: async (driverId, status) => {

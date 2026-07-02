@@ -33,6 +33,7 @@ export function DashboardScreen({ navigation, route }: Props) {
     requestVerificationCode,
     savedHomeAddress,
     updateDriverAvailability,
+    updateDriverLocation,
     verifyContactCode,
     setSimpleMode,
     simpleMode,
@@ -86,7 +87,8 @@ export function DashboardScreen({ navigation, route }: Props) {
         return;
       }
 
-      updateDriverAvailability(onlineDriverId, true, {
+      // Лёгкий канал: только точка, без полного snapshot всем клиентам.
+      updateDriverLocation(onlineDriverId, {
         accuracy: result.accuracy,
         latitude: result.point.latitude,
         longitude: result.point.longitude,
@@ -99,7 +101,7 @@ export function DashboardScreen({ navigation, route }: Props) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [onlineDriverId, updateDriverAvailability]);
+  }, [onlineDriverId, updateDriverLocation]);
 
   const hasActiveAccess =
     currentDriver?.subscriptionStatus === 'active' ||

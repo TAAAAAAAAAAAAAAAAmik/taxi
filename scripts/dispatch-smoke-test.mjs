@@ -111,7 +111,6 @@ try {
 
   assert(accepted.order.status === 'accepted', `Expected accepted order, got ${accepted.order.status}`);
   assert(accepted.order.driver?.id === firstDriver.id, 'First driver should own the order');
-  assert(accepted.order.tripPin, 'Assigned order should expose client trip PIN');
 
   await expectApiFailure(`/orders/${encodeURIComponent(order.id)}/assign`, {
     body: { driverId: secondDriver.id },
@@ -121,7 +120,7 @@ try {
 
   for (const status of ['arrived', 'started', 'completed']) {
     const result = await api(`/orders/${encodeURIComponent(order.id)}/status`, {
-      body: { pinCode: status === 'started' ? accepted.order.tripPin : undefined, status },
+      body: { status },
       method: 'PATCH',
       token: admin.session.token,
     });
@@ -138,16 +137,18 @@ try {
   assert(completed?.paymentEvents?.some((item) => item.status === 'paid'), 'Payment history should include paid');
   assert(completed?.statusHistory?.some((item) => item.status === 'accepted'), 'Status history should include accept');
   assert(completed?.driverCollectedAmount === completed?.total, 'Driver should collect the full trip amount');
-  assert(completed?.driverTrialActive === true, 'First completed driver order should start free trial period');
-  assert(completed?.serviceShareRate === 0, `Expected 0% trial service share, got ${completed?.serviceShareRate}`);
-  assert(completed?.serviceShareAmount === 0, `Expected no service share during trial, got ${completed?.serviceShareAmount}`);
-  assert(completed?.serviceShareStatus === 'not_applicable', 'Trial service share should not require transfer');
+  assert(completed?.driverTrialActive === false, 'Trial model is removed: no free-trial flag on orders');
+  assert(completed?.serviceShareRate === 0, `Expected 0% service share (no-percent model), got ${completed?.serviceShareRate}`);
+  assert(completed?.serviceShareAmount === 0, `Expected no service share, got ${completed?.serviceShareAmount}`);
+  assert(completed?.serviceShareStatus === 'not_applicable', 'Service share should not require transfer');
   assert(
     completed?.driverNetAmount === (completed?.total || 0) - (completed?.serviceShareAmount || 0),
     'Driver net amount should be total minus service share',
   );
 
-  await expectApiFailure(`/orders/${encodeURIComponent(order.id)}/service-share`, {
+  // Доля сервиса отменена: endpoint работает в no-op режиме и не меняет
+  // расчёт заказа (совместимость со старыми клиентами).
+  const shareNoop = await api(`/orders/${encodeURIComponent(order.id)}/service-share`, {
     body: {
       note: 'Smoke driver transfer report',
       status: 'reported_transferred',
@@ -156,14 +157,10 @@ try {
     token: admin.session.token,
   });
 
-  await expectApiFailure(`/orders/${encodeURIComponent(order.id)}/service-share`, {
-    body: {
-      note: 'Smoke admin transfer confirmation',
-      status: 'confirmed',
-    },
-    method: 'PATCH',
-    token: admin.session.token,
-  });
+  assert(
+    shareNoop.order.serviceShareStatus === 'not_applicable' && shareNoop.order.serviceShareAmount === 0,
+    'Service share endpoint should stay a no-op under the no-percent model',
+  );
 
   const shareSummary = await api(
     `/service-share/summary?date=${encodeURIComponent(completed.serviceShareBatchDate)}`,
@@ -174,7 +171,7 @@ try {
   assert(shareSummary.summary.orders.length >= 1, 'Service share summary should include completed order');
   assert(
     shareSummary.summary.summary.totalServiceShareAmount === 0,
-    'Trial service share summary should include zero service share',
+    'Service share summary should stay zero under the no-percent model',
   );
 
   const refunded = await api(`/orders/${encodeURIComponent(order.id)}/payment`, {
