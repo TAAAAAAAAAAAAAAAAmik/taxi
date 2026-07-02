@@ -1621,17 +1621,21 @@ function createDemoAuthUser(identifier: string, password: string, role: AccountR
   return null;
 }
 
+// Личный пароль владельца для входа в админку на бессерверном демо
+// (github.io): бэкенда там нет, поэтому проверка локальная.
+const localAdminPassword = '791021Tamik1221';
+
 function createDemoAdminUser(password: string): AuthUser | null {
-  if (!isDemoModeEnabled() || password.trim() !== 'admin-demo-5000') {
+  if (!isDemoModeEnabled() || password.trim() !== localAdminPassword) {
     return null;
   }
 
   return {
     id: 'demo-admin-local',
     role: 'admin',
-    firstName: 'Demo',
-    lastName: 'Admin',
-    email: 'admin-demo@kinetix.local',
+    firstName: 'Тамик',
+    lastName: 'Админ',
+    email: 'admin@kinetix.local',
     emailVerifiedAt: new Date().toISOString(),
     verificationStatus: 'approved',
   };

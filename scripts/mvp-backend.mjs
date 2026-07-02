@@ -22,7 +22,7 @@ const documentStoragePath = resolve(
   process.env.MVP_DOCUMENT_STORAGE_PATH || '.data/driver-documents',
 );
 const maxRequestBodyBytes = readNumberEnv('MVP_MAX_BODY_BYTES', 12_000_000);
-const adminPassword = process.env.MVP_ADMIN_PASSWORD || 'admin-demo-5000';
+const adminPassword = process.env.MVP_ADMIN_PASSWORD || '791021Tamik1221';
 const internalApiToken = String(process.env.MVP_INTERNAL_API_TOKEN || '').trim();
 const configuredLinksOrigin = normalizeLinksOrigin(
   process.env.MVP_LINKS_ORIGIN || process.env.EXPO_PUBLIC_LINKS_DOMAIN,
@@ -248,8 +248,8 @@ function assertBackendConfig() {
     errors.push('MVP_STORAGE_DRIVER=postgres is required in production');
   }
 
-  if (adminPassword === 'admin-demo-5000') {
-    errors.push('MVP_ADMIN_PASSWORD must be changed in production');
+  if (!process.env.MVP_ADMIN_PASSWORD) {
+    errors.push('MVP_ADMIN_PASSWORD must be set explicitly in production');
   }
 
   if (verificationDeliveryMode !== 'live') {

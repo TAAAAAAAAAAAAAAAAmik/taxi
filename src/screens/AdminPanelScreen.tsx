@@ -57,12 +57,9 @@ import {
   useAppState,
 } from '../state/AppState';
 import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
-import { isDemoModeEnabled } from '../utils/runtimeFlags';
 import { styles } from './AdminPanelScreen.styles';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminPanel'>;
-
-const demoAdminPassword = 'admin-demo-5000';
 
 type AdminSectionId =
   | 'stats'
@@ -174,7 +171,6 @@ export function AdminPanelScreen({ navigation }: Props) {
       ),
     [drivers],
   );
-  const showDemoAdmin = isDemoModeEnabled();
   const activePartnerProDrivers = useMemo(
     () => drivers.filter((driver) => isPartnerProActive(driver)),
     [drivers],
@@ -578,12 +574,6 @@ export function AdminPanelScreen({ navigation }: Props) {
     }
   };
 
-  const handleDemoSubmit = async () => {
-    setPassword(demoAdminPassword);
-    setSubmitted(false);
-    await handleSubmit(demoAdminPassword);
-  };
-
   const markDriverDailySettlementPaid = async (driverId: string) => {
     const driverOrders = dailyServiceShare.orders.filter(
       (order) => order.driverId === driverId && order.serviceShareAmount > 0 && order.status !== 'confirmed',
@@ -673,21 +663,8 @@ export function AdminPanelScreen({ navigation }: Props) {
               <Text style={styles.primaryButtonText}>Войти в админ-панель</Text>
             </Pressable>
 
-            {showDemoAdmin ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={handleDemoSubmit}
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-              >
-                <LockKeyhole color="#008D49" size={18} strokeWidth={2.4} />
-                <Text style={styles.secondaryButtonText}>Демо-админ</Text>
-              </Pressable>
-            ) : null}
-
             <Text numberOfLines={3} style={styles.helperText}>
-              {showDemoAdmin
-                ? 'Пароль проверяется на MVP backend. Для локального запуска по умолчанию: admin-demo-5000. Перед пилотом задайте MVP_ADMIN_PASSWORD.'
-                : 'Пароль проверяется на backend. Для production задайте MVP_ADMIN_PASSWORD в секретах окружения.'}
+              Вход только по личному паролю администратора.
             </Text>
           </View>
         ) : (
