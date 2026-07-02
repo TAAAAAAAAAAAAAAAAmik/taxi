@@ -1562,8 +1562,8 @@ export async function syncDriverSubscriptionPayment(paymentId: string) {
   });
 }
 
-// Ошибка, на которую сервер ответил (4xx/5xx): её нельзя путать с обрывом
-// сети — сервер жив и запрос отклонил осознанно.
+// Осознанный отказ НАШЕГО бэкенда (4xx/5xx со структурированной ошибкой
+// {error}): его нельзя путать с обрывом сети или ответом чужого хоста.
 export class ApiHttpError extends Error {
   readonly status: number;
 
@@ -1588,12 +1588,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message =
+    const apiErrorMessage =
       payload && typeof payload === 'object' && 'error' in payload
         ? String((payload as { error: unknown }).error)
-        : `API request failed: ${response.status}`;
+        : undefined;
 
-    throw new ApiHttpError(message, response.status);
+    if (!apiErrorMessage) {
+      // Ответ без нашего формата ошибки — это не бэкенд (статический хостинг
+      // на 405/404, прокси и т.п.). Для вызывающих это «сервер недоступен»,
+      // офлайн-фолбэк должен сработать как при обрыве сети.
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    throw new ApiHttpError(apiErrorMessage, response.status);
   }
 
   return payload as T;
