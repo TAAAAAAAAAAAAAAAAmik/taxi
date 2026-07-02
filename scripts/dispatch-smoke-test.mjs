@@ -220,6 +220,79 @@ try {
   assert(acceptedDelivery.order.serviceType === 'delivery', 'Accepted delivery should keep serviceType');
   assert(acceptedDelivery.order.deliveryHandoff === 'door_to_door', 'Accepted delivery should keep handoff mode');
 
+  // Освобождаем слот активных заказов: exclusiveOrder ещё активен.
+  await api(`/orders/${encodeURIComponent(exclusiveOrder.id)}/status`, {
+    body: { status: 'completed' },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+
+  // Создание заказа: серверная цена, идемпотентность, лимит активных,
+  // совпадающие адреса, сохранение stops/scheduledAt.
+  const requestId = `SMOKE-${Date.now().toString(36)}`;
+  const guardedOrder = await createOrder({
+    clientName: 'Guard Client',
+    clientPhone: '+79005550011',
+    clientRequestId: requestId,
+    destination: 'Guard destination',
+    paymentMethod: 'Наличные',
+    pickup: 'Guard pickup',
+    role: 'client',
+    scheduledAt: '2026-07-03T09:30',
+    stops: ['Guard stop 1', 'Guard stop 2'],
+    tariff: 'economy',
+    total: 999,
+  }, clientToken);
+
+  assert(
+    guardedOrder.total === 200,
+    `Client total must be recomputed server-side (economy 120 + 2 stops x 40), got ${guardedOrder.total}`,
+  );
+  assert(
+    Array.isArray(guardedOrder.stops) && guardedOrder.stops.length === 2,
+    'Order should persist intermediate stops',
+  );
+  assert(guardedOrder.scheduledAt === '2026-07-03T09:30', 'Order should persist scheduledAt');
+
+  const replayedOrder = await createOrder({
+    clientRequestId: requestId,
+    destination: 'Guard destination',
+    paymentMethod: 'Наличные',
+    pickup: 'Guard pickup',
+    role: 'client',
+    tariff: 'economy',
+    total: 999,
+  }, clientToken);
+
+  assert(replayedOrder.id === guardedOrder.id, 'Same clientRequestId must return the same order, not a duplicate');
+
+  // У клиента уже 2 активных заказа (доставка + guarded) — третий отклоняется.
+  await expectApiFailure('/orders', {
+    body: {
+      destination: 'Third destination',
+      paymentMethod: 'Наличные',
+      pickup: 'Third pickup',
+      role: 'client',
+      tariff: 'economy',
+      total: 120,
+    },
+    method: 'POST',
+    token: clientToken,
+  });
+
+  await expectApiFailure('/orders', {
+    body: {
+      destination: 'Малояз, Советская 1',
+      paymentMethod: 'Наличные',
+      pickup: 'малояз советская 1',
+      role: 'client',
+      tariff: 'economy',
+      total: 120,
+    },
+    method: 'POST',
+    token: clientToken,
+  });
+
   console.log('Dispatch smoke test passed');
 } finally {
   if (backend) {

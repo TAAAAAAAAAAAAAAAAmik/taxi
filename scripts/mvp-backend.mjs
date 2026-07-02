@@ -1850,32 +1850,41 @@ function estimateRouteFare(payload) {
   const serviceType = normalizeOrderServiceType(payload.serviceType || payload.orderType || payload.kind);
   const optionsTotal = readNumber(payload.optionsTotal, estimateOptionsTotal(payload.options));
   const minimumPrice = readNumber(payload.minimumPrice, getTariffMinimum(tariffId) + optionsTotal);
+  // Промежуточные остановки: та же надбавка, что в клиентской оценке
+  // (buildRouteEstimate), чтобы показанная и записанная цена совпадали.
+  const stopsCount = Math.max(
+    0,
+    Math.min(5, Math.trunc(readNumber(payload.stopsCount, Array.isArray(payload.stops) ? payload.stops.length : 0))),
+  );
   const preset = findLocalRoutePreset(pickup, destination);
   const pickupPoint = findRoutePoint(pickup);
   const destinationPoint = findRoutePoint(destination);
-  const distanceKm =
+  const baseDistanceKm =
     preset?.distanceKm ??
     (pickupPoint && destinationPoint
       ? Math.max(3.2, getDistanceKm(pickupPoint, destinationPoint) * 1.28)
       : pickupPoint || destinationPoint
       ? 14
       : 9);
-  const durationMin = preset?.durationMin ?? Math.max(8, Math.round(distanceKm * 1.35 + 6));
+  const distanceKm = baseDistanceKm + stopsCount * 1.8;
+  const durationMin =
+    (preset?.durationMin ?? Math.max(8, Math.round(baseDistanceKm * 1.35 + 6))) + stopsCount * 6;
   if (!isDriverLikeRole(role) && tariffId === 'economy') {
     const economyBase = serviceType === 'delivery' ? 160 : 120;
+    const economyPrice = economyBase + stopsCount * 40;
     return {
       calculatedAt: new Date().toISOString(),
       confidence: preset ? 'preset' : pickupPoint && destinationPoint ? 'estimated' : 'draft',
       currency: 'RUB',
       distanceKm: roundDistance(distanceKm),
-      distancePrice: economyBase,
+      distancePrice: economyPrice,
       durationMin,
       eta: `${durationMin} мин`,
-      note: 'фикс по Малоязу',
+      note: stopsCount ? `фикс по Малоязу · ${stopsCount} ост.` : 'фикс по Малоязу',
       provider: makeGeoProviderMeta('local'),
       surgeCoefficient: 1,
       tariffId,
-      total: economyBase + optionsTotal,
+      total: economyPrice + optionsTotal,
     };
   }
 
@@ -2149,19 +2158,34 @@ function scheduleExclusiveOfferRelease(db, orderId) {
 
   const delayMs = Math.max(0, expiresAt - Date.now() + 150);
 
+  // Освобождение идёт через очередь мутаций на свежей копии базы: запись
+  // копии, замкнутой таймером 30 секунд назад, откатывала бы все изменения,
+  // сделанные за это время.
   setTimeout(() => {
-    const currentOrder = db.orders.find((item) => item.id === orderId);
+    mutateDb(async (freshDb) => {
+      const currentOrder = freshDb.orders.find((item) => item.id === orderId);
 
-    if (!releaseExclusiveOffer(currentOrder, 'expired')) {
-      return;
-    }
+      if (!releaseExclusiveOffer(currentOrder, 'expired')) {
+        return;
+      }
 
-    publishOrderOpenFeed(db, currentOrder)
-      .then(() => writeDb(db))
-      .catch((error) => {
-        console.error('[dispatch] failed to release exclusive offer', error);
-      });
+      await publishOrderOpenFeed(freshDb, currentOrder);
+    }).catch((error) => {
+      console.error('[dispatch] failed to release exclusive offer', error);
+    });
   }, delayMs);
+}
+
+// Быстрая read-only проверка перед mutateDb, чтобы GET-запросы не платили
+// за сериализованную запись, когда освобождать нечего.
+function hasExpiredExclusiveOffers(db) {
+  return db.orders.some(
+    (order) =>
+      isExclusiveOfferActive(order) === false &&
+      order.exclusiveDriverId &&
+      order.exclusiveOfferStatus === 'pending' &&
+      !order.driver?.id,
+  );
 }
 
 function applyExclusiveOffer(db, order) {
@@ -2219,6 +2243,18 @@ function readNumber(value, fallback) {
   const number = Number(value);
 
   return Number.isFinite(number) ? number : fallback;
+}
+
+// Ключ сравнения адресов: регистр, ё/е и пунктуация не должны различать
+// «Малояз, Советская 1» и «малояз советская 1».
+function normalizeAddressKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^a-zа-я0-9]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function clampNumber(value, min, max, fallback) {
@@ -2437,23 +2473,37 @@ function makeOrder(payload) {
   const paymentMethod = String(payload.paymentMethod || 'Наличные');
   const pickup = requireString(payload.pickup, 'pickup');
   const destination = requireString(payload.destination, 'destination');
+
+  if (normalizeAddressKey(pickup) === normalizeAddressKey(destination)) {
+    throw new Error('Точка подачи и назначение совпадают');
+  }
+
   const pickupPoint = readGeoPoint(payload.pickupPoint || payload.pickupCoordinates || payload);
+  const stops = Array.isArray(payload.stops)
+    ? payload.stops
+        .map((stop) => String(stop).trim())
+        .filter(Boolean)
+        .slice(0, 5)
+    : [];
+  const scheduledAt = payload.scheduledAt ? String(payload.scheduledAt).trim().slice(0, 120) : undefined;
+  // Клиентской цене не доверяем: пересчитываем на сервере для любых
+  // клиентских тарифов. payload.total влияет на расчёт только у доверенных
+  // ролей (водитель принимает готовый заказ, админ создаёт вручную).
+  const trustedPricing = isDriverLikeRole(role) || isParkAdminRole(role);
   const routeEstimate = estimateRouteFare({
     destination,
-    minimumPrice: Number(payload.total || 0),
+    minimumPrice: trustedPricing ? Number(payload.total || 0) : undefined,
     options: payload.options,
     optionsTotal: payload.optionsTotal,
     pickup,
     role,
     serviceType,
+    stopsCount: stops.length,
     tariff: payload.tariff,
     tariffId: payload.tariffId,
   });
   const tariffId = normalizeTariffId(payload.tariffId || payload.tariff);
-  const total =
-    !isDriverLikeRole(role) && tariffId === 'economy'
-      ? routeEstimate.total
-      : Number(payload.total || routeEstimate.total);
+  const total = trustedPricing ? Number(payload.total || routeEstimate.total) : routeEstimate.total;
   const paymentStatus = normalizePaymentStatus(
     payload.paymentStatus,
     getInitialPaymentStatus(paymentMethod, total),
@@ -2467,6 +2517,8 @@ function makeOrder(payload) {
     pickup,
     pickupPoint: pickupPoint || findRoutePoint(pickup) || undefined,
     destination,
+    stops,
+    scheduledAt,
     deliveryHandoff: payload.deliveryHandoff ? String(payload.deliveryHandoff).trim() : undefined,
     deliveryPackageType: payload.deliveryPackageType ? String(payload.deliveryPackageType).trim() : undefined,
     packageDescription: payload.packageDescription ? String(payload.packageDescription).trim() : undefined,
@@ -6868,11 +6920,16 @@ async function handleRequest(request, response) {
         return;
       }
 
-      const releasedOffers = await releaseExpiredExclusiveOffers(db);
-      if (releasedOffers.length > 0) {
-        await writeDb(db);
+      // Истёкшие офферы освобождаем через очередь мутаций на свежей копии:
+      // запись request-копии затирала бы конкурентные изменения.
+      let snapshotDb = db;
+      if (hasExpiredExclusiveOffers(db)) {
+        await mutateDb(async (freshDb) => {
+          await releaseExpiredExclusiveOffers(freshDb);
+        });
+        snapshotDb = await readDb();
       }
-      sendJson(response, 200, createRealtimeSnapshot(db, sessionContext));
+      sendJson(response, 200, createRealtimeSnapshot(snapshotDb, sessionContext));
       return;
     }
 
@@ -8736,11 +8793,15 @@ async function handleRequest(request, response) {
         return;
       }
 
-      const releasedOffers = await releaseExpiredExclusiveOffers(db);
-      if (releasedOffers.length > 0) {
-        await writeDb(db);
+      // См. /realtime/snapshot: освобождение офферов — только через mutateDb.
+      let ordersDb = db;
+      if (hasExpiredExclusiveOffers(db)) {
+        await mutateDb(async (freshDb) => {
+          await releaseExpiredExclusiveOffers(freshDb);
+        });
+        ordersDb = await readDb();
       }
-      sendJson(response, 200, { orders: makeOrdersResponse(db, sessionContext) });
+      sendJson(response, 200, { orders: makeOrdersResponse(ordersDb, sessionContext) });
       return;
     }
 
@@ -8798,6 +8859,25 @@ async function handleRequest(request, response) {
             status: 200,
             body: { order: makeOrderResponse(db, existingOrder, sessionContext) },
           };
+        }
+
+        // Анти-спам: у клиента не больше 2 активных заказов одновременно
+        // (каждый новый заказ рассылает пуши всем доступным водителям).
+        if (actorRole === 'client') {
+          const activeCount = db.orders.filter(
+            (item) =>
+              item.userId === sessionContext.user.id &&
+              !['cancelled', 'canceled', 'closed', 'completed'].includes(item.status),
+          ).length;
+
+          if (activeCount >= 2) {
+            return {
+              status: 409,
+              body: {
+                error: 'У вас уже есть 2 активных заказа. Дождитесь их завершения или отмените один.',
+              },
+            };
+          }
         }
 
         const order = applyBonusToOrder(db, makeOrder(orderPayload), orderPayload);

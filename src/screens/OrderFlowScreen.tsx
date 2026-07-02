@@ -185,6 +185,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const [autoLocationRequested, setAutoLocationRequested] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [selectedFeedOrderId, setSelectedFeedOrderId] = useState<string | null>(null);
   const [driverFeedSort, setDriverFeedSort] = useState<DriverFeedSort>('near');
   const [detailsOrder, setDetailsOrder] = useState<AppOrder | null>(null);
@@ -219,7 +220,12 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     () => selectedOptionItems.reduce((sum, option) => sum + option.price, 0),
     [selectedOptionItems],
   );
-  const canConfirm = Boolean(values.pickup?.trim()) && Boolean(values.destination?.trim());
+  const sameRoutePoints =
+    Boolean(values.pickup?.trim()) &&
+    Boolean(values.destination?.trim()) &&
+    normalizeAddressKey(values.pickup) === normalizeAddressKey(values.destination);
+  const canConfirm =
+    Boolean(values.pickup?.trim()) && Boolean(values.destination?.trim()) && !sameRoutePoints;
   const usesRegionalAddressBook = !isDriverRole;
   const availableCarsCount = useMemo(
     () =>
@@ -305,6 +311,25 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       ),
     [availableDriverOrders, currentDriver?.id, nowMs],
   );
+  // Идемпотентность создания: id попытки стабилен между повторами после
+  // сбоя (сервер вернёт уже созданный заказ), но меняется, как только клиент
+  // правит маршрут/тариф — правки означают новый заказ, а не повтор.
+  const orderIntentKey = [
+    values.pickup ?? '',
+    values.destination ?? '',
+    serviceType,
+    selectedTariff.id,
+    paymentMethod,
+    scheduledAt,
+    cleanExtraStops.join('|'),
+    String(optionsTotal),
+  ].join('~');
+  const orderRequestIdRef = useRef(createOrderRequestId());
+  useEffect(() => {
+    orderRequestIdRef.current = createOrderRequestId();
+    setSubmitError('');
+  }, [orderIntentKey]);
+
   const localRouteEstimate = useMemo(
     () =>
       buildRouteEstimate({
@@ -404,6 +429,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
         pickup,
         role,
         serviceType,
+        stopsCount: cleanExtraStops.length,
         tariff: selectedTariff.title,
         tariffId: selectedTariff.id,
       })
@@ -426,6 +452,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       clearTimeout(timer);
     };
   }, [
+    cleanExtraStops.length,
     optionsTotal,
     role,
     selectedOptionLabels,
@@ -657,7 +684,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
 
     const order = {
       destination: values.destination.trim(),
-      id: `CLIENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      id: orderRequestIdRef.current,
       options: selectedOptionLabels,
       optionsTotal,
       paymentMethod,
@@ -680,13 +707,23 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     };
 
     setIsSubmitting(true);
+    setSubmitError('');
 
     try {
-      const createdOrder = await addOrder(order, role, firstName);
+      const result = await addOrder(order, role, firstName);
+
+      if (result.outcome === 'rejected') {
+        // Сервер отклонил заказ — id попытки сохраняем: повтор после
+        // исправления причины не создаст дубликат.
+        setSubmitError(result.message);
+        return;
+      }
+
+      orderRequestIdRef.current = createOrderRequestId();
       setConfirmed(true);
       navigation.navigate('OrderStatus', {
         firstName,
-        order: createdOrder,
+        order: result.order,
         role,
       });
     } finally {
@@ -1533,8 +1570,11 @@ export function OrderFlowScreen({ navigation, route }: Props) {
           </Animated.View>
 
           {confirmed && !canConfirm ? (
-            <Text style={styles.clientError}>{serviceCopy.missingRouteText}</Text>
+            <Text style={styles.clientError}>
+              {sameRoutePoints ? 'Точка подачи и назначение совпадают.' : serviceCopy.missingRouteText}
+            </Text>
           ) : null}
+          {submitError ? <Text style={styles.clientError}>{submitError}</Text> : null}
           {confirmed && isDeliveryOrder && clientStep === 1 && !deliveryPackageReady ? (
             <Text style={styles.clientError}>Выберите тип посылки или опишите, что нужно доставить.</Text>
           ) : null}
@@ -2915,4 +2955,18 @@ function SummaryRow({ label, value }: SummaryRowProps) {
       <Text style={styles.summaryValue}>{value}</Text>
     </View>
   );
+}
+
+function createOrderRequestId() {
+  return `CLIENT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeAddressKey(value?: string) {
+  return (value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^a-zа-я0-9]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

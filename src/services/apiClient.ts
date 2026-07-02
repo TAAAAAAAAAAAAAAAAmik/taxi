@@ -530,6 +530,7 @@ export type ApiRouteEstimateRequest = {
   pickup: string;
   role: AccountRole;
   serviceType?: 'delivery' | 'taxi';
+  stopsCount?: number;
   tariff?: string;
   tariffId?: string;
 };

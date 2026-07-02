@@ -244,6 +244,7 @@ export type AppOrder = OrderStatusSummary & {
   role: AccountRole;
   status: string;
   acceptedAt?: string;
+  clientRequestId?: string;
   arrivedAt?: string;
   completedAt?: string;
   createdAt: string;
@@ -347,7 +348,11 @@ type AppStateValue = {
   realtimeStatus: RealtimeConnectionState;
   realtimeUpdatedAt?: string;
   simpleMode: boolean;
-  addOrder: (order: OrderStatusSummary, role: AccountRole, clientName?: string) => Promise<AppOrder>;
+  addOrder: (
+    order: OrderStatusSummary,
+    role: AccountRole,
+    clientName?: string,
+  ) => Promise<{ message: string; order: AppOrder; outcome: 'server' | 'local' | 'rejected' }>;
   assignOrderToDriver: (orderId: string, driverId: string, status?: string) => Promise<AppOrder | null>;
   declineOrderOffer: (orderId: string, driverId: string) => Promise<AppOrder | null>;
   loginAccount: (identifier: string, password: string, role: AccountRole) => Promise<AuthUser | null>;
@@ -526,7 +531,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setOrders(snapshot.orders);
+    // Снапшот не должен молча стирать заказы, созданные локально в офлайне:
+    // сервер про них не знает, поэтому подмешиваем их сверху (дубликат по
+    // clientRequestId убираем, когда серверная копия появилась).
+    setOrders((current) => {
+      const serverIds = new Set(snapshot.orders.map((item) => item.id));
+      const serverRequestIds = new Set(
+        snapshot.orders.map((item) => item.clientRequestId).filter(Boolean),
+      );
+      const localOnly = current.filter(
+        (item) =>
+          item.id.startsWith('CLIENT-') &&
+          !serverIds.has(item.id) &&
+          !serverRequestIds.has(item.id),
+      );
+
+      return localOnly.length ? [...localOnly, ...snapshot.orders] : snapshot.orders;
+    });
     setDrivers(snapshot.drivers);
     setNotifications(snapshot.notifications);
     if (snapshot.supportThreads) {
@@ -831,13 +852,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
           setOrders((current) => [serverOrder, ...current.filter((item) => item.id !== serverOrder.id)]);
           setServerStatus('connected');
-          setServerMessage('Заказ сохранен на backend.');
-          return serverOrder;
-        } catch {
+          const message = 'Заказ сохранен на backend.';
+          setServerMessage(message);
+          return { message, order: serverOrder, outcome: 'server' };
+        } catch (error) {
+          if (error instanceof ApiHttpError) {
+            // Сервер жив и отклонил заказ (лимит активных, совпадающие адреса
+            // и т.п.): не создаём фантомный локальный заказ и показываем
+            // реальную причину.
+            setServerStatus('connected');
+            setServerMessage(error.message);
+            return { message: error.message, order: localOrder, outcome: 'rejected' };
+          }
+
           setServerStatus('offline');
-          setServerMessage('Backend не отвечает. Заказ сохранен только локально.');
+          const message = 'Backend не отвечает. Заказ сохранен только локально.';
+          setServerMessage(message);
           setOrders((current) => [localOrder, ...current.filter((item) => item.id !== localOrder.id)]);
-          return localOrder;
+          return { message, order: localOrder, outcome: 'local' };
         }
       },
       assignOrderToDriver: async (orderId, driverId, status = 'assigned') => {
