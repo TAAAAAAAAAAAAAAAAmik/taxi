@@ -64,6 +64,7 @@ import {
 } from '../services/apiClient';
 import { requestUserLocation, reverseGeocodePoint } from '../services/locationService';
 import { type AppOrder, type DriverProfile, useAppState } from '../state/AppState';
+import { NearbyCarsMap } from '../components/NearbyCarsMap';
 import { styles } from './OrderFlowScreen.styles';
 import { buildRouteEstimate, formatDistance, getGeoDistanceKm, type OrderServiceType, type RouteEstimate } from './orderFlow.routeEstimate';
 
@@ -193,6 +194,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const [serverAddressSuggestions, setServerAddressSuggestions] = useState<SalavatAddressSuggestion[]>([]);
   const [serverRouteEstimate, setServerRouteEstimate] = useState<RouteEstimate | null>(null);
   const [routeEstimateStatus, setRouteEstimateStatus] = useState<'local' | 'loading' | 'server'>('local');
+  const [customTimeOpen, setCustomTimeOpen] = useState(false);
   const isDriverRole = isDriverLikeRole(role);
   const isSelfEmployedDriver = isSelfEmployedDriverRole(role);
   const reducedMotion = useReducedMotionPreference();
@@ -244,6 +246,17 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   );
   const availableCarsState =
     availableCarsCount === 0 ? 'none' : availableCarsCount <= 2 ? 'low' : 'ready';
+  const sceneCarPoints = useMemo(
+    () =>
+      drivers
+        .filter((driver) => driver.isOnline && driver.lastLocation)
+        .map((driver) => ({
+          latitude: driver.lastLocation!.latitude,
+          longitude: driver.lastLocation!.longitude,
+        }))
+        .slice(0, 12),
+    [drivers],
+  );
   const currentDriver = useMemo(
     () =>
       isDriverRole && currentUser
@@ -817,8 +830,8 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       : isDeliveryOrder && clientStep < lastClientStep
       ? 'Дальше'
       : isDeliveryOrder
-      ? 'Оформить доставку'
-      : 'Вызвать Эконом';
+      ? `Оформить за ${routeEstimate.total} ₽`
+      : `Вызвать за ${routeEstimate.total} ₽`;
     const handleClientStepAction = async () => {
       if (!canConfirm) {
         setConfirmed(true);
@@ -859,39 +872,74 @@ export function OrderFlowScreen({ navigation, route }: Props) {
           keyboardShouldPersistTaps="handled"
           style={styles.clientScroll}
         >
-          <View style={styles.clientTopRow}>
-            <View style={styles.clientBrandRow}>
-              <View style={styles.clientBrandMark}>
-                <Car color="#F4FAF6" size={22} strokeWidth={2.5} />
-              </View>
-              <View style={styles.clientBrandCopy}>
-                <Text style={styles.clientBrand}>Такси Салават</Text>
-                <Text numberOfLines={1} style={styles.clientMeta}>Малояз · быстрые поездки по району</Text>
-              </View>
+          <View style={styles.orderScene}>
+            <NearbyCarsMap cars={sceneCarPoints} height="100%" />
+            <View pointerEvents="none" style={styles.orderSceneShade} />
+            <View style={styles.orderSceneTop}>
+              <Pressable
+                accessibilityLabel="Назад"
+                accessibilityRole="button"
+                onPress={() => navigation.goBack()}
+                style={({ pressed }) => [styles.orderSceneBack, pressed && styles.pressed]}
+              >
+                <ArrowLeft color="#B7F46A" size={21} strokeWidth={2.3} />
+              </Pressable>
+              <Text numberOfLines={1} style={styles.orderSceneTitle}>
+                {isDeliveryOrder ? 'Доставка' : 'Новая поездка'}
+              </Text>
+              <Pressable
+                accessibilityLabel="Крупный текст"
+                accessibilityRole="switch"
+                accessibilityState={{ checked: simpleMode }}
+                onPress={() => setSimpleMode(!simpleMode)}
+                style={({ pressed }) => [
+                  styles.orderSceneAa,
+                  simpleMode && styles.orderSceneAaOn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.orderSceneAaText, simpleMode && styles.orderSceneAaTextOn]}>Aa</Text>
+              </Pressable>
+              {availableCarsCount > 0 ? (
+                <View style={styles.orderSceneCars}>
+                  <View style={styles.orderSceneCarsDot} />
+                  <Text style={styles.orderSceneCarsText}>{availableCarsCount} рядом</Text>
+                </View>
+              ) : null}
             </View>
-            <Pressable
-              accessibilityRole="switch"
-              accessibilityState={{ checked: simpleMode }}
-              onPress={() => setSimpleMode(!simpleMode)}
-              style={({ pressed }) => [styles.clientModeButton, pressed && styles.pressed]}
-            >
-              <SlidersHorizontal color="#008D49" size={18} strokeWidth={2.4} />
-              <Text style={styles.clientModeText}>Простой</Text>
-            </Pressable>
           </View>
 
-          <View style={styles.clientFlowPanel}>
-            <View style={styles.clientFlowHeader}>
-              <View style={styles.clientFlowIcon}>
-                <Route color="#008D49" size={22} strokeWidth={2.4} />
-              </View>
-              <View style={styles.clientFlowCopy}>
-                <Text style={styles.clientFlowTitle}>{currentClientStep.title}</Text>
-                <Text numberOfLines={2} style={styles.clientFlowText}>
-                  {currentClientStep.text}
-                </Text>
-              </View>
-            </View>
+          <View style={styles.orderSheet}>
+            <View style={styles.orderSheetGrab} />
+
+          <View style={styles.serviceSwitch}>
+            {(['taxi', 'delivery'] as OrderServiceType[]).map((item) => {
+              const active = serviceType === item;
+              const ItemIcon = item === 'delivery' ? Package : Car;
+              const itemCopy = getServiceCopy(item);
+
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  key={item}
+                  onPress={() => selectServiceType(item)}
+                  style={({ pressed }) => [
+                    styles.serviceSwitchButton,
+                    active && styles.serviceSwitchButtonActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ItemIcon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.5} />
+                  <Text style={[styles.serviceSwitchTitle, active && styles.serviceSwitchTitleActive]}>
+                    {itemCopy.shortTitle}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {isDeliveryOrder ? (
             <View style={styles.clientStepRail}>
               {clientStepMeta.map((step, index) => {
                 const active = index === clientStep;
@@ -929,76 +977,20 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 );
               })}
             </View>
-            <View style={styles.clientProgressTrack}>
-              <View style={[styles.clientProgressFill, { width: `${clientProgress}%` }]} />
-            </View>
-            <View style={styles.clientFlowMap}>
-              <View style={styles.clientMapRoadWide} />
-              <View style={styles.clientMapRoadThin} />
-              <View style={styles.clientMapRoute}>
-                <View style={styles.clientMapPointStart} />
-                <View style={styles.clientMapRouteLine} />
-                <View style={styles.clientMapCar}>
-                  <Car color="#0B2F25" size={14} strokeWidth={2.8} />
-                </View>
-              </View>
-            </View>
-            <View style={styles.clientSceneSummary}>
-              <Text numberOfLines={1} style={styles.clientScenePoint}>{scenePickup}</Text>
-              <Navigation color="#008D49" size={15} strokeWidth={2.7} />
-              <Text numberOfLines={1} style={styles.clientScenePoint}>{sceneDestination}</Text>
-            </View>
-          </View>
-
-          <View style={styles.serviceSwitch}>
-            {(['taxi', 'delivery'] as OrderServiceType[]).map((item) => {
-              const active = serviceType === item;
-              const ItemIcon = item === 'delivery' ? Package : Car;
-              const itemCopy = getServiceCopy(item);
-
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  key={item}
-                  onPress={() => selectServiceType(item)}
-                  style={({ pressed }) => [
-                    styles.serviceSwitchButton,
-                    active && styles.serviceSwitchButtonActive,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <ItemIcon color={active ? '#F4FAF6' : '#008D49'} size={19} strokeWidth={2.5} />
-                  <Text style={[styles.serviceSwitchTitle, active && styles.serviceSwitchTitleActive]}>
-                    {itemCopy.shortTitle}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          ) : null}
 
           <Animated.View style={[styles.clientStepBody, clientStepAnimatedStyle]}>
           {!isDeliveryOrder || clientStep === 0 ? (
           <View style={styles.clientDestinationBlock}>
             <View style={styles.clientTripHeader}>
-              <Text style={styles.clientTripTitle}>Детали поездки</Text>
-              <Text style={styles.clientTripEta}>{canConfirm ? `Подача ${selectedTariff.eta}` : '2 адреса'}</Text>
-            </View>
-            <View style={styles.clientInputShell}>
-              <View style={styles.clientInputLabelRow}>
-                <View style={styles.clientInputDot} />
-                <Text style={styles.clientInputLabel}>{serviceCopy.pickupLabel}</Text>
-              </View>
-              <TextInput
-                autoCorrect={false}
-                onChangeText={(value) => updateValue('pickup', value)}
-                onFocus={() => setActiveAddressFieldId('pickup')}
-                placeholder={serviceCopy.pickupPlaceholder}
-                placeholderTextColor="#557669"
-                returnKeyType="next"
-                style={[styles.clientDestinationInput, simpleMode && styles.clientDestinationInputSimple]}
-                value={values.pickup ?? ''}
-              />
+              <Text style={styles.clientTripTitle}>Маршрут</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={resetClientRoute}
+                style={({ pressed }) => [styles.clientResetButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.clientResetButtonText}>Сбросить</Text>
+              </Pressable>
             </View>
             <View style={styles.clientInputShell}>
               <View style={styles.clientInputLabelRow}>
@@ -1016,6 +1008,33 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 value={values.destination ?? ''}
               />
             </View>
+            <View style={styles.clientInputShell}>
+              <View style={styles.clientInputLabelRow}>
+                <View style={styles.clientInputDot} />
+                <Text style={styles.clientInputLabel}>{serviceCopy.pickupLabel}</Text>
+                <Pressable
+                  accessibilityLabel="Подставить моё местоположение"
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void requestLocationRoutes();
+                  }}
+                  style={({ pressed }) => [styles.orderLocateChip, pressed && styles.pressed]}
+                >
+                  <LocateFixed color="#008D49" size={13} strokeWidth={2.5} />
+                  <Text style={styles.orderLocateChipText}>моё место</Text>
+                </Pressable>
+              </View>
+              <TextInput
+                autoCorrect={false}
+                onChangeText={(value) => updateValue('pickup', value)}
+                onFocus={() => setActiveAddressFieldId('pickup')}
+                placeholder={serviceCopy.pickupPlaceholder}
+                placeholderTextColor="#557669"
+                returnKeyType="next"
+                style={[styles.clientDestinationInput, simpleMode && styles.clientDestinationInputSimple]}
+                value={values.pickup ?? ''}
+              />
+            </View>
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded: routeDetailsVisible }}
@@ -1023,7 +1042,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               style={({ pressed }) => [styles.clientOptionalToggle, pressed && styles.pressed]}
             >
               <Text style={styles.clientOptionalToggleText}>
-                {routeDetailsVisible ? 'Скрыть время и остановки' : 'Время подачи и остановки'}
+                {routeDetailsVisible ? 'Скрыть остановки' : 'Добавить остановки'}
               </Text>
               <Text style={styles.clientOptionalToggleMeta}>
                 {routeDetailsHasContent ? 'Заполнено' : 'Необязательно'}
@@ -1068,14 +1087,6 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   >
                     <Text style={styles.clientSmallOptionText}>+ Остановка</Text>
                   </Pressable>
-                  <TextInput
-                    autoCorrect={false}
-                    onChangeText={setScheduledAt}
-                    placeholder="Когда подать? Сейчас или 18:30"
-                    placeholderTextColor="#557669"
-                    style={[styles.clientScheduleInput, simpleMode && styles.clientDestinationInputSimple]}
-                    value={scheduledAt}
-                  />
                 </View>
               </>
             ) : null}
@@ -1224,6 +1235,67 @@ export function OrderFlowScreen({ navigation, route }: Props) {
           </View>
           ) : null}
 
+          {!isDeliveryOrder || clientStep === 0 ? (
+            <View style={styles.orderWhenRow}>
+              <Text style={styles.orderWhenLabel}>Подача</Text>
+              {[
+                { label: 'Сейчас', value: '' },
+                { label: '+15 мин', value: 'Через 15 минут' },
+                { label: '+30 мин', value: 'Через 30 минут' },
+              ].map((option) => {
+                const active = !customTimeOpen && scheduledAt === option.value;
+
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    key={option.label}
+                    onPress={() => {
+                      setCustomTimeOpen(false);
+                      setScheduledAt(option.value);
+                    }}
+                    style={({ pressed }) => [
+                      styles.orderWhenChip,
+                      active && styles.orderWhenChipOn,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={[styles.orderWhenChipText, active && styles.orderWhenChipTextOn]}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: customTimeOpen }}
+                onPress={() => {
+                  setCustomTimeOpen(true);
+                  setScheduledAt('');
+                }}
+                style={({ pressed }) => [
+                  styles.orderWhenChip,
+                  customTimeOpen && styles.orderWhenChipOn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.orderWhenChipText, customTimeOpen && styles.orderWhenChipTextOn]}>
+                  Своё время
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {customTimeOpen && (!isDeliveryOrder || clientStep === 0) ? (
+            <TextInput
+              autoCorrect={false}
+              onChangeText={setScheduledAt}
+              placeholder="Например: сегодня 18:30"
+              placeholderTextColor="#557669"
+              style={[styles.clientScheduleInput, simpleMode && styles.clientDestinationInputSimple]}
+              value={scheduledAt}
+            />
+          ) : null}
+
           {clientStep === 1 && isDeliveryOrder ? (
             <View style={styles.deliveryStepPanel}>
               <View style={styles.deliveryPresetGrid}>
@@ -1327,102 +1399,16 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             </View>
           ) : null}
 
-          {!isDeliveryOrder ? (
-            <>
-              <View style={styles.clientSheetHeader}>
-                <Text style={styles.clientSheetTitle}>Выберите поездку</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={resetClientRoute}
-                  style={({ pressed }) => [styles.clientResetButton, pressed && styles.pressed]}
-                >
-                  <Text style={styles.clientResetButtonText}>Сбросить</Text>
-                </Pressable>
+          {!isDeliveryOrder && canConfirm ? (
+            <View style={styles.orderPriceCard}>
+              <View style={styles.orderPriceRow}>
+                <Text style={styles.orderPriceName}>Эконом · фиксированная цена</Text>
+                <Text style={styles.orderPriceValue}>{routeEstimate.total} ₽</Text>
               </View>
-              <View style={styles.clientTariffList}>
-                {economyTariffs.map((tariff) => {
-                  const active = tariff.id === selectedTariffId;
-                  const tariffPrice = active ? routeEstimate.total : tariff.price;
-
-                  return (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      key={tariff.id}
-                      onPress={() => {
-                        setConfirmed(false);
-                        setSelectedTariffId(tariff.id);
-                      }}
-                      style={({ pressed }) => [
-                        styles.clientTariffCard,
-                        active && styles.clientTariffCardActive,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      {active ? (
-                        <>
-                          <View style={styles.clientTariffHeader}>
-                            <View style={styles.clientTariffBadge}>
-                              <Text style={styles.clientTariffBadgeText}>✓ Выбрано</Text>
-                            </View>
-                            <View style={styles.clientTariffVisual}>
-                              <View style={styles.clientTariffRouteDot} />
-                              <View style={styles.clientTariffRouteLine} />
-                              <Car color="#12382C" size={18} strokeWidth={2.1} />
-                            </View>
-                          </View>
-                          <View style={styles.clientTariffMainRow}>
-                            <View style={styles.clientTariffCopy}>
-                              <Text style={styles.clientTariffTitle}>{tariff.title}</Text>
-                              <View style={styles.clientTariffBenefits}>
-                                {serviceCopy.benefits.map((benefit) => (
-                                  <View key={benefit} style={styles.clientTariffBenefit}>
-                                    <View style={styles.clientTariffBenefitDot} />
-                                    <Text numberOfLines={1} style={styles.clientTariffBenefitText}>
-                                      {benefit}
-                                    </Text>
-                                  </View>
-                                ))}
-                              </View>
-                            </View>
-                            <Text style={styles.clientTariffPrice}>{tariffPrice} ₽</Text>
-                          </View>
-                          <View style={styles.clientTariffConfidence}>
-                            <Text style={styles.clientTariffConfidenceText}>Цена до заказа</Text>
-                            <Text style={styles.clientTariffConfidenceText}>Статус онлайн</Text>
-                            <Text style={styles.clientTariffConfidenceText}>{formatDistance(routeEstimate.distanceKm)}</Text>
-                          </View>
-                        </>
-                      ) : (
-                        <>
-                          <Text style={styles.clientTariffTitle}>{tariff.title}</Text>
-                          <Text style={styles.clientTariffSubtitle}>{tariff.subtitle}</Text>
-                        </>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <View style={styles.clientCompactDetails}>
-                <View style={styles.clientDetailItem}>
-                  <Text style={styles.clientDetailLabel}>Маршрут</Text>
-                  <Text numberOfLines={1} style={styles.clientDetailValue}>
-                    {formatDistance(routeEstimate.distanceKm)} · {routeEstimate.durationMin} мин
-                  </Text>
-                </View>
-                <View style={styles.clientDetailItem}>
-                  <Text style={styles.clientDetailLabel}>Подача</Text>
-                  <Text numberOfLines={1} style={styles.clientDetailValue}>{selectedTariff.eta}</Text>
-                </View>
-                <View style={[styles.clientDetailItem, styles.clientDetailStatus]}>
-                  <View style={[styles.clientRealtimeDot, realtimeStatus === 'live' && styles.clientRealtimeDotLive]} />
-                  <Text numberOfLines={1} style={styles.clientDetailStatusText}>
-                    {clientRealtimeLabel}
-                  </Text>
-                </View>
-              </View>
-            </>
+              <Text numberOfLines={1} style={styles.orderPriceMetaText}>
+                {formatDistance(routeEstimate.distanceKm)} · ~{routeEstimate.durationMin} мин · подача {selectedTariff.eta}
+              </Text>
+            </View>
           ) : null}
 
           {clientStep === 2 && isDeliveryOrder ? (
@@ -1569,6 +1555,10 @@ export function OrderFlowScreen({ navigation, route }: Props) {
           ) : null}
           </Animated.View>
 
+          </View>
+        </ScrollView>
+
+        <View style={styles.orderBottomBar}>
           {confirmed && !canConfirm ? (
             <Text style={styles.clientError}>
               {sameRoutePoints ? 'Точка подачи и назначение совпадают.' : serviceCopy.missingRouteText}
@@ -1618,7 +1608,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               </Text>
             </Pressable>
           </View>
-        </ScrollView>
+        </View>
       </SafeAreaView>
     );
   }
