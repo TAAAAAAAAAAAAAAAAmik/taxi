@@ -732,6 +732,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         );
       } catch (error) {
         setDriverSubscription(nextSubscription);
+        // Дневной доступ активируем и в локальном профиле водителя: именно
+        // из него считается видимая подписка (и её 24-часовой срок).
+        if (billingMode === 'daily') {
+          setDrivers((current) =>
+            current.map((item) =>
+              item.id === currentDriver.id
+                ? {
+                    ...item,
+                    accessExpiresAt: nextSubscription.expiresAt,
+                    billingMode,
+                    subscriptionExpiresAt: nextSubscription.expiresAt,
+                    subscriptionStatus: 'active',
+                  }
+                : item,
+            ),
+          );
+        }
         setDriverPayments((current) => [
           createLocalDriverPayment(currentDriver, billingMode, nextSubscription),
           ...current,
@@ -1715,10 +1732,12 @@ const initialDrivers: DriverProfile[] = [
     canReceiveOrders: true,
     contractStatus: 'signed',
     documentsStatus: 'approved',
-    isOnline: true,
+    // Смена платная: без оплаченного дневного доступа демо-водитель не на
+    // линии, кнопка «Выйти на линию» ведёт к оплате.
+    isOnline: false,
     registryStatus: 'active',
     status: 'approved',
-    subscriptionStatus: 'active',
+    subscriptionStatus: 'inactive',
     taxProfileStatus: 'approved',
     userId: 'demo-driver-local',
     vehiclePermitStatus: 'approved',

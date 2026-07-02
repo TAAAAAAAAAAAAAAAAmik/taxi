@@ -103,10 +103,12 @@ export function DashboardScreen({ navigation, route }: Props) {
     };
   }, [onlineDriverId, updateDriverLocation]);
 
+  // driverSubscription из контекста уже учитывает срок действия доступа
+  // (истёкший «active» становится «expired»), в отличие от сырого статуса
+  // в профиле водителя.
   const hasActiveAccess =
-    currentDriver?.subscriptionStatus === 'active' ||
-    (!isSelfEmployedDriver && Boolean(currentDriver?.canReceiveOrders)) ||
-    driverSubscription.status === 'active';
+    driverSubscription.status === 'active' ||
+    (!isSelfEmployedDriver && Boolean(currentDriver?.canReceiveOrders));
   const canToggleLine = Boolean(currentDriver?.canReceiveOrders && hasActiveAccess);
   const driverAccessBlockers = currentDriver?.accessBlockers ?? [];
   // Смена платная: самозанятый водитель не может выйти на линию без оплаты
