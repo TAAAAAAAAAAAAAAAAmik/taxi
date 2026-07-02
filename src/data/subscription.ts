@@ -11,9 +11,9 @@ export type DriverPaymentProvider = {
   shopId?: string;
 };
 
-export const driverPartnerProPrice = 2490;
+export const driverPartnerProPrice = 3290;
 export const driverPartnerProPlanId = 'partner_pro';
-export const driverDailyPrice = 100;
+export const driverDailyPrice = 120;
 export const driverDailyPlanId = 'daily_line';
 export const driverDailyAccessDays = 1;
 
@@ -108,11 +108,11 @@ export const driverAccessPlans: Record<
       'Фиксированная цена на месяц',
       'Чем больше поездок, тем выгоднее',
     ],
-    headline: '2 490 ₽ / месяц',
+    headline: '3 290 ₽ / месяц',
     id: 'monthly',
     monthlyPrice: monthlySubscriptionPlans.self_employed_driver.amount,
     name: 'Партнёр PRO',
-    primaryAction: 'Подключить за 2 490 ₽',
+    primaryAction: 'Подключить за 3 290 ₽',
     salesCopy: 'Фиксированная подписка без процента с заказов.',
     shortName: 'Партнёр PRO',
     subscriptionPlan: driverPartnerProPlanId,
@@ -127,11 +127,11 @@ export const driverAccessPlans: Record<
       'Заказы без процентов',
       'Вся сумма поездки — водителю',
     ],
-    headline: '100 ₽ / день',
+    headline: '120 ₽ / день',
     id: 'daily',
     monthlyPrice: driverDailyPrice,
     name: 'Дневной доступ',
-    primaryAction: 'Открыть линию за 100 ₽',
+    primaryAction: 'Открыть линию за 120 ₽',
     salesCopy: 'Платите по дням, без процентов и обязательств.',
     shortName: 'День',
     subscriptionPlan: driverDailyPlanId,
@@ -141,8 +141,8 @@ export const driverAccessPlans: Record<
 export const driverSubscriptionPlan = driverAccessPlans.daily;
 
 export const driverSubscriptionBenefits = [
-  'День: 100 ₽ за 24 часа на линии.',
-  'Партнёр PRO: 2 490 ₽ в месяц.',
+  'День: 120 ₽ за 24 часа на линии.',
+  'Партнёр PRO: 3 290 ₽ в месяц.',
   'Без процента — вся сумма поездки водителю.',
   'Доступ можно активировать вручную.',
 ];
@@ -152,15 +152,15 @@ export const driverSubscriptionRules = [
   'Сервис не работодатель водителя.',
   'Заказы распределяются по спросу, рейтингу и географии.',
   'Оплата идёт водителю напрямую, без процента сервиса.',
-  'Доступ открывают пасс на день (100 ₽) или Партнёр PRO (2 490 ₽/мес).',
+  'Доступ открывают пасс на день (120 ₽) или Партнёр PRO (3 290 ₽/мес).',
   'Возвраты, безопасность и споры — по правилам сервиса.',
 ];
 
 export const driverSubscriptionEconomics = [
   {
     label: 'Доступ на линию',
-    value: '100 ₽ / день',
-    helper: 'Или 2 490 ₽ в месяц (Партнёр PRO)',
+    value: '120 ₽ / день',
+    helper: 'Или 3 290 ₽ в месяц (Партнёр PRO)',
   },
   {
     label: 'Процент с заказа',

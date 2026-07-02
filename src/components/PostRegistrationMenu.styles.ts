@@ -831,6 +831,7 @@ export const styles = StyleSheet.create({
     gap: 14,
   },
   clientHome: {
+    flex: 1,
     gap: 16,
   },
   clientHero: {
@@ -885,6 +886,7 @@ export const styles = StyleSheet.create({
     width: 46,
   },
   clientHomeBody: {
+    flex: 1,
     gap: 15,
   },
   clientMapCard: {
@@ -892,9 +894,13 @@ export const styles = StyleSheet.create({
     borderColor: 'rgba(11, 47, 37, 0.10)',
     borderRadius: 20,
     borderWidth: 1,
-    height: 212,
+    flex: 1,
+    minHeight: 212,
     overflow: 'hidden',
     position: 'relative',
+  },
+  clientMapGrow: {
+    flex: 1,
   },
   clientMapChip: {
     alignItems: 'center',
@@ -1414,6 +1420,7 @@ export const styles = StyleSheet.create({
     fontWeight: '900',
   },
   clientMain: {
+    flex: 1,
     width: '100%',
   },
   clientMainOrderIcon: {
@@ -2838,6 +2845,7 @@ export const styles = StyleSheet.create({
     fontWeight: '900',
   },
   layout: {
+    flexGrow: 1,
     gap: 12,
   },
   liveDot: {

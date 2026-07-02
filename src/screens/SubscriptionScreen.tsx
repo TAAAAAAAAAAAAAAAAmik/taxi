@@ -113,7 +113,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
         <ScreenHero
           Icon={WalletCards}
           onBack={() => navigation.goBack()}
-          subtitle="100 ₽ за день или Партнёр PRO на месяц"
+          subtitle="120 ₽ за день или Партнёр PRO на месяц"
           title="Доступ к заказам"
         />
 
@@ -161,8 +161,8 @@ export function SubscriptionScreen({ navigation, route }: Props) {
             <Text style={styles.summaryTitle}>Выбрано: {selectedPlan.shortName}</Text>
             <Text style={styles.summaryText}>
               {selectedMode === 'monthly'
-                ? '2 490 ₽ за 30 дней. Доступ включается после проверки оплаты.'
-                : '100 ₽ за 24 часа. Доступ включается после проверки оплаты.'}
+                ? '3 290 ₽ за 30 дней. Доступ включается после проверки оплаты.'
+                : '120 ₽ за 24 часа. Доступ включается после проверки оплаты.'}
             </Text>
             {selectedMode === 'monthly' && paymentSettings?.cardMask ? (
               <Text style={styles.summaryText}>Карта: {paymentSettings.cardMask}</Text>

@@ -99,7 +99,7 @@ type PostRegistrationMenuProps = {
   onOpenReferral: () => void;
   onOpenSavedPlace: () => void;
   onOpenSubscription: () => void;
-  onOpenSupportChat: () => void;
+  onOpenSupportChat: (category?: string) => void;
   onAcceptDriverOrder?: (orderId: string) => void | Promise<void>;
 };
 
@@ -287,7 +287,7 @@ export function PostRegistrationMenu({
     ],
   };
 
-  const handleActionTarget = (target?: MenuActionTarget) => {
+  const handleActionTarget = (target?: MenuActionTarget, supportCategory?: string) => {
     if (target === 'order') {
       onOpenOrderFlow();
       return;
@@ -324,7 +324,7 @@ export function PostRegistrationMenu({
     }
 
     if (target === 'supportChat') {
-      onOpenSupportChat();
+      onOpenSupportChat(supportCategory);
       return;
     }
 
@@ -735,9 +735,9 @@ function ClientHomePage({
           </PressableScale>
         </StaggerView>
 
-        <StaggerView index={4}>
+        <StaggerView index={4} style={styles.clientMapGrow}>
           <View style={styles.clientMapCard}>
-            <NearbyCarsMap cars={carPoints} height={206} />
+            <NearbyCarsMap cars={carPoints} height="100%" />
             <View style={styles.clientMapChip}>
               <View style={styles.clientMapChipDot} />
               <Text numberOfLines={1} style={styles.clientMapChipText}>
@@ -2034,7 +2034,7 @@ function DrawerMenuItem({ active, index, item, onPress, progress }: DrawerMenuIt
 type QuickActionCardProps = {
   action: QuickAction;
   actionIndex?: number;
-  onActionTarget: (target?: MenuActionTarget) => void;
+  onActionTarget: (target?: MenuActionTarget, supportCategory?: string) => void;
 };
 
 function QuickActionCard({ action, actionIndex = 0, onActionTarget }: QuickActionCardProps) {
@@ -2044,7 +2044,7 @@ function QuickActionCard({ action, actionIndex = 0, onActionTarget }: QuickActio
     <StaggerView index={actionIndex} style={styles.quickGridItem}>
       <PressableScale
         accessibilityRole="button"
-        onPress={() => onActionTarget(action.target)}
+        onPress={() => onActionTarget(action.target, action.supportCategory)}
         style={styles.quickCard}
       >
         <View style={styles.quickIconWrap}>
@@ -2061,7 +2061,7 @@ function DriverPayoutsPage({
   onActionTarget,
   stats,
 }: {
-  onActionTarget: (target?: MenuActionTarget) => void;
+  onActionTarget: (target?: MenuActionTarget, supportCategory?: string) => void;
   stats?: DriverStatsSummary;
 }) {
   const [statsOpen, setStatsOpen] = useState(false);
@@ -2107,7 +2107,7 @@ function DriverPayoutsPage({
             День
           </Text>
           <Text style={[styles.payoutTariffText, activePlan === 'daily' && styles.payoutTariffTextActive]}>
-            100 ₽
+            120 ₽
           </Text>
         </PressableScale>
         <PressableScale
@@ -2120,7 +2120,7 @@ function DriverPayoutsPage({
             PRO
           </Text>
           <Text style={[styles.payoutTariffText, activePlan === 'monthly' && styles.payoutTariffTextActive]}>
-            2 490 ₽
+            3 290 ₽
           </Text>
         </PressableScale>
       </StaggerView>
@@ -2134,7 +2134,7 @@ function DriverPayoutsPage({
         >
           <CreditCard color="#F4FAF6" size={18} strokeWidth={2.4} />
           <Text style={styles.payoutPayButtonText}>
-            {activePlan === 'monthly' ? 'Оплатить PRO' : 'Оплатить смену 100 ₽'}
+            {activePlan === 'monthly' ? 'Оплатить PRO' : 'Оплатить смену 120 ₽'}
           </Text>
         </PressableScale>
         <PressableScale
@@ -2165,7 +2165,7 @@ function DriverProfilePage({
 }: {
   displayName: string;
   driverStats?: DriverStatsSummary;
-  onActionTarget: (target?: MenuActionTarget) => void;
+  onActionTarget: (target?: MenuActionTarget, supportCategory?: string) => void;
 }) {
   const [activePanel, setActivePanel] = useState<'settings' | 'profile'>('profile');
   const initials = getInitials(displayName);
@@ -2261,7 +2261,7 @@ type SectionPageViewProps = {
   driverStats?: DriverStatsSummary;
   menuButton?: boolean;
   onAcceptDriverOrder?: (orderId: string) => void | Promise<void>;
-  onActionTarget: (target?: MenuActionTarget) => void;
+  onActionTarget: (target?: MenuActionTarget, supportCategory?: string) => void;
   onOpenMenu?: () => void;
   page: SectionPage;
 };

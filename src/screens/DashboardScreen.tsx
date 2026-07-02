@@ -324,7 +324,9 @@ export function DashboardScreen({ navigation, route }: Props) {
         onOpenReferral={() => navigation.navigate('Referral', { firstName, role })}
         onOpenSavedPlace={() => navigation.navigate('SavedPlace', { firstName, role })}
         onOpenSubscription={() => navigation.navigate('Subscription', { firstName, role })}
-        onOpenSupportChat={() => navigation.navigate('SupportChat', { firstName, role })}
+        onOpenSupportChat={(category?: string) =>
+          navigation.navigate('SupportChat', { firstName, role, ...(category ? { category } : {}) })
+        }
         onAcceptDriverOrder={isDriverRole ? handleAcceptDashboardOrder : undefined}
         onToggleSimpleMode={() => setSimpleMode(!simpleMode)}
         onLogout={async () => {

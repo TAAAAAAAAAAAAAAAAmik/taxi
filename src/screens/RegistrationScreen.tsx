@@ -427,7 +427,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
               {isSelfEmployedDriverRole(normalizeAccountRole(role)) ? (
                 <InfoPanel Icon={Car} title="Партнёр PRO">
                   <Text style={styles.panelText}>
-                    2 490 ₽ / месяц или 100 ₽ / день · вся сумма поездки остается водителю.
+                    3 290 ₽ / месяц или 120 ₽ / день · вся сумма поездки остается водителю.
                   </Text>
                   <Text style={styles.panelTextMuted}>{driverAccessPlans.monthly.description}</Text>
                 </InfoPanel>

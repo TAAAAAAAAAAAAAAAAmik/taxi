@@ -59,13 +59,13 @@ const driverAccessPlans = {
   monthly: {
     accessDays: 30,
     commissionPercent: 0,
-    monthlyPrice: 2490,
+    monthlyPrice: 3290,
     name: 'Партнёр PRO',
   },
   daily: {
     accessDays: 1,
     commissionPercent: 0,
-    monthlyPrice: 100,
+    monthlyPrice: 120,
     name: 'Дневной доступ',
   },
 };
@@ -8078,7 +8078,7 @@ async function handleRequest(request, response) {
         amount: driverAccessPlans.monthly.monthlyPrice,
         cardMask: maskPaymentCardNumber(paymentCardNumber),
         instructions:
-          'Для подключения Партнёр PRO переведите 2 490 ₽ на карту владельца проекта и отправьте чек администратору.',
+          'Для подключения Партнёр PRO переведите 3 290 ₽ на карту владельца проекта и отправьте чек администратору.',
         planName: driverAccessPlans.monthly.name,
       });
       return;

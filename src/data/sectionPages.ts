@@ -280,18 +280,24 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
           title: 'Проблема с поездкой',
           subtitle: 'Маршрут, водитель или стоимость.',
           icon: 'route',
+          supportCategory: 'Поездка',
+          target: 'supportChat',
         },
         {
           id: 'payment-issue',
           title: 'Оплата',
           subtitle: 'Чек, карта или списание.',
           icon: 'credit-card',
+          supportCategory: 'Оплата',
+          target: 'supportChat',
         },
         {
           id: 'safety',
           title: 'Безопасность',
           subtitle: 'Срочные и важные обращения.',
           icon: 'shield',
+          supportCategory: 'Безопасность',
+          target: 'supportChat',
         },
       ],
       listTitle: 'Категории обращений',
@@ -413,7 +419,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
     },
     subscription: {
       title: 'Тариф и расчеты',
-      subtitle: 'Дневной доступ за 100 ₽ или Партнёр PRO за 2 490 ₽.',
+      subtitle: 'Дневной доступ за 120 ₽ или Партнёр PRO за 3 290 ₽.',
       icon: 'wallet',
       statusTitle: 'Доступ к заказам открывается после допуска',
       statusText:
@@ -423,8 +429,8 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
       secondaryAction: 'Посмотреть ленту',
       secondaryTarget: 'order',
       metrics: [
-        { label: 'Партнёр PRO', value: '2 490 ₽', helper: '30 дней доступа' },
-        { label: 'Дневной доступ', value: '100 ₽', helper: '24 часа на линии' },
+        { label: 'Партнёр PRO', value: '3 290 ₽', helper: '30 дней доступа' },
+        { label: 'Дневной доступ', value: '120 ₽', helper: '24 часа на линии' },
         { label: 'Проценты', value: 'Нет', helper: 'С заказов ничего не удерживается' },
       ],
       quickActions: [
@@ -463,7 +469,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
           id: 'pay',
           title: 'Дневной доступ',
           subtitle: 'Клиент платит водителю напрямую, сервис не считает процент с поездки.',
-          value: '100 ₽',
+          value: '120 ₽',
           status: 'Доступ',
         },
         {
@@ -517,7 +523,7 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
         {
           id: 'access',
             title: 'Модель расчетов',
-            subtitle: 'Дневной доступ 100 ₽ или Партнёр PRO 2 490 ₽/мес.',
+            subtitle: 'Дневной доступ 120 ₽ или Партнёр PRO 3 290 ₽/мес.',
             value: 'День/PRO',
           status: 'Нужно',
         },
@@ -784,18 +790,24 @@ export const sectionPages: Record<string, Record<string, SectionPage>> = {
           title: 'Проблема с заказом',
           subtitle: 'Пассажир, маршрут или отмена.',
           icon: 'briefcase',
+          supportCategory: 'Поездка',
+          target: 'supportChat',
         },
         {
           id: 'payout',
           title: 'Выплата',
           subtitle: 'Начисления и реквизиты.',
           icon: 'wallet',
+          supportCategory: 'Оплата',
+          target: 'supportChat',
         },
         {
           id: 'block',
           title: 'Блокировка',
           subtitle: 'Проверка статуса доступа.',
           icon: 'shield',
+          supportCategory: 'Безопасность',
+          target: 'supportChat',
         },
       ],
       listTitle: 'Темы поддержки',
@@ -1289,49 +1301,6 @@ sectionPages.driver.settings = {
       target: 'deleteAccount',
     },
   ],
-};
-
-sectionPages.driver.settlementHistory = {
-  ...sectionPages.driver.payouts,
-  title: 'История расчетов',
-  subtitle: 'Сверки, статусы оплаты и суммы к переводу.',
-  icon: 'wallet',
-  statusTitle: 'История появится после поездок',
-  statusText: 'История оплат и заработка — отдельно от ленты.',
-  primaryAction: 'Открыть тариф',
-  primaryTarget: 'subscription',
-  secondaryAction: 'История заказов',
-  secondaryTarget: 'history',
-  metrics: [
-    { label: 'Сегодня', value: '0 ₽', helper: 'Нет начислений' },
-    { label: 'Статус', value: 'Открыто', helper: 'Доступ к линии' },
-    { label: 'Проценты', value: 'Нет', helper: 'С заказов ничего не удерживается' },
-  ],
-  listTitle: 'Сверки и оплаты',
-  rows: [
-    {
-      id: 'pending',
-      title: 'Ожидает перевода',
-      subtitle: 'После завершенных заказов здесь будет сумма к оплате сервису.',
-      value: '0 ₽',
-      status: 'Нет',
-    },
-    {
-      id: 'reported',
-      title: 'Водитель отметил перевод',
-      subtitle: 'Администратор проверяет и подтверждает оплату.',
-      value: '0 ₽',
-      status: 'Нет',
-    },
-    {
-      id: 'confirmed',
-      title: 'Оплачено',
-      subtitle: 'Подтвержденные дневные расчеты остаются в истории.',
-      value: '0 ₽',
-      status: 'История',
-    },
-  ],
-  note: 'Дополняет экран дохода, ничего не урезает.',
 };
 
 sectionPages.fleet.finance = {

@@ -42,6 +42,8 @@ export type QuickAction = {
   subtitle: string;
   icon: MenuIconName;
   target?: MenuActionTarget;
+  // Для target 'supportChat': чат откроется сразу в нужной категории.
+  supportCategory?: string;
 };
 
 export type DashboardMetric = {
@@ -169,7 +171,7 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
       {
         id: 'subscription',
         title: 'Тариф',
-        subtitle: 'День 100 ₽ или PRO 2 490 ₽',
+        subtitle: 'День 120 ₽ или PRO 3 290 ₽',
         icon: 'wallet',
         badge: 'Главное',
       },
@@ -248,7 +250,7 @@ export const roleMenuConfig: Record<string, RoleMenuConfig> = {
     metrics: [
       {
         label: 'Доступ',
-        value: '100 ₽',
+        value: '120 ₽',
         helper: 'На 24 часа',
       },
       {
@@ -425,7 +427,7 @@ roleMenuConfig.driver = {
     {
       id: 'subscription',
       title: 'Тариф',
-      subtitle: 'День 100 ₽ или Партнер PRO',
+      subtitle: 'День 120 ₽ или Партнер PRO',
       icon: 'credit-card',
     },
     {
@@ -653,7 +655,7 @@ roleMenuConfig.driver = {
     {
       id: 'subscription',
       title: 'Тариф',
-      subtitle: 'День 100 ₽ и Партнер PRO',
+      subtitle: 'День 120 ₽ и Партнер PRO',
       icon: 'credit-card',
       target: 'subscription',
     },
@@ -683,12 +685,6 @@ roleMenuConfig.driver = {
       subtitle: 'Выполненные поездки и суммы',
       icon: 'route',
       target: 'history',
-    },
-    {
-      id: 'settlementHistory',
-      title: 'История расчетов',
-      subtitle: 'Дневные сверки и оплаты',
-      icon: 'wallet',
     },
     {
       id: 'support',
@@ -897,12 +893,6 @@ roleMenuConfig.park_driver = {
       subtitle: 'Код, ссылка и бонусы',
       icon: 'users',
       target: 'referral',
-    },
-    {
-      id: 'settlementHistory',
-      title: 'История выплат',
-      subtitle: 'Баланс, реквизиты и статусы',
-      icon: 'wallet',
     },
     {
       id: 'support',

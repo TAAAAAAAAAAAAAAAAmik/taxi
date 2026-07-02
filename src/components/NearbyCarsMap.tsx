@@ -4,7 +4,8 @@ import { type GeoPoint } from '../data/salavatDistrict';
 
 type NearbyCarsMapProps = {
   cars?: GeoPoint[];
-  height?: number;
+  // Число (px) или '100%', когда карта растягивается флексом родителя.
+  height?: number | string;
 };
 
 // Центр Салаватского района (с. Малояз).

@@ -148,7 +148,7 @@ try {
   assert(dailyAccess.driver.billingMode === 'daily', 'Driver billing mode should switch to daily');
   assert(dailyAccess.driver.accessExpiresAt, 'Daily access should set access expiry');
   assert(dailyAccess.driver.subscriptionPlan === 'daily_line', 'Daily access should activate daily plan');
-  assert(dailyAccess.payments[0].amount === 100, 'Daily access should cost 100 RUB');
+  assert(dailyAccess.payments[0].amount === 120, 'Daily access should cost 120 RUB');
   assert(
     dailyAccess.driver.canReceiveOrders,
     'Daily access driver should still receive orders after compliance',
