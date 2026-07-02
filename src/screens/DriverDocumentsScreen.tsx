@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
-import { ArrowLeft, Camera, FileCheck2, ImagePlus, ShieldCheck, Upload } from 'lucide-react-native';
+import { Camera, FileCheck2, ImagePlus, ShieldCheck, Upload } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { isDriverLikeRole } from '../data/registration';
+import { ScreenHero } from '../components/ScreenHero';
 import { RootStackParamList } from '../navigation/types';
 import {
   DriverDocumentKind,
@@ -54,8 +54,7 @@ const statusLabels: Record<DriverDocumentUpload['status'], string> = {
   rejected: 'Отклонено',
 };
 
-export function DriverDocumentsScreen({ navigation, route }: Props) {
-  const { firstName, role } = route.params;
+export function DriverDocumentsScreen({ navigation }: Props) {
   const { currentUser, drivers, serverMessage, submitDriverDocuments } = useAppState();
   const [selectedDocuments, setSelectedDocuments] = useState<
     Partial<Record<DriverDocumentKind, DriverDocumentUploadInput>>
@@ -169,30 +168,13 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page}>
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          >
-            <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
-            <Text style={styles.backButtonText}>Назад</Text>
-          </Pressable>
-          <Text style={styles.roleText}>{isDriverLikeRole(role) ? 'Водитель' : 'Документы'}</Text>
-        </View>
-
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <ShieldCheck color="#008D49" size={30} strokeWidth={2.4} />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text numberOfLines={2} style={styles.title}>Документы водителя</Text>
-            <Text numberOfLines={2} style={styles.subtitle}>
-              {firstName?.trim() || currentUser?.firstName || 'Водитель'}, отправьте фото документов
-              на проверку допуска к заказам.
-            </Text>
-          </View>
-        </View>
+        <ScreenHero
+          Icon={ShieldCheck}
+          bleed={14}
+          onBack={() => navigation.goBack()}
+          subtitle="Фото документов для допуска к заказам."
+          title="Документы водителя"
+        />
 
         <View style={styles.summaryGrid}>
           <SummaryCell label="Загружено" value={`${uploadedCount}/${documentSpecs.length}`} />
@@ -286,7 +268,7 @@ export function DriverDocumentsScreen({ navigation, route }: Props) {
             pressed && styles.pressed,
           ]}
         >
-          <Upload color="#12382C" size={19} strokeWidth={2.4} />
+          <Upload color="#F4FAF6" size={19} strokeWidth={2.4} />
           <Text style={styles.primaryButtonText}>
             {isSubmitting ? 'Отправляем...' : 'Отправить на проверку'}
           </Text>
@@ -306,36 +288,24 @@ function SummaryCell({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  backButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    minHeight: 42,
-    paddingHorizontal: 12,
-  },
-  backButtonText: {
-    color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
-  },
   documentActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   documentCard: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: 'rgba(11, 47, 37, 0.10)',
+    borderRadius: 18,
     borderWidth: 1,
     flex: 1,
-    gap: 8,
+    gap: 10,
     minWidth: 260,
-    padding: 10,
+    padding: 15,
+    shadowColor: '#0B2F25',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
   },
   documentCopy: {
     flex: 1,
@@ -350,11 +320,11 @@ const styles = StyleSheet.create({
   },
   documentIcon: {
     alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    height: 36,
+    backgroundColor: 'rgba(0, 141, 73, 0.10)',
+    borderRadius: 12,
+    height: 40,
     justifyContent: 'center',
-    width: 36,
+    width: 40,
   },
   documentsList: {
     flexDirection: 'row',
@@ -377,29 +347,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 18,
   },
-  hero: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    padding: 12,
-  },
-  heroCopy: {
-    flex: 1,
-    gap: 7,
-    minWidth: 0,
-  },
-  heroIcon: {
-    alignItems: 'center',
-    backgroundColor: '#E8F3EF',
-    borderRadius: 8,
-    height: 46,
-    justifyContent: 'center',
-    width: 46,
-  },
   notice: {
     color: '#557669',
     fontSize: 13,
@@ -413,22 +360,22 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   reviewPanel: {
-    backgroundColor: '#E8F3EF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    backgroundColor: '#FFFCF3',
+    borderColor: 'rgba(231, 180, 22, 0.35)',
+    borderRadius: 16,
     borderWidth: 1,
     gap: 7,
-    padding: 12,
+    padding: 15,
   },
   reviewText: {
-    color: '#008D49',
+    color: '#8A6D1D',
     fontSize: 13,
     lineHeight: 18,
   },
   reviewTitle: {
-    color: '#008D49',
+    color: '#12382C',
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   page: {
     backgroundColor: '#F4FAF6',
@@ -443,25 +390,25 @@ const styles = StyleSheet.create({
   primaryButton: {
     alignItems: 'center',
     backgroundColor: '#008D49',
-    borderRadius: 8,
+    borderRadius: 14,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 50,
+    minHeight: 52,
     paddingHorizontal: 16,
+    shadowColor: 'rgba(0, 111, 58, 0.22)',
+    shadowOffset: { height: 7, width: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
   },
   primaryButtonMuted: {
     backgroundColor: '#A9BBB3',
+    shadowOpacity: 0,
   },
   primaryButtonText: {
     color: '#F4FAF6',
     fontSize: 15,
-    fontWeight: '900',
-  },
-  roleText: {
-    color: '#008D49',
-    fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   safeArea: {
     backgroundColor: '#F4FAF6',
@@ -469,45 +416,44 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    backgroundColor: '#F7FBF8',
+    borderColor: 'rgba(11, 47, 37, 0.10)',
+    borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 7,
     justifyContent: 'center',
-    minHeight: 40,
+    minHeight: 42,
     paddingHorizontal: 12,
   },
   secondaryButtonText: {
-    color: '#008D49',
+    color: '#12382C',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   statusBadge: {
-    backgroundColor: '#E8F3EF',
-    borderRadius: 6,
+    backgroundColor: 'rgba(0, 141, 73, 0.10)',
+    borderRadius: 8,
     color: '#008D49',
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '800',
     overflow: 'hidden',
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-  },
-  subtitle: {
-    color: '#557669',
-    fontSize: 14,
-    lineHeight: 20,
   },
   summaryCell: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#008D49',
-    borderRadius: 8,
+    borderColor: 'rgba(11, 47, 37, 0.10)',
+    borderRadius: 16,
     borderWidth: 1,
     flex: 1,
     gap: 5,
     minWidth: 104,
-    padding: 10,
+    padding: 13,
+    shadowColor: '#0B2F25',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
   },
   summaryGrid: {
     flexDirection: 'row',
@@ -515,27 +461,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   summaryLabel: {
-    color: '#557669',
+    color: '#71877D',
     fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+    fontWeight: '700',
   },
   summaryValue: {
     color: '#12382C',
     fontSize: 18,
-    fontWeight: '900',
-  },
-  title: {
-    color: '#12382C',
-    fontSize: 24,
-    fontWeight: '900',
-    lineHeight: 30,
-  },
-  topBar: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
 });
