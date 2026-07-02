@@ -1641,6 +1641,7 @@ function DriverCommandCenter({
         </View>
         <Text style={styles.driverHeroTitle}>{lineLabel}</Text>
         <Text numberOfLines={2} style={styles.driverHeroSub}>{lineHint}</Text>
+        <View style={styles.driverHeroSpacer} />
         <PressableScale
           accessibilityRole="button"
           disabled={!ctaActionable}

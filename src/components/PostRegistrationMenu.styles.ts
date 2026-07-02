@@ -478,10 +478,12 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   driverHome: {
+    flex: 1,
     gap: 14,
   },
   driverHero: {
     backgroundColor: '#0A1411',
+    flexGrow: 1,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     marginHorizontal: -14,
@@ -507,6 +509,9 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     position: 'relative',
     zIndex: 1,
+  },
+  driverHeroSpacer: {
+    flexGrow: 1,
   },
   driverHeroTopRight: {
     alignItems: 'center',
