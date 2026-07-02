@@ -107,13 +107,10 @@ export function DashboardScreen({ navigation, route }: Props) {
     driverSubscription.status === 'active';
   const canToggleLine = Boolean(currentDriver?.canReceiveOrders && hasActiveAccess);
   const driverAccessBlockers = currentDriver?.accessBlockers ?? [];
-  // Смена платная: если единственное, что мешает выйти на линию, — не оплачен
-  // доступ (дневной доступ истёк ровно через 24 часа), кнопка ведёт к оплате.
-  const driverNeedsPayment =
-    isDriverRole &&
-    isSelfEmployedDriver &&
-    !hasActiveAccess &&
-    driverAccessBlockers.filter((blocker) => blocker !== 'paid_access').length === 0;
+  // Смена платная: самозанятый водитель не может выйти на линию без оплаты
+  // доступа (дневной доступ истекает ровно через 24 часа). Пока доступ не
+  // активен — кнопка «Выйти на линию» ведёт к оплате.
+  const driverNeedsPayment = isDriverRole && isSelfEmployedDriver && !hasActiveAccess;
   const driverStats = useMemo(
     () =>
       currentDriver

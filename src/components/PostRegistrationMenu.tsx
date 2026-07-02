@@ -2072,7 +2072,7 @@ function DriverPayoutsPage({
 
   return (
     <View style={styles.payoutPage}>
-      <View style={styles.payoutHeroCard}>
+      <StaggerView index={0} style={styles.payoutHeroCard}>
         <View style={styles.payoutHeroTop}>
           <View style={styles.payoutHeroIcon}>
             <Wallet color="#F4FAF6" size={24} strokeWidth={2.5} />
@@ -2094,17 +2094,14 @@ function DriverPayoutsPage({
             <Text numberOfLines={1} style={styles.payoutKeyLabel}>{accessUntil}</Text>
           </View>
         </View>
-      </View>
+      </StaggerView>
 
-      <View style={styles.payoutTariffRow}>
-        <Pressable
+      <StaggerView index={1} style={styles.payoutTariffRow}>
+        <PressableScale
+          accessibilityLabel="Дневной доступ"
           accessibilityRole="button"
           onPress={() => onActionTarget('subscription')}
-          style={({ pressed }) => [
-            styles.payoutTariffChip,
-            activePlan === 'daily' && styles.payoutTariffChipActive,
-            pressed && styles.pressed,
-          ]}
+          style={[styles.payoutTariffChip, activePlan === 'daily' && styles.payoutTariffChipActive]}
         >
           <Text style={[styles.payoutTariffTitle, activePlan === 'daily' && styles.payoutTariffTitleActive]}>
             День
@@ -2112,15 +2109,12 @@ function DriverPayoutsPage({
           <Text style={[styles.payoutTariffText, activePlan === 'daily' && styles.payoutTariffTextActive]}>
             100 ₽
           </Text>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
+          accessibilityLabel="Партнёр PRO"
           accessibilityRole="button"
           onPress={() => onActionTarget('subscription')}
-          style={({ pressed }) => [
-            styles.payoutTariffChip,
-            activePlan === 'monthly' && styles.payoutTariffChipActive,
-            pressed && styles.pressed,
-          ]}
+          style={[styles.payoutTariffChip, activePlan === 'monthly' && styles.payoutTariffChipActive]}
         >
           <Text style={[styles.payoutTariffTitle, activePlan === 'monthly' && styles.payoutTariffTitleActive]}>
             PRO
@@ -2128,33 +2122,38 @@ function DriverPayoutsPage({
           <Text style={[styles.payoutTariffText, activePlan === 'monthly' && styles.payoutTariffTextActive]}>
             2 490 ₽
           </Text>
-        </Pressable>
-      </View>
+        </PressableScale>
+      </StaggerView>
 
-      <View style={styles.payoutActionsRow}>
-        <Pressable
+      <StaggerView index={2} style={styles.payoutActionsRow}>
+        <PressableScale
+          accessibilityLabel="Оплатить доступ"
           accessibilityRole="button"
           onPress={() => onActionTarget('subscription')}
-          style={({ pressed }) => [styles.payoutPayButton, pressed && styles.pressed]}
+          style={styles.payoutPayButton}
         >
           <CreditCard color="#F4FAF6" size={18} strokeWidth={2.4} />
           <Text style={styles.payoutPayButtonText}>
             {activePlan === 'monthly' ? 'Оплатить PRO' : 'Оплатить смену 100 ₽'}
           </Text>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
+          accessibilityLabel="Статистика"
           accessibilityRole="button"
-          accessibilityState={{ expanded: statsOpen }}
           onPress={() => setStatsOpen((current) => !current)}
-          style={({ pressed }) => [styles.payoutStatsButton, statsOpen && styles.payoutStatsButtonActive, pressed && styles.pressed]}
+          style={[styles.payoutStatsButton, statsOpen && styles.payoutStatsButtonActive]}
         >
           <Text style={[styles.payoutStatsButtonText, statsOpen && styles.payoutStatsButtonTextActive]}>
             Статистика
           </Text>
-        </Pressable>
-      </View>
+        </PressableScale>
+      </StaggerView>
 
-      {statsOpen && stats ? <DriverStatsPanel stats={stats} /> : null}
+      {statsOpen && stats ? (
+        <StaggerView index={3}>
+          <DriverStatsPanel stats={stats} />
+        </StaggerView>
+      ) : null}
     </View>
   );
 }
@@ -2173,7 +2172,7 @@ function DriverProfilePage({
 
   return (
     <View style={styles.clientFocusPage}>
-      <View style={styles.accountHeroCard}>
+      <StaggerView index={0} style={styles.accountHeroCard}>
         <View style={styles.accountHeroAvatar}>
           <Text style={styles.accountHeroAvatarText}>{initials}</Text>
         </View>
@@ -2184,9 +2183,9 @@ function DriverProfilePage({
             {formatDriverAccessLabel(driverStats)} · {formatDriverAccessUntil(driverStats)}
           </Text>
         </View>
-      </View>
+      </StaggerView>
 
-      <View style={styles.accountRoundRow}>
+      <StaggerView index={1} style={styles.accountRoundRow}>
         <ClientAccountRoundButton
           icon="support"
           title="Поддержка"
@@ -2204,10 +2203,10 @@ function DriverProfilePage({
           title="Профиль"
           onPress={() => setActivePanel('profile')}
         />
-      </View>
+      </StaggerView>
 
       {activePanel === 'settings' ? (
-        <View style={styles.accountPanel}>
+        <StaggerView index={2} style={styles.accountPanel}>
           <Text style={styles.accountPanelTitle}>Настройки</Text>
           <View style={styles.accountProfileActions}>
             <Pressable
@@ -2232,9 +2231,9 @@ function DriverProfilePage({
               <Text style={styles.accountDangerButtonText}>Удалить</Text>
             </Pressable>
           </View>
-        </View>
+        </StaggerView>
       ) : (
-        <View style={styles.accountPanel}>
+        <StaggerView index={2} style={styles.accountPanel}>
           <Text style={styles.accountPanelTitle}>Профиль</Text>
           <View style={styles.accountProfileRow}>
             <Text style={styles.accountProfileLabel}>Имя</Text>
@@ -2246,7 +2245,7 @@ function DriverProfilePage({
               {formatDriverAccessLabel(driverStats)} · {formatDriverAccessUntil(driverStats)}
             </Text>
           </View>
-        </View>
+        </StaggerView>
       )}
     </View>
   );
@@ -2494,11 +2493,11 @@ function DriverFeedPreview({
 
       {visibleOrders.length ? (
         <View style={styles.driverFeedList}>
-          {visibleOrders.map((order) => {
+          {visibleOrders.map((order, orderIndex) => {
             const detailsOpen = detailsOrderId === order.id;
 
             return (
-              <View key={order.id} style={styles.driverFeedCard}>
+              <StaggerView key={order.id} index={orderIndex} style={styles.driverFeedCard}>
                 <View style={styles.driverFeedCardTop}>
                   <View style={styles.driverFeedCardTags}>
                     <Text numberOfLines={1} style={styles.driverFeedService}>{order.serviceLabel ?? 'Такси'}</Text>
@@ -2511,29 +2510,29 @@ function DriverFeedPreview({
                   <Text numberOfLines={1} style={styles.driverFeedAddress}>{order.address}</Text>
                 </View>
                 <View style={styles.driverFeedActions}>
-                  <Pressable
+                  <PressableScale
                     accessibilityLabel="Информация о заказе"
                     accessibilityRole="button"
                     onPress={() => toggleDetailsOrder(order.id)}
-                    style={({ pressed }) => [styles.driverFeedInfoButton, detailsOpen && styles.driverFeedInfoButtonActive, pressed && styles.pressed]}
+                    style={[styles.driverFeedInfoButton, detailsOpen && styles.driverFeedInfoButtonActive]}
                   >
                     <Text style={[styles.driverFeedInfoText, detailsOpen && styles.driverFeedInfoTextActive]}>i</Text>
-                  </Pressable>
-                  <Pressable
+                  </PressableScale>
+                  <PressableScale
+                    accessibilityLabel="Принять заказ"
                     accessibilityRole="button"
                     disabled={disabled}
                     onPress={() => onAcceptOrder?.(order.id)}
-                    style={({ pressed }) => [
+                    style={[
                       styles.driverFeedAcceptButton,
                       styles.driverFeedAcceptButtonWide,
                       disabled && styles.disabledButton,
-                      pressed && styles.pressed,
                     ]}
                   >
                     <Text style={styles.driverFeedAcceptText}>
                       {busyId === order.id ? '...' : 'Принять'}
                     </Text>
-                  </Pressable>
+                  </PressableScale>
                 </View>
                 {busyId === order.id ? <View style={styles.driverFeedAcceptProgress} /> : null}
                 {detailsOpen ? (
@@ -2546,7 +2545,7 @@ function DriverFeedPreview({
                     </View>
                   </View>
                 ) : null}
-              </View>
+              </StaggerView>
             );
           })}
         </View>
@@ -2558,13 +2557,14 @@ function DriverFeedPreview({
         />
       )}
 
-      <Pressable
+      <PressableScale
+        accessibilityLabel="Открыть полный экран"
         accessibilityRole="button"
         onPress={onOpenFullFeed}
-        style={({ pressed }) => [styles.driverFeedFullButton, pressed && styles.pressed]}
+        style={styles.driverFeedFullButton}
       >
         <Text style={styles.driverFeedFullButtonText}>Открыть полный экран</Text>
-      </Pressable>
+      </PressableScale>
     </View>
   );
 }
