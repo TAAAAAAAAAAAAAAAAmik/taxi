@@ -54,8 +54,21 @@ const statusLabels: Record<DriverDocumentUpload['status'], string> = {
   rejected: 'Отклонено',
 };
 
+// Совпадает с лимитом бэкенда (decodeDocumentImage): проверяем до отправки,
+// чтобы не гонять мегабайты ради ошибки 400.
+const maxDocumentFileBytes = 5_000_000;
+
+function estimateDocumentBytes(asset: { base64?: string | null; fileSize?: number }) {
+  if (asset.fileSize && asset.fileSize > 0) {
+    return asset.fileSize;
+  }
+
+  // base64 кодирует 3 байта в 4 символа.
+  return Math.floor((asset.base64?.length ?? 0) * 0.75);
+}
+
 export function DriverDocumentsScreen({ navigation }: Props) {
-  const { currentUser, drivers, serverMessage, submitDriverDocuments } = useAppState();
+  const { currentUser, drivers, submitDriverDocuments } = useAppState();
   const [selectedDocuments, setSelectedDocuments] = useState<
     Partial<Record<DriverDocumentKind, DriverDocumentUploadInput>>
   >({});
@@ -129,6 +142,11 @@ export function DriverDocumentsScreen({ navigation }: Props) {
       return;
     }
 
+    if (estimateDocumentBytes(asset) > maxDocumentFileBytes) {
+      setNotice('Файл больше 5 МБ — сервер его не примет. Сфотографируйте документ ещё раз.');
+      return;
+    }
+
     setSelectedDocuments((current) => ({
       ...current,
       [kind]: {
@@ -159,10 +177,16 @@ export function DriverDocumentsScreen({ navigation }: Props) {
 
     setIsSubmitting(true);
     setNotice('');
-    await submitDriverDocuments(currentDriver.id, documents);
+    const result = await submitDriverDocuments(currentDriver.id, documents);
     setIsSubmitting(false);
-    setSelectedDocuments({});
-    setNotice(serverMessage || 'Документы отправлены на проверку.');
+
+    if (result.ok) {
+      // Выбор очищаем только когда документы реально зафиксированы —
+      // при отказе сервера файлы остаются выбранными для повторной отправки.
+      setSelectedDocuments({});
+    }
+
+    setNotice(result.message);
   };
 
   return (

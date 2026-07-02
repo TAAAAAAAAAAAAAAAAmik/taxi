@@ -10,6 +10,7 @@ import { OrderStatusSummary } from '../navigation/types';
 import {
   AccountDeletionResult,
   AdminReferralDashboard,
+  ApiHttpError,
   AuthDeliveryChannel,
   AuthUser,
   assignOrderWithStatus as assignOrderApi,
@@ -403,7 +404,10 @@ type AppStateValue = {
     subscriptionStatus?: DriverProfile['subscriptionStatus'],
   ) => Promise<void>;
   reviewDriverDocuments: (driverId: string, payload: DriverDocumentReviewPayload) => Promise<void>;
-  submitDriverDocuments: (driverId: string, documents: DriverDocumentUploadInput[]) => Promise<void>;
+  submitDriverDocuments: (
+    driverId: string,
+    documents: DriverDocumentUploadInput[],
+  ) => Promise<{ message: string; ok: boolean }>;
   updateDriverAvailability: (
     driverId: string,
     isOnline: boolean,
@@ -1334,10 +1338,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             current.map((driver) => (driver.id === serverDriver.id ? serverDriver : driver)),
           );
           setServerStatus('connected');
-          setServerMessage('Документы водителя отправлены на backend.');
-        } catch {
+          const message = 'Документы отправлены на проверку.';
+          setServerMessage(message);
+          return { message, ok: true };
+        } catch (error) {
+          if (error instanceof ApiHttpError) {
+            // Сервер жив и осознанно отклонил пачку (например, файл больше
+            // лимита): не подделываем локальный статус «на проверке»,
+            // а показываем реальную причину.
+            setServerStatus('connected');
+            const message = `Сервер отклонил документы: ${error.message}`;
+            setServerMessage(message);
+            return { message, ok: false };
+          }
+
           setServerStatus('offline');
-          setServerMessage('Backend не отвечает. Документы отмечены локально, файлы не сохранены на сервер.');
+          const message =
+            'Backend не отвечает. Документы отмечены локально, файлы не сохранены на сервер.';
+          setServerMessage(message);
           setDrivers((current) =>
             current.map((driver) => {
               if (driver.id !== driverId) {
@@ -1368,6 +1386,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               };
             }),
           );
+          // Локальный фолбэк зафиксировал документы (демо-режим), поэтому
+          // выбор на экране можно очищать — ok: true.
+          return { message, ok: true };
         }
       },
       updateDriverAvailability: async (driverId, isOnline, location) => {

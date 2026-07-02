@@ -1534,6 +1534,18 @@ export async function syncDriverSubscriptionPayment(paymentId: string) {
   });
 }
 
+// Ошибка, на которую сервер ответил (4xx/5xx): её нельзя путать с обрывом
+// сети — сервер жив и запрос отклонил осознанно.
+export class ApiHttpError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiHttpError';
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
@@ -1553,7 +1565,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         ? String((payload as { error: unknown }).error)
         : `API request failed: ${response.status}`;
 
-    throw new Error(message);
+    throw new ApiHttpError(message, response.status);
   }
 
   return payload as T;

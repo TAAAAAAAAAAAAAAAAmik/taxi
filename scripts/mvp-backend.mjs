@@ -6399,27 +6399,59 @@ async function applyDriverDocumentUploads(db, driver, payload, actor) {
     throw new Error('documents are required');
   }
 
-  for (const item of documents) {
+  // Сначала валидируем и декодируем всю пачку, и только потом пишем на диск:
+  // ошибка в любом документе отклоняет запрос целиком, без осиротевших файлов
+  // и наполовину обновлённого водителя.
+  const preparedDocuments = documents.map((item) => {
     const kind = normalizeDriverDocumentKind(item.kind);
     const mimeType = normalizeImageMimeType(item.mimeType);
-    const fileName = sanitizeFileName(item.fileName || `${kind}${getImageExtension(mimeType)}`);
-    const fileBuffer = decodeDocumentImage(item.base64, mimeType);
-    const storageKey = await writeDriverDocumentFile(driver.id, kind, mimeType, fileBuffer);
 
-    currentUploads[kind] = {
-      checksum: hashBuffer(fileBuffer),
-      fileName,
-      fileSize: fileBuffer.length,
+    return {
+      fileBuffer: decodeDocumentImage(item.base64, mimeType),
+      fileName: sanitizeFileName(item.fileName || `${kind}${getImageExtension(mimeType)}`),
       height: Math.max(0, Number(item.height || 0)),
       kind,
       mimeType,
       source: item.source === 'camera' ? 'camera' : 'library',
+      width: Math.max(0, Number(item.width || 0)),
+    };
+  });
+
+  const duplicateKind = preparedDocuments.find(
+    (item, index) => preparedDocuments.findIndex((other) => other.kind === item.kind) !== index,
+  );
+
+  if (duplicateKind) {
+    throw new Error(`Duplicate document kind in batch: ${duplicateKind.kind}`);
+  }
+
+  const replacedStorageKeys = [];
+
+  for (const item of preparedDocuments) {
+    const previousStorageKey = currentUploads[item.kind]?.storageKey;
+    const storageKey = await writeDriverDocumentFile(driver.id, item.kind, item.mimeType, item.fileBuffer);
+
+    if (previousStorageKey && previousStorageKey !== storageKey) {
+      replacedStorageKeys.push(previousStorageKey);
+    }
+
+    currentUploads[item.kind] = {
+      checksum: hashBuffer(item.fileBuffer),
+      fileName: item.fileName,
+      fileSize: item.fileBuffer.length,
+      height: item.height,
+      kind: item.kind,
+      mimeType: item.mimeType,
+      source: item.source,
       status: 'pending',
       storageKey,
       uploadedAt: now,
-      width: Math.max(0, Number(item.width || 0)),
+      width: item.width,
     };
   }
+
+  // Заменённые файлы удаляем в фоне: неудача чистки не должна ронять загрузку.
+  void removeDriverDocumentFiles(replacedStorageKeys);
 
   driver.documentUploads = currentUploads;
   driver.documentReview = {
@@ -6618,6 +6650,20 @@ async function readDriverDocumentFile(upload) {
   }
 
   return readFile(targetPath);
+}
+
+async function removeDriverDocumentFiles(storageKeys) {
+  const storageRoot = resolve(documentStoragePath);
+
+  for (const storageKey of storageKeys) {
+    const targetPath = resolve(storageRoot, storageKey);
+
+    if (!isPathInside(storageRoot, targetPath)) {
+      continue;
+    }
+
+    await rm(targetPath, { force: true }).catch(() => undefined);
+  }
 }
 
 function normalizeDriverComplianceStatus(value, driver) {

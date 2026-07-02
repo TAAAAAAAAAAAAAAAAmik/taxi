@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { rm } from 'node:fs/promises';
+import { readdir, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const port = Number(process.env.DRIVER_DOCUMENTS_SMOKE_PORT || 3313);
@@ -162,6 +162,64 @@ try {
   assert(reuploaded.driver.documentsStatus === 'pending', 'Reupload should return package to pending');
   assert(reuploaded.driver.documentUploads?.passport?.status === 'pending', 'Reuploaded document should be pending');
 
+  // Заменённый файл паспорта должен удаляться из хранилища (чистка в фоне).
+  await delay(300);
+  const storedFilesAfterReupload = await countStoredFiles();
+
+  assert(
+    storedFilesAfterReupload === 5,
+    `Replaced document file should be cleaned up (expected 5 files, got ${storedFilesAfterReupload})`,
+  );
+
+  // Пачка атомарна: битый документ отклоняет весь запрос, валидный сосед из
+  // той же пачки не применяется и файлов после отказа не прибавляется.
+  const driverLicenseBefore = (await api('/drivers', { token: admin.session.token }))
+    .drivers.find((item) => item.id === driver.id)?.documentUploads?.driverLicense;
+  const failedBatch = await apiRaw(`/drivers/${encodeURIComponent(driver.id)}/documents`, {
+    body: {
+      documents: [
+        {
+          base64: tinyPngBase64,
+          fileName: 'license-new.png',
+          height: 1,
+          kind: 'driverLicense',
+          mimeType: 'image/png',
+          source: 'library',
+          width: 1,
+        },
+        {
+          base64: '',
+          fileName: 'sts-broken.png',
+          height: 1,
+          kind: 'sts',
+          mimeType: 'image/png',
+          source: 'library',
+          width: 1,
+        },
+      ],
+    },
+    method: 'POST',
+    token: registered.session.token,
+  });
+
+  assert(failedBatch.status === 400, 'Broken document should reject the whole batch');
+
+  const driverLicenseAfter = (await api('/drivers', { token: admin.session.token }))
+    .drivers.find((item) => item.id === driver.id)?.documentUploads?.driverLicense;
+
+  assert(
+    driverLicenseAfter?.uploadedAt === driverLicenseBefore?.uploadedAt &&
+      driverLicenseAfter?.storageKey === driverLicenseBefore?.storageKey,
+    'Valid document from a rejected batch should not be applied',
+  );
+
+  const storedFilesAfterFailedBatch = await countStoredFiles();
+
+  assert(
+    storedFilesAfterFailedBatch === 5,
+    `Rejected batch should not leave orphan files (expected 5 files, got ${storedFilesAfterFailedBatch})`,
+  );
+
   const approved = await api(`/drivers/${encodeURIComponent(driver.id)}/documents/review`, {
     body: {
       note: 'Пакет документов читается',
@@ -237,6 +295,12 @@ async function apiRaw(path, options = {}) {
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
+}
+
+async function countStoredFiles() {
+  const entries = await readdir(storagePath, { recursive: true, withFileTypes: true }).catch(() => []);
+
+  return entries.filter((entry) => entry.isFile()).length;
 }
 
 function assert(condition, message) {
