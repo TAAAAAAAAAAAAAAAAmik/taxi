@@ -210,6 +210,10 @@ export function PostRegistrationMenu({
   const isClientRole = role === 'client';
   const isDriverRole = isDriverLikeRole(role);
   const isSelfEmployedDriver = isSelfEmployedDriverRole(role);
+  // На мобильном у водителя тёмный hero должен быть у самого верха, как у
+  // клиента: прячем верхнюю панель и профиль-сайдбар, а меню (☰) переносим
+  // внутрь hero. На широком экране сайдбар остаётся.
+  const driverMobileTopless = isDriverRole && !isWide;
   const [activeItemId, setActiveItemId] = useState(config.menuItems[0].id);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const reducedMotion = useReducedMotionPreference();
@@ -356,7 +360,7 @@ export function PostRegistrationMenu({
   return (
     <View style={styles.shell}>
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
-        {isClientRole ? null : (
+        {isClientRole || driverMobileTopless ? null : (
           <View style={styles.topBar}>
             <Pressable
               accessibilityLabel="Открыть меню"
@@ -379,7 +383,7 @@ export function PostRegistrationMenu({
           </View>
         )}
 
-        {realtimeMessage && !isClientRole ? (
+        {realtimeMessage && !isClientRole && !driverMobileTopless ? (
           <View style={styles.livePanel}>
             <View style={[styles.liveDot, realtimeStatus === 'live' && styles.liveDotActive]} />
             <Text style={styles.livePanelText}>{realtimeMessage}</Text>
@@ -387,7 +391,7 @@ export function PostRegistrationMenu({
         ) : null}
 
         <View style={[styles.layout, !isClientRole && isWide && styles.layoutWide]}>
-          {!isClientRole ? (
+          {!isClientRole && !driverMobileTopless ? (
           <View style={[styles.sidebar, isWide && styles.sidebarWide]}>
             <View style={styles.profilePanel}>
               <View style={styles.avatar}>
@@ -433,6 +437,8 @@ export function PostRegistrationMenu({
                 driverLine={driverLine}
                 driverStats={driverStats}
                 isSelfEmployedDriver={isSelfEmployedDriver}
+                menuButton={driverMobileTopless}
+                onOpenMenu={() => setDrawerOpen(true)}
                 onOpenOrderFlow={onOpenOrderFlow}
                 onOpenSubscription={onOpenSubscription}
                 onToggleDriverLine={onToggleDriverLine}
@@ -446,8 +452,10 @@ export function PostRegistrationMenu({
                 driverFeedLockedReason={driverFeedLockedReason}
                 driverFeedOrders={driverFeedOrders}
                 driverStats={activeItem.id === 'payouts' || activeItem.id === 'profile' ? driverStats : undefined}
+                menuButton={driverMobileTopless}
                 onAcceptDriverOrder={onAcceptDriverOrder}
                 onActionTarget={handleActionTarget}
+                onOpenMenu={() => setDrawerOpen(true)}
                 page={activePage}
               />
             )}
@@ -799,10 +807,14 @@ function ClientPageHeader({
 // водитель переключается нижними табами.
 function DriverPageHero({
   Icon,
+  menuButton,
+  onOpenMenu,
   subtitle,
   title,
 }: {
   Icon: ComponentType<LucideProps>;
+  menuButton?: boolean;
+  onOpenMenu?: () => void;
   subtitle?: string;
   title: string;
 }) {
@@ -819,6 +831,16 @@ function DriverPageHero({
             <Text numberOfLines={1} style={styles.clientPageHeroSub}>{subtitle}</Text>
           ) : null}
         </View>
+        {menuButton && onOpenMenu ? (
+          <PressableScale
+            accessibilityLabel="Открыть меню"
+            accessibilityRole="button"
+            onPress={onOpenMenu}
+            style={styles.clientHeroMenu}
+          >
+            <MenuIcon color={kinetixColors.lime} size={22} strokeWidth={2.4} />
+          </PressableScale>
+        ) : null}
       </View>
     </View>
   );
@@ -1527,16 +1549,20 @@ function DriverHomePage({
   driverLine,
   driverStats,
   isSelfEmployedDriver,
+  menuButton,
+  onOpenMenu,
   onOpenOrderFlow,
   onOpenSubscription,
   onToggleDriverLine,
-}: DriverCommandCenterProps & { appTitle: string }) {
+}: DriverCommandCenterProps & { appTitle: string; menuButton?: boolean; onOpenMenu?: () => void }) {
   return (
     <View style={styles.driverHome}>
       <DriverCommandCenter
         driverLine={driverLine}
         driverStats={driverStats}
         isSelfEmployedDriver={isSelfEmployedDriver}
+        menuButton={menuButton}
+        onOpenMenu={onOpenMenu}
         onOpenOrderFlow={onOpenOrderFlow}
         onOpenSubscription={onOpenSubscription}
         onToggleDriverLine={onToggleDriverLine}
@@ -1549,10 +1575,12 @@ function DriverCommandCenter({
   driverLine,
   driverStats,
   isSelfEmployedDriver,
+  menuButton,
+  onOpenMenu,
   onOpenOrderFlow,
   onOpenSubscription,
   onToggleDriverLine,
-}: DriverCommandCenterProps) {
+}: DriverCommandCenterProps & { menuButton?: boolean; onOpenMenu?: () => void }) {
   const online = driverLine.isOnline;
   const requiresPayment = !online && !driverLine.canToggle && Boolean(driverLine.requiresPayment);
   const ctaActionable = online || driverLine.canToggle || requiresPayment;
@@ -1592,11 +1620,23 @@ function DriverCommandCenter({
         <View style={styles.driverHeroGlow} />
         <View style={styles.driverHeroTop}>
           <Text style={styles.driverHeroEyebrow}>{isSelfEmployedDriver ? 'Смена' : 'Линия'}</Text>
-          <View style={[styles.driverHeroPill, online && styles.driverHeroPillOn]}>
-            <View style={[styles.driverHeroDot, online && styles.driverHeroDotOn]} />
-            <Text style={[styles.driverHeroPillText, online && styles.driverHeroPillTextOn]}>
-              {online ? 'В сети' : 'Не в сети'}
-            </Text>
+          <View style={styles.driverHeroTopRight}>
+            <View style={[styles.driverHeroPill, online && styles.driverHeroPillOn]}>
+              <View style={[styles.driverHeroDot, online && styles.driverHeroDotOn]} />
+              <Text style={[styles.driverHeroPillText, online && styles.driverHeroPillTextOn]}>
+                {online ? 'В сети' : 'Не в сети'}
+              </Text>
+            </View>
+            {menuButton && onOpenMenu ? (
+              <PressableScale
+                accessibilityLabel="Открыть меню"
+                accessibilityRole="button"
+                onPress={onOpenMenu}
+                style={styles.clientHeroMenu}
+              >
+                <MenuIcon color={kinetixColors.lime} size={22} strokeWidth={2.4} />
+              </PressableScale>
+            ) : null}
           </View>
         </View>
         <Text style={styles.driverHeroTitle}>{lineLabel}</Text>
@@ -2220,8 +2260,10 @@ type SectionPageViewProps = {
   driverFeedLockedReason?: string;
   driverFeedOrders?: DriverFeedPreviewOrder[];
   driverStats?: DriverStatsSummary;
+  menuButton?: boolean;
   onAcceptDriverOrder?: (orderId: string) => void | Promise<void>;
   onActionTarget: (target?: MenuActionTarget) => void;
+  onOpenMenu?: () => void;
   page: SectionPage;
 };
 
@@ -2232,8 +2274,10 @@ function SectionPageView({
   driverFeedLockedReason,
   driverFeedOrders = [],
   driverStats,
+  menuButton,
   onAcceptDriverOrder,
   onActionTarget,
+  onOpenMenu,
   page,
 }: SectionPageViewProps) {
   const Icon = iconMap[page.icon];
@@ -2244,6 +2288,8 @@ function SectionPageView({
       <>
         <DriverPageHero
           Icon={Wallet}
+          menuButton={menuButton}
+          onOpenMenu={onOpenMenu}
           subtitle="Оплата доступа и статистика — без процента с заказов"
           title="Доход"
         />
@@ -2258,6 +2304,8 @@ function SectionPageView({
       <>
         <DriverPageHero
           Icon={User}
+          menuButton={menuButton}
+          onOpenMenu={onOpenMenu}
           subtitle="Данные, документы и настройки водителя"
           title="Профиль"
         />
@@ -2276,6 +2324,8 @@ function SectionPageView({
       <>
         <DriverPageHero
           Icon={Route}
+          menuButton={menuButton}
+          onOpenMenu={onOpenMenu}
           subtitle="Заказы рядом — расстояние, адрес и цена"
           title="Лента заказов"
         />
@@ -2293,7 +2343,13 @@ function SectionPageView({
 
   return (
     <>
-      <DriverPageHero Icon={Icon} subtitle={page.subtitle} title={page.title} />
+      <DriverPageHero
+        Icon={Icon}
+        menuButton={menuButton}
+        onOpenMenu={onOpenMenu}
+        subtitle={page.subtitle}
+        title={page.title}
+      />
 
       <View style={styles.metricsGrid}>
         {page.metrics.map((metric) => (

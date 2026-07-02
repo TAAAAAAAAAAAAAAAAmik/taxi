@@ -511,6 +511,11 @@ export const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1,
   },
+  driverHeroTopRight: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
   driverHeroEyebrow: {
     color: '#93BAA8',
     fontSize: 12,
