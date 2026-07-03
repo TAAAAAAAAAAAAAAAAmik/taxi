@@ -19,6 +19,7 @@ import {
   Clock,
   CreditCard,
   FileText,
+  Gift,
   Headphones,
   Home,
   LucideProps,
@@ -425,6 +426,7 @@ export function PostRegistrationMenu({
                 onOpenMenu={() => setDrawerOpen(true)}
                 onOpenOrderFlow={onOpenOrderFlow}
                 onOpenOrderHistory={onOpenOrderHistory}
+                onOpenReferral={onOpenReferral}
                 onOpenSavedPlace={onOpenSavedPlace}
                 onOpenSupportChat={onOpenSupportChat}
                 onOrderHome={onOrderHome}
@@ -562,6 +564,7 @@ type ClientPageViewProps = {
   onOpenMenu: () => void;
   onOpenOrderFlow: () => void;
   onOpenOrderHistory: () => void;
+  onOpenReferral: () => void;
   onOpenSavedPlace: () => void;
   onOpenSupportChat: () => void;
   onOrderHome: () => void;
@@ -577,6 +580,7 @@ function ClientPageView({
   onOpenMenu,
   onOpenOrderFlow,
   onOpenOrderHistory,
+  onOpenReferral,
   onOpenSavedPlace,
   onOpenSupportChat,
   onOrderHome,
@@ -605,11 +609,12 @@ function ClientPageView({
     return (
       <ClientAccountPage
         displayName={displayName}
-        initialPanel={activeItemId === 'settings' ? 'settings' : 'profile'}
         onDeleteAccount={onDeleteAccount}
         onOpenMenu={onOpenMenu}
+        onOpenReferral={onOpenReferral}
         onOpenSavedPlace={onOpenSavedPlace}
         onOpenSupportChat={onOpenSupportChat}
+        orderSummary={orderSummary}
         savedHomeAddressLabel={savedHomeAddressLabel}
       />
     );
@@ -1046,73 +1051,132 @@ function ClientOrdersPage({
   );
 }
 
+function ProfileListRow({
+  Icon,
+  badge,
+  badgeTone = 'ok',
+  first = false,
+  onPress,
+  subtitle,
+  title,
+}: {
+  Icon: ComponentType<LucideProps>;
+  badge?: string;
+  badgeTone?: 'ok' | 'warn';
+  first?: boolean;
+  onPress: () => void;
+  subtitle: string;
+  title: string;
+}) {
+  return (
+    <PressableScale
+      accessibilityLabel={title}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.profileListRow, !first && styles.profileListRowDivider]}
+    >
+      <View style={styles.clientFavIcon}>
+        <Icon color={kinetixColors.amber} size={19} strokeWidth={2.3} />
+      </View>
+      <View style={styles.clientActionCopy}>
+        <Text numberOfLines={1} style={styles.clientFavName}>{title}</Text>
+        <Text numberOfLines={1} style={styles.clientFavAddr}>{subtitle}</Text>
+      </View>
+      {badge ? (
+        <Text style={[styles.profileRowBadge, badgeTone === 'warn' && styles.profileRowBadgeWarn]}>
+          {badge}
+        </Text>
+      ) : null}
+      <ChevronRight color="#C2D2C9" size={20} strokeWidth={2.4} />
+    </PressableScale>
+  );
+}
+
 function ClientAccountPage({
   displayName,
   onDeleteAccount,
   onOpenMenu,
+  onOpenReferral,
   onOpenSavedPlace,
   onOpenSupportChat,
+  orderSummary,
   savedHomeAddressLabel,
 }: {
   displayName: string;
-  initialPanel: 'settings' | 'profile';
+  orderSummary?: ClientOrderSummary;
   savedHomeAddressLabel?: string;
   onDeleteAccount: () => void;
   onOpenMenu: () => void;
+  onOpenReferral: () => void;
   onOpenSavedPlace: () => void;
   onOpenSupportChat: () => void;
 }) {
+  const { currentUser, referralDashboard } = useAppState();
   const [doNotCall, setDoNotCall] = useState(false);
   const [shareLocation, setShareLocation] = useState(true);
   const initials = getInitials(displayName);
+  const contactLine = [currentUser?.phone || currentUser?.email, 'Салаватский район']
+    .filter(Boolean)
+    .join(' · ');
+  const isVerified =
+    currentUser?.verificationStatus === 'approved' ||
+    Boolean(currentUser?.phoneVerifiedAt || currentUser?.emailVerifiedAt);
+  const bonusBalance = referralDashboard?.bonusBalance ?? currentUser?.bonusBalance ?? 0;
+  const referralReward = referralDashboard?.rewards?.clientReward ?? 60;
 
   return (
     <View style={styles.clientFocusPage}>
       <ClientPageHeader Icon={User} onOpenMenu={onOpenMenu} subtitle="Профиль и настройки" title="Аккаунт" />
 
-      <View style={styles.accountProfileCard}>
-        <View style={styles.accountProfileAvatar}>
-          <Text style={styles.accountProfileAvatarText}>{initials}</Text>
+      <StaggerView index={0} style={styles.accountProfileCard}>
+        <View style={styles.profileCardTop}>
+          <View style={styles.accountProfileAvatar}>
+            <Text style={styles.accountProfileAvatarText}>{initials}</Text>
+          </View>
+          <View style={styles.clientActionCopy}>
+            <Text numberOfLines={1} style={styles.accountProfileName}>{displayName}</Text>
+            <Text numberOfLines={1} style={styles.accountProfileMeta}>{contactLine}</Text>
+          </View>
+          {isVerified ? <Text style={styles.profileRowBadge}>✓ Подтверждён</Text> : null}
         </View>
-        <View style={styles.clientActionCopy}>
-          <Text numberOfLines={1} style={styles.accountProfileName}>{displayName}</Text>
-          <Text numberOfLines={1} style={styles.accountProfileMeta}>Клиент · Салаватский район</Text>
+        <View style={styles.profileStatsRow}>
+          <View style={styles.profileStat}>
+            <Text numberOfLines={1} style={styles.profileStatValue}>{orderSummary?.totalCount ?? 0}</Text>
+            <Text numberOfLines={1} style={styles.profileStatLabel}>поездок</Text>
+          </View>
+          <View style={styles.profileStat}>
+            <Text numberOfLines={1} style={styles.profileStatValue}>{orderSummary?.totalSpent ?? 0} ₽</Text>
+            <Text numberOfLines={1} style={styles.profileStatLabel}>на поездки</Text>
+          </View>
+          <View style={styles.profileStat}>
+            <Text numberOfLines={1} style={styles.profileStatValue}>{bonusBalance} ₽</Text>
+            <Text numberOfLines={1} style={styles.profileStatLabel}>бонусы</Text>
+          </View>
         </View>
-      </View>
+      </StaggerView>
 
-      <PressableScale
-        accessibilityLabel="Сохранённые адреса"
-        accessibilityRole="button"
-        onPress={onOpenSavedPlace}
-        style={styles.clientFavRow}
-      >
-        <View style={styles.clientFavIcon}>
-          <Home color={kinetixColors.amber} size={20} strokeWidth={2.3} />
-        </View>
-        <View style={styles.clientActionCopy}>
-          <Text numberOfLines={1} style={styles.clientFavName}>Сохранённые адреса</Text>
-          <Text numberOfLines={1} style={styles.clientFavAddr}>
-            {savedHomeAddressLabel ?? 'Дом и частые точки'}
-          </Text>
-        </View>
-        <ChevronRight color="#C2D2C9" size={20} strokeWidth={2.4} />
-      </PressableScale>
-
-      <PressableScale
-        accessibilityLabel="Поддержка"
-        accessibilityRole="button"
-        onPress={onOpenSupportChat}
-        style={styles.clientFavRow}
-      >
-        <View style={styles.clientFavIcon}>
-          <Headphones color={kinetixColors.amber} size={20} strokeWidth={2.3} />
-        </View>
-        <View style={styles.clientActionCopy}>
-          <Text numberOfLines={1} style={styles.clientFavName}>Поддержка</Text>
-          <Text numberOfLines={1} style={styles.clientFavAddr}>Вопросы по поездкам</Text>
-        </View>
-        <ChevronRight color="#C2D2C9" size={20} strokeWidth={2.4} />
-      </PressableScale>
+      <StaggerView index={1} style={styles.profileList}>
+        <ProfileListRow
+          Icon={Home}
+          first
+          onPress={onOpenSavedPlace}
+          subtitle={savedHomeAddressLabel ?? 'Дом и частые точки'}
+          title="Сохранённые адреса"
+        />
+        <ProfileListRow
+          Icon={Gift}
+          badge={`+${referralReward} ₽`}
+          onPress={onOpenReferral}
+          subtitle="Бонусы за клиентов и водителей"
+          title="Пригласить друзей"
+        />
+        <ProfileListRow
+          Icon={Headphones}
+          onPress={onOpenSupportChat}
+          subtitle="Вопросы по поездкам"
+          title="Поддержка"
+        />
+      </StaggerView>
 
       <View style={styles.accountPanel}>
         <Text style={styles.accountPanelTitle}>Настройки</Text>
@@ -1220,35 +1284,6 @@ function ClientAboutPage({
 
       <Text style={styles.aboutMeta}>Версия 1.0.0 · Сделано для Салаватского района</Text>
     </View>
-  );
-}
-
-function ClientAccountRoundButton({
-  active = false,
-  icon,
-  onPress,
-  title,
-}: {
-  active?: boolean;
-  icon: 'profile' | 'settings' | 'support';
-  title: string;
-  onPress: () => void;
-}) {
-  const Icon = icon === 'support' ? Headphones : icon === 'settings' ? ShieldCheck : UsersRound;
-
-  return (
-    <PressableScale
-      accessibilityRole="button"
-      onPress={onPress}
-      style={styles.accountRoundButton}
-    >
-      <View style={[styles.accountRoundIcon, active && styles.accountRoundIconActive]}>
-        <Icon color={active ? '#F4FAF6' : '#008D49'} size={24} strokeWidth={2.5} />
-      </View>
-      <Text numberOfLines={1} style={[styles.accountRoundText, active && styles.accountRoundTextActive]}>
-        {title}
-      </Text>
-    </PressableScale>
   );
 }
 
@@ -2166,88 +2201,117 @@ function DriverProfilePage({
 }: {
   displayName: string;
   driverStats?: DriverStatsSummary;
-  onActionTarget: (target?: MenuActionTarget, supportCategory?: string) => void;
+  onActionTarget: (target?: MenuActionTarget) => void;
 }) {
-  const [activePanel, setActivePanel] = useState<'settings' | 'profile'>('profile');
+  const { currentUser, drivers } = useAppState();
+  const currentDriver = currentUser
+    ? drivers.find((driver) => driver.userId === currentUser.id)
+    : undefined;
   const initials = getInitials(displayName);
+  const vehicleLine = [currentDriver?.vehicle, currentDriver?.plate].filter(Boolean).join(' · ');
+  const accessActive = currentDriver?.subscriptionStatus === 'active';
+  const accessBadge = accessActive
+    ? `${formatDriverAccessLabel(driverStats)} · ${formatDriverAccessUntil(driverStats)}`
+    : 'Нет доступа';
+  const documentsBadge =
+    currentDriver?.documentsStatus === 'approved'
+      ? { label: 'Одобрены', tone: 'ok' as const }
+      : currentDriver?.documentsStatus === 'pending'
+        ? { label: 'На проверке', tone: 'warn' as const }
+        : currentDriver?.documentsStatus === 'rejected'
+          ? { label: 'Отклонены', tone: 'warn' as const }
+          : { label: 'Нет файлов', tone: 'warn' as const };
+  const rating = currentDriver?.rating;
 
   return (
     <View style={styles.clientFocusPage}>
-      <StaggerView index={0} style={styles.accountHeroCard}>
-        <View style={styles.accountHeroAvatar}>
-          <Text style={styles.accountHeroAvatarText}>{initials}</Text>
-        </View>
-        <View style={styles.accountHeroCopy}>
-          <Text numberOfLines={1} style={styles.accountHeroName}>{displayName}</Text>
-          <Text numberOfLines={1} style={styles.accountHeroMeta}>Водитель-партнёр</Text>
-          <Text numberOfLines={1} style={styles.accountHeroBadge}>
-            {formatDriverAccessLabel(driverStats)} · {formatDriverAccessUntil(driverStats)}
-          </Text>
-        </View>
-      </StaggerView>
-
-      <StaggerView index={1} style={styles.accountRoundRow}>
-        <ClientAccountRoundButton
-          icon="support"
-          title="Поддержка"
-          onPress={() => onActionTarget('supportChat')}
-        />
-        <ClientAccountRoundButton
-          active={activePanel === 'settings'}
-          icon="settings"
-          title="Настройки"
-          onPress={() => setActivePanel('settings')}
-        />
-        <ClientAccountRoundButton
-          active={activePanel === 'profile'}
-          icon="profile"
-          title="Профиль"
-          onPress={() => setActivePanel('profile')}
-        />
-      </StaggerView>
-
-      {activePanel === 'settings' ? (
-        <StaggerView index={2} style={styles.accountPanel}>
-          <Text style={styles.accountPanelTitle}>Настройки</Text>
-          <View style={styles.accountProfileActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => onActionTarget('documents')}
-              style={({ pressed }) => [styles.accountSecondaryButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.accountSecondaryButtonText}>Документы</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => onActionTarget('subscription')}
-              style={({ pressed }) => [styles.accountSecondaryButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.accountSecondaryButtonText}>Тариф</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => onActionTarget('deleteAccount')}
-              style={({ pressed }) => [styles.accountDangerButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.accountDangerButtonText}>Удалить</Text>
-            </Pressable>
+      <StaggerView index={0} style={styles.accountProfileCard}>
+        <View style={styles.profileCardTop}>
+          <View style={styles.accountProfileAvatar}>
+            <Text style={styles.accountProfileAvatarText}>{initials}</Text>
           </View>
-        </StaggerView>
-      ) : (
-        <StaggerView index={2} style={styles.accountPanel}>
-          <Text style={styles.accountPanelTitle}>Профиль</Text>
-          <View style={styles.accountProfileRow}>
-            <Text style={styles.accountProfileLabel}>Имя</Text>
-            <Text style={styles.accountProfileValue}>{displayName}</Text>
-          </View>
-          <View style={styles.accountProfileRow}>
-            <Text style={styles.accountProfileLabel}>Доступ</Text>
-            <Text style={styles.accountProfileValue}>
-              {formatDriverAccessLabel(driverStats)} · {formatDriverAccessUntil(driverStats)}
+          <View style={styles.clientActionCopy}>
+            <Text numberOfLines={1} style={styles.accountProfileName}>{displayName}</Text>
+            <Text numberOfLines={1} style={styles.accountProfileMeta}>
+              {vehicleLine || 'Водитель-партнёр'}
             </Text>
           </View>
-        </StaggerView>
-      )}
+          <Text style={[styles.profileRowBadge, !accessActive && styles.profileRowBadgeWarn]}>
+            {accessBadge}
+          </Text>
+        </View>
+        <View style={styles.profileStatsRow}>
+          <View style={styles.profileStat}>
+            <Text numberOfLines={1} style={styles.profileStatValue}>
+              {rating ? `★ ${rating.toFixed(2)}` : '★ —'}
+            </Text>
+            <Text numberOfLines={1} style={styles.profileStatLabel}>рейтинг</Text>
+          </View>
+          <View style={styles.profileStat}>
+            <Text numberOfLines={1} style={styles.profileStatValue}>{driverStats?.todayOrders ?? 0}</Text>
+            <Text numberOfLines={1} style={styles.profileStatLabel}>заказы</Text>
+          </View>
+          <View style={styles.profileStat}>
+            <Text numberOfLines={1} style={styles.profileStatValue}>{driverStats?.grossToday ?? 0} ₽</Text>
+            <Text numberOfLines={1} style={styles.profileStatLabel}>сегодня</Text>
+          </View>
+        </View>
+      </StaggerView>
+
+      <StaggerView index={1} style={styles.profileList}>
+        <ProfileListRow
+          Icon={ShieldCheck}
+          badge={documentsBadge.label}
+          badgeTone={documentsBadge.tone}
+          first
+          onPress={() => onActionTarget('documents')}
+          subtitle="Паспорт, ВУ, СТС, ОСАГО"
+          title="Документы"
+        />
+        <ProfileListRow
+          Icon={CreditCard}
+          badge={accessActive ? formatDriverAccessUntil(driverStats) : undefined}
+          badgeTone={accessActive ? 'ok' : 'warn'}
+          onPress={() => onActionTarget('subscription')}
+          subtitle="120 ₽ день · 3 290 ₽ PRO"
+          title="Тариф и оплата"
+        />
+        <ProfileListRow
+          Icon={Route}
+          onPress={() => onActionTarget('history')}
+          subtitle="Поездки и суммы"
+          title="История заказов"
+        />
+        <ProfileListRow
+          Icon={Gift}
+          onPress={() => onActionTarget('referral')}
+          subtitle="Бонус за водителей и клиентов"
+          title="Пригласить друзей"
+        />
+        <ProfileListRow
+          Icon={Headphones}
+          onPress={() => onActionTarget('supportChat')}
+          subtitle="Помощь по заказам и допуску"
+          title="Поддержка"
+        />
+      </StaggerView>
+
+      <StaggerView index={2}>
+        <PressableScale
+          accessibilityLabel="Удалить аккаунт"
+          accessibilityRole="button"
+          onPress={() => onActionTarget('deleteAccount')}
+          style={styles.accountDangerRow}
+        >
+          <View style={styles.accountDangerIcon}>
+            <Trash2 color="#FF3B30" size={19} strokeWidth={2.2} />
+          </View>
+          <View style={styles.clientActionCopy}>
+            <Text numberOfLines={1} style={styles.accountDangerName}>Удалить аккаунт</Text>
+            <Text numberOfLines={1} style={styles.clientFavAddr}>Стирает профиль и данные</Text>
+          </View>
+        </PressableScale>
+      </StaggerView>
     </View>
   );
 }
