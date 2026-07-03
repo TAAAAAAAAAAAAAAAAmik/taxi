@@ -176,6 +176,7 @@ export type CreateOrderPayload = OrderStatusSummary & {
   routeEstimate?: ApiRouteEstimate;
   safetyPinRequired?: boolean;
   tariffId?: string;
+  useBonus?: boolean;
   userId?: string;
 };
 

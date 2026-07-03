@@ -349,7 +349,7 @@ type AppStateValue = {
   realtimeUpdatedAt?: string;
   simpleMode: boolean;
   addOrder: (
-    order: OrderStatusSummary,
+    order: OrderStatusSummary & { useBonus?: boolean },
     role: AccountRole,
     clientName?: string,
   ) => Promise<{ message: string; order: AppOrder; outcome: 'server' | 'local' | 'rejected' }>;
@@ -1709,6 +1709,8 @@ function createDemoAuthUser(identifier: string, password: string, role: AccountR
       firstName: 'Демо',
       email: 'demo-client@example.test',
       emailVerifiedAt: new Date().toISOString(),
+      // Демо-бонусы, чтобы на бессерверном демо был виден тумблер «Оплатить бонусами».
+      bonusBalance: 60,
     };
   }
 

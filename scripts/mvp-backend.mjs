@@ -5345,23 +5345,38 @@ function createWalletExpiryDate() {
   return expiresAt.toISOString();
 }
 
-function calculateBonusBalance(db, userId) {
-  return db.walletLedger
-    .filter((entry) => entry.userId === userId)
-    .reduce((sum, entry) => {
-      const amount = Number(entry.amount || 0);
-      const status = normalizeWalletStatus(entry.status);
+// Баланс с честным сгоранием: списания гасят начисления по FIFO (старые
+// первыми), и сгорает только непотраченный остаток истёкшего начисления.
+function calculateBonusBalance(db, userId, at = Date.now()) {
+  const entries = db.walletLedger.filter((entry) => entry.userId === userId);
+  const credits = entries
+    .filter(
+      (entry) => Number(entry.amount || 0) > 0 && normalizeWalletStatus(entry.status) === 'available',
+    )
+    .sort((left, right) => Date.parse(left.createdAt || '') - Date.parse(right.createdAt || ''));
+  let debt = entries
+    .filter(
+      (entry) => Number(entry.amount || 0) < 0 && normalizeWalletStatus(entry.status) === 'used',
+    )
+    .reduce((sum, entry) => sum - Number(entry.amount), 0);
 
-      if (status === 'available') {
-        return sum + amount;
-      }
+  let balance = 0;
 
-      if (status === 'used' && amount < 0) {
-        return sum + amount;
-      }
+  for (const credit of credits) {
+    const amount = Number(credit.amount || 0);
+    const consumed = Math.min(amount, debt);
 
-      return sum;
-    }, 0);
+    debt -= consumed;
+    const remaining = amount - consumed;
+    const expiresAt = Date.parse(credit.expiresAt || '');
+    const expired = Number.isFinite(expiresAt) && expiresAt <= at;
+
+    if (remaining > 0 && !expired) {
+      balance += remaining;
+    }
+  }
+
+  return balance;
 }
 
 function syncUserBonusBalance(db, userId) {
@@ -5392,7 +5407,9 @@ function creditWallet(db, userId, amount, reason, sourceType, sourceId, options 
       entry.userId === userId &&
       entry.sourceType === sourceType &&
       entry.sourceId === sourceId &&
-      entry.reason === reason &&
+      // Для реферальных начислений текст причины может отличаться
+      // (авто-начисление vs заметка админа) — дедупим по источнику.
+      (sourceType === 'referral' || entry.reason === reason) &&
       Number(entry.amount || 0) > 0,
   );
 
@@ -5486,6 +5503,29 @@ function applyBonusToOrder(db, order, payload) {
   return order;
 }
 
+// Отменённая поездка не должна съедать бонусы: возвращаем списанное.
+// Идемпотентно за счёт дедупа creditWallet по (userId, trip_refund, orderId).
+function refundOrderBonus(db, order) {
+  const bonusApplied = Number(order.bonusApplied || 0);
+
+  if (!bonusApplied || !order.userId || order.bonusRefundedAt) {
+    return;
+  }
+
+  const refunded = creditWallet(
+    db,
+    order.userId,
+    bonusApplied,
+    `Возврат бонусов за отменённый заказ ${order.id}`,
+    'trip_refund',
+    order.id,
+  );
+
+  if (refunded) {
+    order.bonusRefundedAt = new Date().toISOString();
+  }
+}
+
 function createInviteUrl(code, role) {
   const normalizedRole = normalizeRole(role);
   const roleParam = ['client', 'self_employed_driver', 'park_admin', 'park_driver'].includes(normalizedRole)
@@ -5512,7 +5552,11 @@ function countDriverCompletedOrders(db, userId) {
   }
 
   return db.orders.filter(
-    (order) => order.driver?.id === driver.id && ['closed', 'completed'].includes(order.status),
+    (order) =>
+      order.driver?.id === driver.id &&
+      ['closed', 'completed'].includes(order.status) &&
+      !order.isTestOrder &&
+      !order.disputeStatus,
   ).length;
 }
 
@@ -6075,6 +6119,12 @@ function rewardReferral(db, referral, reason, actorUserId = 'system') {
     return false;
   }
 
+  // Уже выплачено — повторное «Начислено» (в т.ч. из админки с другой
+  // заметкой) не должно создавать второе начисление.
+  if (referral.status === 'rewarded') {
+    return false;
+  }
+
   const now = new Date().toISOString();
   referral.status = 'rewarded';
   referral.qualifiedAt = referral.qualifiedAt || now;
@@ -6100,12 +6150,7 @@ function settleClientReferralForOrder(db, order) {
     return;
   }
 
-  const completedOrders = db.orders.filter(
-    (item) =>
-      item.userId === order.userId &&
-      item.role === 'client' &&
-      ['closed', 'completed'].includes(item.status),
-  ).length;
+  const completedOrders = countClientCompletedOrders(db, order.userId);
 
   if (completedOrders < referralRewards.clientQualificationOrders) {
     referral.status = 'qualified';
@@ -6140,17 +6185,12 @@ function settleDriverReferralForOrder(db, order) {
     return;
   }
 
-  const completedOrders = db.orders.filter(
-    (item) =>
-      item.driver?.id === driver.id &&
-      ['closed', 'completed'].includes(item.status) &&
-      !item.isTestOrder &&
-      !item.disputeStatus,
-  ).length;
+  const completedOrders = countDriverCompletedOrders(db, driver.userId);
 
   if (completedOrders < referralRewards.driverQualificationOrders) {
-    referral.status = 'registered';
-    addReferralAudit(db, referral.id, 'registered', 'system', `Прогресс водителя: ${completedOrders}/${referralRewards.driverQualificationOrders}`);
+    // Статус не понижаем: ручной «qualified» от админа не должен
+    // перетираться очередной поездкой ниже порога.
+    addReferralAudit(db, referral.id, 'progress', 'system', `Прогресс водителя: ${completedOrders}/${referralRewards.driverQualificationOrders}`);
     return;
   }
 
@@ -7286,124 +7326,127 @@ async function handleRequest(request, response) {
         return;
       }
 
-      if (
-        (email && findUserByIdentifier(db.users, email)) ||
-        (phone && findUserByIdentifier(db.users, phone))
-      ) {
-        sendJson(response, 409, { error: 'User already exists' });
-        return;
-      }
+      // Проверка уникальности и запись нового пользователя идут одной критической
+      // секцией: два одновременных запроса с одним телефоном не создадут дубликат.
+      const outcome = await mutateDb(async (freshDb) => {
+        if (
+          (email && findUserByIdentifier(freshDb.users, email)) ||
+          (phone && findUserByIdentifier(freshDb.users, phone))
+        ) {
+          return { status: 409, body: { error: 'User already exists' } };
+        }
 
-      db.users.forEach((existingUser) => ensureUserReferralCode(existingUser, db.users));
-      const normalizedReferralCode = normalizeReferralCode(payload.referralCode);
-      const referralInviter = normalizedReferralCode
-        ? findUserByReferralCode(db.users, normalizedReferralCode)
-        : undefined;
-      const referralMarketingPartner = normalizedReferralCode
-        ? findMarketingPartnerByCode(db, normalizedReferralCode)
-        : undefined;
-
-      if (normalizedReferralCode && !referralInviter && !referralMarketingPartner) {
-        sendJson(response, 400, { error: 'Referral code not found' });
-        return;
-      }
-
-      const referralRegistrationError = referralInviter
-        ? getReferralRegistrationError(referralInviter, { email, phone })
-        : '';
-
-      if (referralRegistrationError) {
-        sendJson(response, 400, { error: referralRegistrationError });
-        return;
-      }
-
-      const now = new Date().toISOString();
-      const pendingParkInvite =
-        role === 'park_driver' ? findParkDriverInvite(db, payload.parkInviteCode) : undefined;
-      const marketingInviteCode = normalizeReferralCode(payload.marketingInviteCode);
-      const pendingMarketingInvite =
-        role === 'marketer'
-          ? db.marketingInvites.find(
-              (invite) => invite.code === marketingInviteCode && invite.status === 'pending',
-            )
+        freshDb.users.forEach((existingUser) => ensureUserReferralCode(existingUser, freshDb.users));
+        const normalizedReferralCode = normalizeReferralCode(payload.referralCode);
+        const referralInviter = normalizedReferralCode
+          ? findUserByReferralCode(freshDb.users, normalizedReferralCode)
+          : undefined;
+        const referralMarketingPartner = normalizedReferralCode
+          ? findMarketingPartnerByCode(freshDb, normalizedReferralCode)
           : undefined;
 
-      if (role === 'park_driver' && !pendingParkInvite) {
-        sendJson(response, 400, { error: 'Valid taxi park invite code is required' });
-        return;
-      }
+        if (normalizedReferralCode && !referralInviter && !referralMarketingPartner) {
+          return { status: 400, body: { error: 'Referral code not found' } };
+        }
 
-      if (role === 'marketer' && !pendingMarketingInvite) {
-        sendJson(response, 400, { error: 'Valid marketing invite code is required' });
-        return;
-      }
+        const referralRegistrationError = referralInviter
+          ? getReferralRegistrationError(referralInviter, { email, phone })
+          : '';
 
-      const invitedPark = pendingParkInvite
-        ? db.parks.find((item) => item.id === pendingParkInvite.parkId)
-        : undefined;
-      const user = {
-        id: `user-${Date.now().toString(36)}`,
-        role,
-        firstName: String(payload.firstName || ''),
-        lastName: String(payload.lastName || ''),
-        email,
-        phone,
-        passwordHash: hashPassword(password),
-        referralCode: '',
-        referredByCode: referralInviter ? normalizedReferralCode : '',
-        bonusBalance: 0,
-        parkId: pendingParkInvite?.parkId,
-        parkName: invitedPark?.organisationName,
-        verificationStatus: 'pending_contacts',
-        createdAt: now,
-        updatedAt: now,
-      };
+        if (referralRegistrationError) {
+          return { status: 400, body: { error: referralRegistrationError } };
+        }
 
-      if (skipPhoneVerification) {
-        user.phoneVerifiedAt = now;
-      }
+        const now = new Date().toISOString();
+        const pendingParkInvite =
+          role === 'park_driver' ? findParkDriverInvite(freshDb, payload.parkInviteCode) : undefined;
+        const marketingInviteCode = normalizeReferralCode(payload.marketingInviteCode);
+        const pendingMarketingInvite =
+          role === 'marketer'
+            ? freshDb.marketingInvites.find(
+                (invite) => invite.code === marketingInviteCode && invite.status === 'pending',
+              )
+            : undefined;
 
-      const { record: sessionRecord, session } = makeSession(user.id, role);
+        if (role === 'park_driver' && !pendingParkInvite) {
+          return { status: 400, body: { error: 'Valid taxi park invite code is required' } };
+        }
 
-      ensureUserReferralCode(user, db.users);
-      db.users.unshift(user);
-      db.sessions.unshift(sessionRecord);
-      attachReferral(db, user, payload.referralCode);
+        if (role === 'marketer' && !pendingMarketingInvite) {
+          return { status: 400, body: { error: 'Valid marketing invite code is required' } };
+        }
 
-      if (isSelfEmployedDriverRole(role) && !db.drivers.some((driver) => driver.userId === user.id)) {
-        db.drivers.unshift(makeDriverFromUser(user, payload, { employmentType: 'self_employed' }));
-      }
+        const invitedPark = pendingParkInvite
+          ? freshDb.parks.find((item) => item.id === pendingParkInvite.parkId)
+          : undefined;
+        const user = {
+          id: `user-${Date.now().toString(36)}`,
+          role,
+          firstName: String(payload.firstName || ''),
+          lastName: String(payload.lastName || ''),
+          email,
+          phone,
+          passwordHash: hashPassword(password),
+          referralCode: '',
+          referredByCode: referralInviter ? normalizedReferralCode : '',
+          bonusBalance: 0,
+          parkId: pendingParkInvite?.parkId,
+          parkName: invitedPark?.organisationName,
+          verificationStatus: 'pending_contacts',
+          createdAt: now,
+          updatedAt: now,
+        };
 
-      if (isParkAdminRole(role)) {
-        const park = makeParkFromUser(user, payload);
-        user.parkId = park.id;
-        user.parkName = park.organisationName;
-        db.parks.unshift(park);
-      }
+        if (skipPhoneVerification) {
+          user.phoneVerifiedAt = now;
+        }
 
-      if (isParkDriverRole(role)) {
-        const driver = makeDriverFromUser(user, payload, {
-          employmentType: 'park_driver',
-          parkId: pendingParkInvite.parkId,
-        });
-        user.parkId = pendingParkInvite.parkId;
-        user.parkName = invitedPark?.organisationName;
-        pendingParkInvite.userId = user.id;
-        pendingParkInvite.driverId = driver.id;
-        pendingParkInvite.status = 'invited';
-        pendingParkInvite.updatedAt = now;
-        db.drivers.unshift(driver);
-      }
+        const { record: sessionRecord, session } = makeSession(user.id, role);
 
-      if (isMarketerRole(role)) {
-        pendingMarketingInvite.status = 'used';
-        pendingMarketingInvite.usedAt = now;
-        pendingMarketingInvite.usedByUserId = user.id;
-        ensureMarketingPartnerForUser(db, user);
-      }
+        ensureUserReferralCode(user, freshDb.users);
+        freshDb.users.unshift(user);
+        freshDb.sessions.unshift(sessionRecord);
+        attachReferral(freshDb, user, payload.referralCode);
 
-      await writeDb(db);
-      sendJson(response, 201, { session, user: publicUser(user) });
+        if (
+          isSelfEmployedDriverRole(role) &&
+          !freshDb.drivers.some((driver) => driver.userId === user.id)
+        ) {
+          freshDb.drivers.unshift(makeDriverFromUser(user, payload, { employmentType: 'self_employed' }));
+        }
+
+        if (isParkAdminRole(role)) {
+          const park = makeParkFromUser(user, payload);
+          user.parkId = park.id;
+          user.parkName = park.organisationName;
+          freshDb.parks.unshift(park);
+        }
+
+        if (isParkDriverRole(role)) {
+          const driver = makeDriverFromUser(user, payload, {
+            employmentType: 'park_driver',
+            parkId: pendingParkInvite.parkId,
+          });
+          user.parkId = pendingParkInvite.parkId;
+          user.parkName = invitedPark?.organisationName;
+          pendingParkInvite.userId = user.id;
+          pendingParkInvite.driverId = driver.id;
+          pendingParkInvite.status = 'invited';
+          pendingParkInvite.updatedAt = now;
+          freshDb.drivers.unshift(driver);
+        }
+
+        if (isMarketerRole(role)) {
+          pendingMarketingInvite.status = 'used';
+          pendingMarketingInvite.usedAt = now;
+          pendingMarketingInvite.usedByUserId = user.id;
+          ensureMarketingPartnerForUser(freshDb, user);
+        }
+
+        return { status: 201, body: { session, user: publicUser(user) } };
+      });
+
+      sendJson(response, outcome.status, outcome.body);
       return;
     }
 
@@ -8098,21 +8141,37 @@ async function handleRequest(request, response) {
         return;
       }
 
-      if (nextStatus === 'rewarded') {
-        rewardReferral(db, referral, payload.note || 'Реферальный бонус подтвержден администратором', sessionContext.user.id);
-      } else {
-        referral.status = nextStatus;
-        if (nextStatus === 'qualified') {
-          referral.qualifiedAt = referral.qualifiedAt || new Date().toISOString();
+      // Меняем статус через очередь мутаций на свежей копии: запись
+      // request-копии затирала бы конкурентные изменения.
+      const dashboard = await mutateDb(async (freshDb) => {
+        const freshReferral = freshDb.referrals.find((item) => item.id === pathParts[2]);
+
+        if (!freshReferral) {
+          return null;
         }
-        if (nextStatus === 'blocked') {
-          referral.blockedAt = referral.blockedAt || new Date().toISOString();
+
+        if (nextStatus === 'rewarded') {
+          rewardReferral(freshDb, freshReferral, payload.note || 'Реферальный бонус подтвержден администратором', sessionContext.user.id);
+        } else {
+          freshReferral.status = nextStatus;
+          if (nextStatus === 'qualified') {
+            freshReferral.qualifiedAt = freshReferral.qualifiedAt || new Date().toISOString();
+          }
+          if (nextStatus === 'blocked') {
+            freshReferral.blockedAt = freshReferral.blockedAt || new Date().toISOString();
+          }
+          addReferralAudit(freshDb, freshReferral.id, nextStatus, sessionContext.user.id, payload.note || 'Статус изменен администратором');
         }
-        addReferralAudit(db, referral.id, nextStatus, sessionContext.user.id, payload.note || 'Статус изменен администратором');
+
+        return makeAdminReferralDashboard(freshDb);
+      });
+
+      if (!dashboard) {
+        sendJson(response, 404, { error: 'Referral not found' });
+        return;
       }
 
-      await writeDb(db);
-      sendJson(response, 200, makeAdminReferralDashboard(db));
+      sendJson(response, 200, dashboard);
       return;
     }
 
@@ -9001,6 +9060,10 @@ async function handleRequest(request, response) {
         if (['closed', 'completed'].includes(order.status)) {
           order.completedAt = order.completedAt || order.updatedAt;
           settleOrderPayment(db, order, 'status-patch');
+        }
+
+        if (['cancelled', 'canceled'].includes(order.status)) {
+          refundOrderBonus(db, order);
         }
         settleClientReferralForOrder(db, order);
         settleDriverReferralForOrder(db, order);

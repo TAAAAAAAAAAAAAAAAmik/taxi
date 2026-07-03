@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { rm } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const port = Number(process.env.REFERRAL_SMOKE_PORT || 3310);
@@ -221,6 +221,88 @@ try {
   assert(
     finalDashboard.bonusBalance >= 260,
     `Inviter total reward should be at least 260, got ${finalDashboard.bonusBalance}`,
+  );
+
+  // Защита от двойной выплаты: клиентский реферал уже rewarded автоматически,
+  // повторное админское подтверждение не должно начислить бонус ещё раз.
+  const balanceBeforeDoublePay = finalDashboard.bonusBalance;
+
+  await api(`/admin/referrals/${encodeURIComponent(clientReferral.id)}/status`, {
+    body: {
+      note: 'Smoke duplicate payout attempt',
+      status: 'rewarded',
+    },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+
+  const doublePayDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
+    token: inviter.session.token,
+  });
+
+  assert(
+    doublePayDashboard.bonusBalance === balanceBeforeDoublePay,
+    `Re-confirming a rewarded referral must not pay twice: ${balanceBeforeDoublePay} -> ${doublePayDashboard.bonusBalance}`,
+  );
+
+  // Оплата бонусами + возврат при отмене: списанное возвращается на баланс.
+  const bonusOrder = await createOrder({
+    destination: 'Bonus spend destination',
+    paymentMethod: 'cash',
+    pickup: 'Bonus spend pickup',
+    role: 'client',
+    tariff: 'economy',
+    total: 100,
+    useBonus: true,
+  }, inviter.session.token);
+  const bonusApplied = Number(bonusOrder.bonusApplied || 0);
+
+  assert(bonusApplied > 0, 'Order with useBonus should debit referral bonuses');
+
+  const spentDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
+    token: inviter.session.token,
+  });
+
+  assert(
+    spentDashboard.bonusBalance === balanceBeforeDoublePay - bonusApplied,
+    `Bonus debit should reduce balance by ${bonusApplied}, got ${balanceBeforeDoublePay} -> ${spentDashboard.bonusBalance}`,
+  );
+
+  await api(`/orders/${encodeURIComponent(bonusOrder.id)}/status`, {
+    body: { status: 'cancelled' },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+
+  const refundDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
+    token: inviter.session.token,
+  });
+
+  assert(
+    refundDashboard.bonusBalance === balanceBeforeDoublePay,
+    `Cancelled order should refund spent bonuses: expected ${balanceBeforeDoublePay}, got ${refundDashboard.bonusBalance}`,
+  );
+
+  // FIFO-сгорание: истёкший кредит выпадает из баланса, но уже погашенная
+  // списаниями часть не «воскресает». Кредиты инвайтера: 60 (клиентский),
+  // 200 (водительский), возврат отмены. Списание гасится FIFO, истекает 200-й.
+  const rawDb = JSON.parse(await readFile(dbPath, 'utf8'));
+  const driverRewardEntry = rawDb.walletLedger.find(
+    (entry) => entry.userId === inviter.user.id && Number(entry.amount) === 200,
+  );
+
+  assert(driverRewardEntry, 'Driver reward wallet entry should exist');
+  driverRewardEntry.expiresAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  await writeFile(dbPath, `${JSON.stringify(rawDb, null, 2)}\n`);
+
+  const expiryDashboard = await api(`/referrals?userId=${inviter.user.id}`, {
+    token: inviter.session.token,
+  });
+  const expectedAfterExpiry = Math.max(60, bonusApplied);
+
+  assert(
+    expiryDashboard.bonusBalance === expectedAfterExpiry,
+    `Expired driver reward should burn FIFO-correctly: expected ${expectedAfterExpiry}, got ${expiryDashboard.bonusBalance}`,
   );
 
   console.log('Referral smoke test passed');

@@ -195,6 +195,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const [serverRouteEstimate, setServerRouteEstimate] = useState<RouteEstimate | null>(null);
   const [routeEstimateStatus, setRouteEstimateStatus] = useState<'local' | 'loading' | 'server'>('local');
   const [customTimeOpen, setCustomTimeOpen] = useState(false);
+  const [useBonus, setUseBonus] = useState(false);
   const isDriverRole = isDriverLikeRole(role);
   const isSelfEmployedDriver = isSelfEmployedDriverRole(role);
   const reducedMotion = useReducedMotionPreference();
@@ -358,6 +359,8 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   );
   const routeEstimate = serverRouteEstimate ?? localRouteEstimate;
   const total = isDriverRole && selectedFeedOrder ? selectedFeedOrder.total : routeEstimate.total;
+  const bonusBalance = !isDriverRole ? Math.max(0, Math.round(currentUser?.bonusBalance ?? 0)) : 0;
+  const bonusDiscount = useBonus ? Math.min(bonusBalance, routeEstimate.total) : 0;
 
   useEffect(() => {
     if (!isDriverRole) {
@@ -716,6 +719,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       tariff: selectedTariff.title,
       tariffId: selectedTariff.id,
       total,
+      useBonus: useBonus && bonusBalance > 0,
       ...(locationPoint ? { pickupPoint: locationPoint } : {}),
     };
 
@@ -830,8 +834,8 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       : isDeliveryOrder && clientStep < lastClientStep
       ? 'Дальше'
       : isDeliveryOrder
-      ? `Оформить за ${routeEstimate.total} ₽`
-      : `Вызвать за ${routeEstimate.total} ₽`;
+      ? `Оформить за ${Math.max(0, routeEstimate.total - bonusDiscount)} ₽`
+      : `Вызвать за ${Math.max(0, routeEstimate.total - bonusDiscount)} ₽`;
     const handleClientStepAction = async () => {
       if (!canConfirm) {
         setConfirmed(true);
@@ -1403,11 +1407,32 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             <View style={styles.orderPriceCard}>
               <View style={styles.orderPriceRow}>
                 <Text style={styles.orderPriceName}>Эконом · фиксированная цена</Text>
-                <Text style={styles.orderPriceValue}>{routeEstimate.total} ₽</Text>
+                <Text style={styles.orderPriceValue}>{Math.max(0, routeEstimate.total - bonusDiscount)} ₽</Text>
               </View>
               <Text numberOfLines={1} style={styles.orderPriceMetaText}>
                 {formatDistance(routeEstimate.distanceKm)} · ~{routeEstimate.durationMin} мин · подача {selectedTariff.eta}
               </Text>
+              {bonusBalance > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: useBonus }}
+                  onPress={() => setUseBonus((current) => !current)}
+                  style={({ pressed }) => [
+                    styles.orderBonusRow,
+                    useBonus && styles.orderBonusRowActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <View style={[styles.orderBonusDot, useBonus && styles.orderBonusDotActive]}>
+                    {useBonus ? <Text style={styles.orderBonusDotMark}>✓</Text> : null}
+                  </View>
+                  <Text numberOfLines={1} style={[styles.orderBonusText, useBonus && styles.orderBonusTextActive]}>
+                    {useBonus
+                      ? `Спишем ${bonusDiscount} ₽ бонусами`
+                      : `Оплатить бонусами · ${bonusBalance} ₽`}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 
