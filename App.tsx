@@ -69,6 +69,9 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
   const brandProgress = useRef(new Animated.Value(0)).current;
   const sloganProgress = useRef(new Animated.Value(0)).current;
   const exitProgress = useRef(new Animated.Value(0)).current;
+  // Светящаяся «фара» едет по маршруту от старта к пину, ведя кончик линии —
+  // motion объясняет продукт: такси проходит маршрут. Синхронна с прорисовкой.
+  const driveProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (reducedMotion) {
@@ -78,6 +81,7 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       routeTurnProgress.setValue(1);
       routeEndProgress.setValue(1);
       markerProgress.setValue(1);
+      driveProgress.setValue(1);
       brandProgress.setValue(1);
       sloganProgress.setValue(1);
       const timer = setTimeout(onDone, 420);
@@ -137,6 +141,14 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
             useNativeDriver: true,
           }),
         ]),
+        // Фара едет ровно за прорисовкой линии (520+360+520 = 1400мс),
+        // сегментные скорости заданы точками inputRange в carX/carY.
+        Animated.timing(driveProgress, {
+          duration: 1400,
+          easing: Easing.linear,
+          toValue: 1,
+          useNativeDriver: true,
+        }),
       ]),
       Animated.stagger(140, [
         Animated.timing(brandProgress, {
@@ -178,6 +190,7 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
     backgroundProgress,
     brandProgress,
     exitProgress,
+    driveProgress,
     markerProgress,
     onDone,
     pulseProgress,
@@ -215,6 +228,20 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
   const routeEndScale = routeEndProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [0.02, 1],
+  });
+  // Путь фары по центрам сегментов маршрута (top-left с учётом размера 14):
+  // старт → угол1 → угол2 → пин. Точки inputRange = доли 520/360/520 от 1400мс.
+  const carTranslateX = driveProgress.interpolate({
+    inputRange: [0, 0.371, 0.629, 1],
+    outputRange: [37, 167, 167, 269],
+  });
+  const carTranslateY = driveProgress.interpolate({
+    inputRange: [0, 0.371, 0.629, 1],
+    outputRange: [139, 139, 71, 73],
+  });
+  const carOpacity = driveProgress.interpolate({
+    inputRange: [0, 0.05, 0.9, 1],
+    outputRange: [0, 1, 1, 0],
   });
   const markerOpacity = markerProgress.interpolate({
     inputRange: [0, 0.4, 1],
@@ -307,6 +334,26 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
           />
           <Animated.View
             style={[
+              styles.cometHalo,
+              {
+                opacity: carOpacity,
+                transform: [{ translateX: carTranslateX }, { translateY: carTranslateY }],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.comet,
+              {
+                opacity: carOpacity,
+                transform: [{ translateX: carTranslateX }, { translateY: carTranslateY }],
+              },
+            ]}
+          >
+            <View style={styles.cometCore} />
+          </Animated.View>
+          <Animated.View
+            style={[
               styles.markerCluster,
               {
                 opacity: markerOpacity,
@@ -386,6 +433,38 @@ const styles = StyleSheet.create({
   brandBlock: {
     alignItems: 'center',
     marginTop: 28,
+  },
+  comet: {
+    alignItems: 'center',
+    backgroundColor: splashColors.route,
+    borderRadius: 999,
+    height: 14,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    shadowColor: splashColors.route,
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 12,
+    top: 0,
+    width: 14,
+  },
+  cometCore: {
+    backgroundColor: '#F2FBF6',
+    borderRadius: 999,
+    height: 5,
+    width: 5,
+  },
+  cometHalo: {
+    backgroundColor: splashColors.routeSoft,
+    borderRadius: 999,
+    height: 36,
+    left: 0,
+    marginLeft: -11,
+    marginTop: -11,
+    position: 'absolute',
+    top: 0,
+    width: 36,
   },
   glowBlob: {
     backgroundColor: splashColors.glow,
