@@ -36,65 +36,77 @@
         position: fixed;
         z-index: 9999;
       }
-      #kinetix-boot .kb-badge {
+      #kinetix-boot .kb-badge-wrap {
         align-items: center;
-        background: #B7F46A;
-        border-radius: 22px;
         display: flex;
-        height: 72px;
+        height: 82px;
         justify-content: center;
-        margin-bottom: 24px;
+        margin-bottom: 26px;
         position: relative;
-        width: 72px;
+        width: 82px;
       }
-      #kinetix-boot .kb-badge::before {
-        background: rgba(92, 230, 160, 0.12);
+      #kinetix-boot .kb-badge-wrap::before {
+        background: rgba(92, 230, 160, 0.14);
         border-radius: 50%;
         content: '';
-        height: 150px;
+        height: 190px;
         position: absolute;
-        width: 150px;
+        width: 190px;
         z-index: -1;
       }
+      #kinetix-boot .kb-badge {
+        align-items: center;
+        background: rgba(183, 244, 106, 0.06);
+        border: 1px solid rgba(183, 244, 106, 0.42);
+        border-radius: 22px;
+        box-shadow: 0 0 22px rgba(183, 244, 106, 0.24);
+        display: flex;
+        height: 74px;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+        width: 74px;
+      }
+      #kinetix-boot .kb-badge::before {
+        background: rgba(255, 255, 255, 0.10);
+        border-radius: 50%;
+        content: '';
+        height: 60px;
+        left: -6px;
+        position: absolute;
+        top: -34px;
+        width: 86px;
+      }
       #kinetix-boot .kb-brand {
-        color: #F2FBF6;
+        color: #F4FBF7;
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 32px;
+        font-size: 33px;
         font-weight: 800;
-        letter-spacing: -0.6px;
+        letter-spacing: -0.5px;
       }
       #kinetix-boot .kb-sub {
-        color: #93BAA8;
+        color: rgba(159, 196, 178, 0.9);
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        letter-spacing: 0.2px;
-        margin-top: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 3.4px;
+        margin-top: 9px;
       }
-      #kinetix-boot .kb-track {
-        background: rgba(183, 244, 106, 0.16);
-        border-radius: 999px;
-        bottom: 72px;
-        height: 3px;
-        overflow: hidden;
+      #kinetix-boot .kb-spin {
+        border: 2px solid rgba(183, 244, 106, 0.16);
+        border-radius: 50%;
+        border-top-color: #B7F46A;
+        bottom: 76px;
+        height: 22px;
         position: absolute;
-        width: 128px;
+        width: 22px;
+        animation: kb-spin 1s linear infinite;
       }
-      #kinetix-boot .kb-track::after {
-        animation: kb-load 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        background: #B7F46A;
-        border-radius: 999px;
-        content: '';
-        display: block;
-        height: 3px;
-        width: 100%;
-      }
-      @keyframes kb-load {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
+      @keyframes kb-spin {
+        to { transform: rotate(360deg); }
       }
       @media (prefers-reduced-motion: reduce) {
-        #kinetix-boot .kb-track::after { animation: none; }
+        #kinetix-boot .kb-spin { animation: none; }
       }
     </style>
 </head>
@@ -107,15 +119,17 @@
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
     <div id="kinetix-boot">
-      <div class="kb-badge">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="#0A1411" stroke="#0A1411" stroke-width="2" stroke-linejoin="round">
-          <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-        </svg>
+      <div class="kb-badge-wrap">
+        <div class="kb-badge">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+          </svg>
+        </div>
       </div>
       <div class="kb-brand">Kinetix</div>
-      <div class="kb-sub">Такси Партнёр</div>
-      <div class="kb-track"></div>
+      <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
+      <div class="kb-spin"></div>
     </div>
-  <script src="/taxi/_expo/static/js/web/index-3395a11c21609653ef6bb2e0ac6a02f0.js" defer></script>
+  <script src="/taxi/_expo/static/js/web/index-0f9164ca3a3acb685079be09300679ee.js" defer></script>
 </body>
 </html>
