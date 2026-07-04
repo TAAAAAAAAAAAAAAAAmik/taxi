@@ -7,17 +7,21 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { AppStateProvider } from './src/state/AppState';
 import { useReducedMotionPreference } from './src/hooks/useReducedMotionPreference';
 
-// Минималистичный запуск в духе Яндекс Go: спокойный тёмный экран, крупный
-// фирменный значок и лого по центру, тонкий индикатор загрузки снизу.
-// Графит и лайм из premium-токенов hero — переход в Welcome бесшовный.
+// Премиальный минимализм запуска: глубокий графит со светом за иконкой,
+// тёмно-стеклянный значок с лайм-обводкой, благородная типографика и
+// деликатный дуговой индикатор. Графит и лайм из токенов hero — переход
+// в Welcome бесшовный.
 const splashColors = {
   background: '#0A1411',
-  brand: '#F2FBF6',
-  glow: 'rgba(92, 230, 160, 0.12)',
+  brand: '#F4FBF7',
   lime: '#B7F46A',
-  graphite: '#0A1411',
-  track: 'rgba(183, 244, 106, 0.16)',
-  secondaryText: '#93BAA8',
+  badgeFill: 'rgba(183, 244, 106, 0.06)',
+  badgeBorder: 'rgba(183, 244, 106, 0.42)',
+  badgeHighlight: 'rgba(255, 255, 255, 0.10)',
+  glowInner: 'rgba(92, 230, 160, 0.16)',
+  glowOuter: 'rgba(92, 230, 160, 0.06)',
+  spinnerTrack: 'rgba(183, 244, 106, 0.16)',
+  caption: 'rgba(159, 196, 178, 0.9)',
 } as const;
 
 export default function App() {
@@ -25,7 +29,7 @@ export default function App() {
   const handleSplashDone = useCallback(() => setSplashVisible(false), []);
 
   // Статичный boot-splash из index.html (виден, пока грузится бандл) гаснет,
-  // как только React-сплэш с той же тёмной сценой смонтирован — стык невидим.
+  // как только React-сплэш с той же сценой смонтирован — стык невидим.
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') {
       return;
@@ -61,27 +65,20 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
   const badgeProgress = useRef(new Animated.Value(0)).current;
   const brandProgress = useRef(new Animated.Value(0)).current;
   const sloganProgress = useRef(new Animated.Value(0)).current;
-  const loaderProgress = useRef(new Animated.Value(0)).current;
+  const breatheProgress = useRef(new Animated.Value(0)).current;
+  const spinProgress = useRef(new Animated.Value(0)).current;
   const exitProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (reducedMotion) {
-      // Reduced-motion: контент показываем сразу, но даём спокойный beat
-      // загрузки и выдержку, чтобы экран не мелькал.
       badgeProgress.setValue(1);
       brandProgress.setValue(1);
       sloganProgress.setValue(1);
 
       const calm = Animated.sequence([
-        Animated.timing(loaderProgress, {
-          duration: 900,
-          easing: Easing.linear,
-          toValue: 1,
-          useNativeDriver: false,
-        }),
-        Animated.delay(560),
+        Animated.delay(1200),
         Animated.timing(exitProgress, {
-          duration: 460,
+          duration: 480,
           easing: Easing.bezier(0.4, 0, 0.2, 1),
           toValue: 1,
           useNativeDriver: true,
@@ -97,55 +94,82 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       return () => calm.stop();
     }
 
-    const intro = Animated.sequence([
-      // Значок «влетает» лёгким пружинным масштабом — как иконка приложения.
-      Animated.timing(badgeProgress, {
-        duration: 560,
-        easing: Easing.out(Easing.back(1.4)),
+    // Едва заметное «дыхание» света за иконкой — премиальная живость.
+    const breathe = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breatheProgress, {
+          duration: 1900,
+          easing: Easing.inOut(Easing.sin),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(breatheProgress, {
+          duration: 1900,
+          easing: Easing.inOut(Easing.sin),
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    // Тонкая дуга-индикатор вращается, пока читается лого.
+    const spin = Animated.loop(
+      Animated.timing(spinProgress, {
+        duration: 1000,
+        easing: Easing.linear,
         toValue: 1,
         useNativeDriver: true,
       }),
-      Animated.parallel([
-        Animated.stagger(150, [
-          Animated.timing(brandProgress, {
-            duration: 520,
-            easing: Easing.out(Easing.cubic),
-            toValue: 1,
-            useNativeDriver: true,
-          }),
-          Animated.timing(sloganProgress, {
-            duration: 440,
-            easing: Easing.out(Easing.cubic),
-            toValue: 1,
-            useNativeDriver: true,
-          }),
-        ]),
-        // Тонкая полоса загрузки заполняется, пока читается лого.
-        Animated.timing(loaderProgress, {
-          duration: 1300,
-          easing: Easing.inOut(Easing.ease),
+    );
+
+    const intro = Animated.sequence([
+      // Значок мягко «оседает» без отскока — сдержанно, дорого.
+      Animated.timing(badgeProgress, {
+        duration: 640,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.stagger(150, [
+        Animated.timing(brandProgress, {
+          duration: 560,
+          easing: Easing.out(Easing.cubic),
           toValue: 1,
-          useNativeDriver: false,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sloganProgress, {
+          duration: 480,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
         }),
       ]),
-      Animated.delay(240),
-      // Выход: короткий «зум в приложение» (как раскрытие иконки в интерфейс).
+      Animated.delay(900),
       Animated.timing(exitProgress, {
-        duration: 480,
+        duration: 500,
         easing: Easing.bezier(0.4, 0, 0.2, 1),
         toValue: 1,
         useNativeDriver: true,
       }),
     ]);
 
+    breathe.start();
+    spin.start();
     intro.start(({ finished }) => {
+      breathe.stop();
+      spin.stop();
+
       if (finished) {
         onDone();
       }
     });
 
-    return () => intro.stop();
-  }, [badgeProgress, brandProgress, exitProgress, loaderProgress, onDone, reducedMotion, sloganProgress]);
+    return () => {
+      intro.stop();
+      breathe.stop();
+      spin.stop();
+    };
+  }, [badgeProgress, brandProgress, breatheProgress, exitProgress, onDone, reducedMotion, sloganProgress, spinProgress]);
 
   const splashOpacity = exitProgress.interpolate({
     inputRange: [0, 1],
@@ -153,15 +177,23 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
   });
   const splashScale = exitProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 1.06],
+    outputRange: [1, 1.05],
   });
   const badgeOpacity = badgeProgress.interpolate({
-    inputRange: [0, 0.55, 1],
+    inputRange: [0, 0.5, 1],
     outputRange: [0, 1, 1],
   });
   const badgeScale = badgeProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.82, 1],
+    outputRange: [0.86, 1],
+  });
+  const glowScale = breatheProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.12],
+  });
+  const glowOpacity = breatheProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.75, 1],
   });
   const brandOpacity = brandProgress.interpolate({
     inputRange: [0, 0.5, 1],
@@ -179,14 +211,14 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
     inputRange: [0, 1],
     outputRange: [8, 0],
   });
-  const loaderScaleX = loaderProgress.interpolate({
+  const spinRotate = spinProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
   });
-  const loaderOpacity = exitProgress.interpolate({
-    inputRange: [0, 0.6, 1],
-    outputRange: [1, 1, 0],
-  });
+  const spinnerOpacity = Animated.multiply(
+    sloganProgress,
+    exitProgress.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 1, 0] }),
+  );
 
   return (
     <Animated.View
@@ -199,26 +231,34 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       ]}
     >
       <View style={styles.center}>
-        <Animated.View
-          style={[
-            styles.badge,
-            {
-              opacity: badgeOpacity,
-              transform: [{ scale: badgeScale }],
-            },
-          ]}
-        >
-          <View style={styles.badgeGlow} />
-          <Navigation color={splashColors.graphite} fill={splashColors.graphite} size={30} strokeWidth={2} />
-        </Animated.View>
+        <View style={styles.badgeWrap}>
+          <Animated.View
+            style={[
+              styles.glowOuter,
+              { opacity: glowOpacity, transform: [{ scale: glowScale }] },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.glowInner,
+              { opacity: glowOpacity, transform: [{ scale: glowScale }] },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.badge,
+              { opacity: badgeOpacity, transform: [{ scale: badgeScale }] },
+            ]}
+          >
+            <View style={styles.badgeHighlight} />
+            <Navigation color={splashColors.lime} fill={splashColors.lime} size={30} strokeWidth={2} />
+          </Animated.View>
+        </View>
 
         <Animated.Text
           style={[
             styles.brand,
-            {
-              opacity: brandOpacity,
-              transform: [{ translateY: brandTranslate }],
-            },
+            { opacity: brandOpacity, transform: [{ translateY: brandTranslate }] },
           ]}
         >
           Kinetix
@@ -226,19 +266,16 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
 
         <Animated.Text
           style={[
-            styles.sub,
-            {
-              opacity: sloganOpacity,
-              transform: [{ translateY: sloganTranslate }],
-            },
+            styles.caption,
+            { opacity: sloganOpacity, transform: [{ translateY: sloganTranslate }] },
           ]}
         >
-          Такси Партнёр
+          ТАКСИ · ПАРТНЁР
         </Animated.Text>
       </View>
 
-      <Animated.View style={[styles.loaderTrack, { opacity: loaderOpacity }]}>
-        <Animated.View style={[styles.loaderFill, { transform: [{ scaleX: loaderScaleX }] }]} />
+      <Animated.View style={[styles.spinner, { opacity: spinnerOpacity }]}>
+        <Animated.View style={[styles.spinnerArc, { transform: [{ rotate: spinRotate }] }]} />
       </Animated.View>
     </Animated.View>
   );
@@ -258,51 +295,79 @@ const styles = StyleSheet.create({
   center: {
     alignItems: 'center',
   },
+  badgeWrap: {
+    alignItems: 'center',
+    height: 82,
+    justifyContent: 'center',
+    marginBottom: 26,
+    width: 82,
+  },
+  glowOuter: {
+    backgroundColor: splashColors.glowOuter,
+    borderRadius: 999,
+    height: 220,
+    position: 'absolute',
+    width: 220,
+  },
+  glowInner: {
+    backgroundColor: splashColors.glowInner,
+    borderRadius: 999,
+    height: 132,
+    position: 'absolute',
+    width: 132,
+  },
   badge: {
     alignItems: 'center',
-    backgroundColor: splashColors.lime,
+    backgroundColor: splashColors.badgeFill,
+    borderColor: splashColors.badgeBorder,
     borderRadius: 22,
-    height: 72,
+    borderWidth: 1,
+    height: 74,
     justifyContent: 'center',
-    marginBottom: 24,
-    width: 72,
+    overflow: 'hidden',
+    shadowColor: splashColors.lime,
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0.28,
+    shadowRadius: 22,
+    width: 74,
   },
-  badgeGlow: {
-    backgroundColor: splashColors.glow,
+  badgeHighlight: {
+    backgroundColor: splashColors.badgeHighlight,
     borderRadius: 999,
-    height: 150,
+    height: 60,
+    left: -6,
     position: 'absolute',
-    width: 150,
-    zIndex: -1,
+    top: -34,
+    width: 86,
   },
   brand: {
     color: splashColors.brand,
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: -0.6,
+    fontSize: 33,
+    fontWeight: '800',
+    letterSpacing: -0.5,
     lineHeight: 38,
   },
-  sub: {
-    color: splashColors.secondaryText,
-    fontSize: 14,
+  caption: {
+    color: splashColors.caption,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.2,
-    marginTop: 6,
+    letterSpacing: 3.4,
+    marginTop: 9,
   },
-  loaderTrack: {
-    backgroundColor: splashColors.track,
-    borderRadius: 999,
-    bottom: 72,
-    height: 3,
-    overflow: 'hidden',
+  spinner: {
+    alignItems: 'center',
+    bottom: 76,
+    height: 22,
+    justifyContent: 'center',
     position: 'absolute',
-    width: 128,
+    width: 22,
   },
-  loaderFill: {
-    backgroundColor: splashColors.lime,
+  spinnerArc: {
+    borderColor: splashColors.spinnerTrack,
     borderRadius: 999,
-    height: 3,
-    transformOrigin: 'left',
-    width: '100%',
+    borderTopColor: splashColors.lime,
+    borderWidth: 2,
+    height: 22,
+    width: 22,
   },
 });
