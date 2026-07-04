@@ -11,6 +11,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "node --stack_size=8192 node_modules/typescript/lib/tsc.js --noEmit",
+    "build:web": "EXPO_BASE_URL=/taxi expo export --platform web --output-dir dist && node scripts/inject-web-splash.mjs dist/index.html",
+    "postexport:splash": "node scripts/inject-web-splash.mjs dist/index.html",
     "test:dispatch": "node scripts/dispatch-smoke-test.mjs",
     "test:driver-billing": "node scripts/driver-billing-smoke-test.mjs",
     "test:driver-billing:yookassa": "node scripts/driver-billing-yookassa-smoke-test.mjs",

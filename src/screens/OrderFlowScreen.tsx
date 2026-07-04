@@ -7,6 +7,7 @@ import {
   Check,
   Clock3,
   Info,
+  LoaderCircle,
   LocateFixed,
   MapPinned,
   Navigation,
@@ -35,7 +36,10 @@ import {
   KinetixButton,
   KinetixEmptyState,
   KinetixSkeleton,
+  PopIn,
+  TickerText,
 } from '../components/KinetixUI';
+import { kinetixEasing } from '../theme/kinetixTokens';
 import { orderFlowConfig, OrderField, OrderOption, OrderTariff } from '../data/orderFlow';
 import {
   AccountRole,
@@ -200,6 +204,72 @@ export function OrderFlowScreen({ navigation, route }: Props) {
   const isSelfEmployedDriver = isSelfEmployedDriverRole(role);
   const reducedMotion = useReducedMotionPreference();
   const clientStepTransition = useRef(new Animated.Value(1)).current;
+  // Кинематографичный вход сцены заказа: карта «оседает» лёгким zoom-out,
+  // шит выезжает снизу по drawer-кривой, бар с CTA всплывает следом.
+  // Играет один раз на открытие экрана; при reduced-motion — статично.
+  const entranceStatic = isDriverRole || reducedMotion;
+  const sceneEntrance = useRef(new Animated.Value(entranceStatic ? 1 : 0)).current;
+  const sheetEntrance = useRef(new Animated.Value(entranceStatic ? 1 : 0)).current;
+  const barEntrance = useRef(new Animated.Value(entranceStatic ? 1 : 0)).current;
+  const entrancePlayed = useRef(false);
+  const submitSpin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isDriverRole || entrancePlayed.current) {
+      return;
+    }
+
+    entrancePlayed.current = true;
+
+    if (reducedMotion) {
+      sceneEntrance.setValue(1);
+      sheetEntrance.setValue(1);
+      barEntrance.setValue(1);
+      return;
+    }
+
+    Animated.stagger(110, [
+      Animated.timing(sceneEntrance, {
+        toValue: 1,
+        duration: 640,
+        easing: kinetixEasing.easeOut,
+        useNativeDriver: false,
+      }),
+      Animated.timing(sheetEntrance, {
+        toValue: 1,
+        duration: 480,
+        easing: kinetixEasing.drawer,
+        useNativeDriver: false,
+      }),
+      Animated.timing(barEntrance, {
+        toValue: 1,
+        duration: 340,
+        easing: kinetixEasing.easeOut,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [barEntrance, isDriverRole, reducedMotion, sceneEntrance, sheetEntrance]);
+
+  // Пока заказ отправляется, стрелка CTA сменяется вращающимся лоадером —
+  // мотив «система ищет машину», а не замёрзшая кнопка.
+  useEffect(() => {
+    if (!isSubmitting || reducedMotion) {
+      return;
+    }
+
+    submitSpin.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(submitSpin, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }),
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [isSubmitting, reducedMotion, submitSpin]);
 
   const selectedTariff = useMemo(
     () => config.tariffs.find((tariff) => tariff.id === selectedTariffId) ?? config.tariffs[0],
@@ -876,7 +946,17 @@ export function OrderFlowScreen({ navigation, route }: Props) {
           keyboardShouldPersistTaps="handled"
           style={styles.clientScroll}
         >
-          <View style={styles.orderScene}>
+          <Animated.View
+            style={[
+              styles.orderScene,
+              {
+                opacity: sceneEntrance,
+                transform: [
+                  { scale: sceneEntrance.interpolate({ inputRange: [0, 1], outputRange: [1.045, 1] }) },
+                ],
+              },
+            ]}
+          >
             <NearbyCarsMap cars={sceneCarPoints} height="100%" />
             <View pointerEvents="none" style={styles.orderSceneShade} />
             <View style={styles.orderSceneTop}>
@@ -911,9 +991,19 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 </View>
               ) : null}
             </View>
-          </View>
+          </Animated.View>
 
-          <View style={styles.orderSheet}>
+          <Animated.View
+            style={[
+              styles.orderSheet,
+              {
+                opacity: sheetEntrance,
+                transform: [
+                  { translateY: sheetEntrance.interpolate({ inputRange: [0, 1], outputRange: [56, 0] }) },
+                ],
+              },
+            ]}
+          >
             <View style={styles.orderSheetGrab} />
 
           <View style={styles.serviceSwitch}>
@@ -1407,7 +1497,9 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             <View style={styles.orderPriceCard}>
               <View style={styles.orderPriceRow}>
                 <Text style={styles.orderPriceName}>Эконом · фиксированная цена</Text>
-                <Text style={styles.orderPriceValue}>{Math.max(0, routeEstimate.total - bonusDiscount)} ₽</Text>
+                <TickerText style={styles.orderPriceValue}>
+                  {`${Math.max(0, routeEstimate.total - bonusDiscount)} ₽`}
+                </TickerText>
               </View>
               <Text numberOfLines={1} style={styles.orderPriceMetaText}>
                 {formatDistance(routeEstimate.distanceKm)} · ~{routeEstimate.durationMin} мин · подача {selectedTariff.eta}
@@ -1424,7 +1516,11 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   ]}
                 >
                   <View style={[styles.orderBonusDot, useBonus && styles.orderBonusDotActive]}>
-                    {useBonus ? <Text style={styles.orderBonusDotMark}>✓</Text> : null}
+                    {useBonus ? (
+                      <PopIn>
+                        <Text style={styles.orderBonusDotMark}>✓</Text>
+                      </PopIn>
+                    ) : null}
                   </View>
                   <Text numberOfLines={1} style={[styles.orderBonusText, useBonus && styles.orderBonusTextActive]}>
                     {useBonus
@@ -1574,16 +1670,26 @@ export function OrderFlowScreen({ navigation, route }: Props) {
               </View>
               <View style={[styles.clientSummaryRow, styles.clientSummaryTotalRow]}>
                 <Text style={styles.clientSummaryTotalLabel}>Итого</Text>
-                <Text style={styles.clientSummaryTotalValue}>{total} ₽</Text>
+                <TickerText style={styles.clientSummaryTotalValue}>{`${total} ₽`}</TickerText>
               </View>
             </View>
           ) : null}
           </Animated.View>
 
-          </View>
+          </Animated.View>
         </ScrollView>
 
-        <View style={styles.orderBottomBar}>
+        <Animated.View
+          style={[
+            styles.orderBottomBar,
+            {
+              opacity: barEntrance,
+              transform: [
+                { translateY: barEntrance.interpolate({ inputRange: [0, 1], outputRange: [44, 0] }) },
+              ],
+            },
+          ]}
+        >
           {confirmed && !canConfirm ? (
             <Text style={styles.clientError}>
               {sameRoutePoints ? 'Точка подачи и назначение совпадают.' : serviceCopy.missingRouteText}
@@ -1624,16 +1730,36 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 pressed && styles.pressed,
               ]}
             >
-              <Navigation color="#F4FAF6" size={21} strokeWidth={2.6} />
-              <Text style={[styles.clientCallButtonText, simpleMode && styles.clientCallButtonTextSimple]}>
+              {isSubmitting && !reducedMotion ? (
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: submitSpin.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '360deg'],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <LoaderCircle color="#F4FAF6" size={21} strokeWidth={2.6} />
+                </Animated.View>
+              ) : (
+                <Navigation color="#F4FAF6" size={21} strokeWidth={2.6} />
+              )}
+              <TickerText
+                numberOfLines={1}
+                style={[styles.clientCallButtonText, simpleMode && styles.clientCallButtonTextSimple]}
+              >
                 {clientPrimaryLabel}
-              </Text>
+              </TickerText>
               <Text style={styles.hiddenClientButtonLabel}>
                 {isSubmitting ? 'Ищем машину' : 'Вызвать'}
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </SafeAreaView>
     );
   }

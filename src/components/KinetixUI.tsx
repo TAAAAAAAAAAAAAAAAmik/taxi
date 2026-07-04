@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -7,6 +7,7 @@ import {
   StyleProp,
   StyleSheet,
   Text,
+  TextStyle,
   View,
   ViewStyle,
 } from 'react-native';
@@ -124,6 +125,112 @@ export function StaggerView({
           transform: [
             { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
           ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+// Одометр-тик для меняющихся чисел (цена, итог): старое значение опускается
+// и гаснет, новое поднимается снизу. При серии быстрых изменений очередь не
+// копится — по завершении тика показывается последнее значение.
+export function TickerText({
+  children,
+  numberOfLines,
+  style,
+}: {
+  children: string;
+  numberOfLines?: number;
+  style?: StyleProp<TextStyle>;
+}) {
+  const reducedMotion = useReducedMotionPreference();
+  const progress = useRef(new Animated.Value(1)).current;
+  const [display, setDisplay] = useState(children);
+  const target = useRef(children);
+  const animating = useRef(false);
+
+  useEffect(() => {
+    target.current = children;
+
+    if (reducedMotion) {
+      setDisplay(children);
+      return;
+    }
+
+    if (children === display || animating.current) {
+      return;
+    }
+
+    animating.current = true;
+    Animated.timing(progress, {
+      toValue: 0,
+      duration: 90,
+      easing: kinetixEasing.easeOut,
+      useNativeDriver: false,
+    }).start(() => {
+      setDisplay(target.current);
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 180,
+        easing: kinetixEasing.easeOut,
+        useNativeDriver: false,
+      }).start(() => {
+        animating.current = false;
+        setDisplay((current) => (current === target.current ? current : target.current));
+      });
+    });
+  }, [children, display, progress, reducedMotion]);
+
+  return (
+    <Animated.Text
+      numberOfLines={numberOfLines}
+      style={[
+        style,
+        {
+          opacity: progress,
+          transform: [
+            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [7, 0] }) },
+          ],
+        },
+      ]}
+    >
+      {display}
+    </Animated.Text>
+  );
+}
+
+// Появление мелких элементов (чекмарки, бейджи): scale 0.6→1 + opacity,
+// не с scale(0) — «из ничего» не появляется ничто.
+export function PopIn({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const reducedMotion = useReducedMotionPreference();
+  const progress = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      progress.setValue(1);
+      return;
+    }
+
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: 180,
+      easing: kinetixEasing.easeOut,
+      useNativeDriver: false,
+    });
+
+    animation.start();
+    return () => animation.stop();
+  }, [progress, reducedMotion]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: progress,
+          transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
         },
       ]}
     >

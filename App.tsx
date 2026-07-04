@@ -1,37 +1,65 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { AppStateProvider } from './src/state/AppState';
-import { kinetixColors } from './src/theme/kinetixTokens';
+import { useReducedMotionPreference } from './src/hooks/useReducedMotionPreference';
 
+// Ночная сцена запуска: глубокий графит и лайм из premium-токенов hero.
+// Сплэш и Welcome живут в одном мире — переход между ними бесшовный.
 const splashColors = {
-  background: kinetixColors.graphite,
-  brand: kinetixColors.textPrimary,
-  guideLine: 'rgba(0, 107, 182, 0.08)',
-  markerCore: kinetixColors.surface,
-  panel: 'rgba(255, 255, 255, 0.86)',
-  panelBorder: 'rgba(0, 141, 73, 0.18)',
-  route: kinetixColors.amber,
-  routeGlow: 'rgba(0, 141, 73, 0.32)',
-  routeSoft: 'rgba(0, 141, 73, 0.14)',
-  secondaryText: kinetixColors.textSecondary,
+  background: '#0A1411',
+  brand: '#F2FBF6',
+  glow: 'rgba(92, 230, 160, 0.10)',
+  guideLine: 'rgba(92, 230, 160, 0.07)',
+  markerCore: '#0A1411',
+  panel: 'rgba(255, 255, 255, 0.04)',
+  panelBorder: 'rgba(92, 230, 160, 0.16)',
+  route: '#B7F46A',
+  routeGlow: 'rgba(183, 244, 106, 0.45)',
+  routeSoft: 'rgba(183, 244, 106, 0.14)',
+  secondaryText: '#93BAA8',
 } as const;
 
 export default function App() {
   const [splashVisible, setSplashVisible] = useState(true);
   const handleSplashDone = useCallback(() => setSplashVisible(false), []);
 
+  // Статичный boot-splash из index.html (виден, пока грузится бандл) гаснет,
+  // как только React-сплэш с той же тёмной сценой смонтирован — стык невидим.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+      return;
+    }
+
+    const boot = document.getElementById('kinetix-boot');
+
+    if (!boot) {
+      return;
+    }
+
+    boot.style.transition = 'opacity 260ms ease';
+    boot.style.opacity = '0';
+    const timer = setTimeout(() => boot.remove(), 320);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <AppStateProvider>
       <StatusBar style="dark" />
-      {splashVisible ? <SalavatSplash onDone={handleSplashDone} /> : <AppNavigator />}
+      <AppNavigator />
+      {splashVisible ? (
+        <View style={styles.splashLayer}>
+          <SalavatSplash onDone={handleSplashDone} />
+        </View>
+      ) : null}
     </AppStateProvider>
   );
 }
 
 function SalavatSplash({ onDone }: { onDone: () => void }) {
+  const reducedMotion = useReducedMotionPreference();
   const backgroundProgress = useRef(new Animated.Value(0)).current;
   const routeStartProgress = useRef(new Animated.Value(0)).current;
   const routeTurnProgress = useRef(new Animated.Value(0)).current;
@@ -43,6 +71,19 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
   const exitProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (reducedMotion) {
+      // Без хореографии: короткий статичный кадр бренда и сразу в приложение.
+      backgroundProgress.setValue(1);
+      routeStartProgress.setValue(1);
+      routeTurnProgress.setValue(1);
+      routeEndProgress.setValue(1);
+      markerProgress.setValue(1);
+      brandProgress.setValue(1);
+      sloganProgress.setValue(1);
+      const timer = setTimeout(onDone, 420);
+      return () => clearTimeout(timer);
+    }
+
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseProgress, {
@@ -111,7 +152,7 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
           useNativeDriver: true,
         }),
       ]),
-      Animated.delay(720),
+      Animated.delay(560),
       Animated.timing(exitProgress, {
         duration: 420,
         easing: Easing.bezier(0.4, 0, 0.2, 1),
@@ -140,6 +181,7 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
     markerProgress,
     onDone,
     pulseProgress,
+    reducedMotion,
     routeEndProgress,
     routeStartProgress,
     routeTurnProgress,
@@ -152,7 +194,7 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
   });
   const splashTranslate = exitProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -10],
+    outputRange: [0, -18],
   });
   const backdropOpacity = backgroundProgress.interpolate({
     inputRange: [0, 1],
@@ -218,6 +260,8 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       ]}
     >
       <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+        <View style={[styles.glowBlob, styles.glowBlobTop]} />
+        <View style={[styles.glowBlob, styles.glowBlobBottom]} />
         <Animated.View
           style={[
             styles.backdropPanel,
@@ -342,6 +386,21 @@ const styles = StyleSheet.create({
   brandBlock: {
     alignItems: 'center',
     marginTop: 28,
+  },
+  glowBlob: {
+    backgroundColor: splashColors.glow,
+    borderRadius: 999,
+    height: 260,
+    position: 'absolute',
+    width: 260,
+  },
+  glowBlobBottom: {
+    bottom: -90,
+    left: -80,
+  },
+  glowBlobTop: {
+    right: -70,
+    top: -60,
   },
   gridLine: {
     backgroundColor: splashColors.guideLine,
@@ -482,6 +541,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: 24,
+  },
+  splashLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
   },
   splashText: {
     color: splashColors.secondaryText,

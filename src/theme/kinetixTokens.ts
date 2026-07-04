@@ -131,6 +131,9 @@ export const kinetixEasing = {
   // transitions on web stay visibly smooth.
   easeOut: Easing.bezier(0.33, 1, 0.68, 1),
   standard: Easing.bezier(0.4, 0, 0.2, 1),
+  // iOS-подобная кривая для шитов/дровера (Ionic): быстрый старт,
+  // долгое мягкое оседание — для «выезда» панелей снизу.
+  drawer: Easing.bezier(0.32, 0.72, 0, 1),
 } as const;
 
 export const kinetixIconography = {
