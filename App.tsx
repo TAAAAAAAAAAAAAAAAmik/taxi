@@ -93,12 +93,16 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
   ).current;
 
   useEffect(() => {
-    if (reducedMotion) {
-      sceneProgress.setValue(1);
-      badgeProgress.setValue(1);
-      brandProgress.setValue(1);
-      sloganProgress.setValue(1);
+    // Сцена, значок и бренд показываются сразу — React принимает эстафету от
+    // статичного boot-splash в том же кадре, поэтому появление не «переигрывается»
+    // (иначе значок/лого моргают: полная картинка boot → пропала → появилась
+    // снова в React). Живут поверх только радар и дыхание света.
+    sceneProgress.setValue(1);
+    badgeProgress.setValue(1);
+    brandProgress.setValue(1);
+    sloganProgress.setValue(1);
 
+    if (reducedMotion) {
       const calm = Animated.sequence([
         Animated.delay(1300),
         Animated.timing(exitProgress, {
@@ -147,36 +151,9 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       ]),
     );
 
+    // Держим кадр (радар пульсирует, свет дышит), затем плавный выход.
     const intro = Animated.sequence([
-      // Сцена-карта проявляется целиком.
-      Animated.timing(sceneProgress, {
-        duration: 700,
-        easing: Easing.out(Easing.cubic),
-        toValue: 1,
-        useNativeDriver: true,
-      }),
-      // Значок мягко оседает.
-      Animated.timing(badgeProgress, {
-        duration: 620,
-        easing: Easing.bezier(0.16, 1, 0.3, 1),
-        toValue: 1,
-        useNativeDriver: true,
-      }),
-      Animated.stagger(150, [
-        Animated.timing(brandProgress, {
-          duration: 560,
-          easing: Easing.out(Easing.cubic),
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-        Animated.timing(sloganProgress, {
-          duration: 480,
-          easing: Easing.out(Easing.cubic),
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.delay(1000),
+      Animated.delay(1900),
       Animated.timing(exitProgress, {
         duration: 520,
         easing: Easing.bezier(0.4, 0, 0.2, 1),

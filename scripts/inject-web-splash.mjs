@@ -38,21 +38,11 @@ const bootStyles = `
         position: absolute;
         width: 190px;
         z-index: -1;
+        animation: kb-breathe 4s ease-in-out infinite;
       }
-      #kinetix-boot .kb-radar {
-        border: 1.5px solid rgba(183, 244, 106, 0.5);
-        border-radius: 50%;
-        height: 82px;
-        position: absolute;
-        width: 82px;
-        animation: kb-radar 2.7s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-      }
-      #kinetix-boot .kb-radar.r2 { animation-delay: 0.9s; }
-      #kinetix-boot .kb-radar.r3 { animation-delay: 1.8s; }
-      @keyframes kb-radar {
-        0% { opacity: 0; transform: scale(0.7); }
-        15% { opacity: 0.4; }
-        100% { opacity: 0; transform: scale(3.1); }
+      @keyframes kb-breathe {
+        0%, 100% { opacity: 0.75; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.1); }
       }
       #kinetix-boot .kb-badge {
         align-items: center;
@@ -93,17 +83,16 @@ const bootStyles = `
         margin-top: 9px;
       }
       @media (prefers-reduced-motion: reduce) {
-        #kinetix-boot .kb-radar { animation: none; opacity: 0; }
+        #kinetix-boot .kb-badge-wrap::before { animation: none; }
       }
     </style>`;
 
-// Ночная сцена: радар-кольца поиска + тёмно-стеклянный значок с лайм-стрелкой.
+// Ночная сцена: тёмно-стеклянный значок со свечением и лайм-стрелкой.
+// Радар-кольца добавляет React-splash поверх — в boot их нет, чтобы при
+// передаче эстафеты они не двоились.
 const bootMarkup = `
     <div id="kinetix-boot">
       <div class="kb-badge-wrap">
-        <div class="kb-radar r1"></div>
-        <div class="kb-radar r2"></div>
-        <div class="kb-radar r3"></div>
         <div class="kb-badge">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
             <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
