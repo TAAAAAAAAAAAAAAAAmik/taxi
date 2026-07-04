@@ -16,65 +16,84 @@ const bootStyles = `
         background: #0A1411;
         display: flex;
         flex-direction: column;
-        gap: 18px;
         inset: 0;
         justify-content: center;
         position: fixed;
         z-index: 9999;
       }
-      #kinetix-boot .kb-glow {
-        background: rgba(92, 230, 160, 0.10);
-        border-radius: 50%;
-        height: 260px;
-        position: absolute;
-        right: -70px;
-        top: -60px;
-        width: 260px;
-      }
-      #kinetix-boot .kb-pin {
+      #kinetix-boot .kb-badge {
+        align-items: center;
         background: #B7F46A;
-        border-radius: 50%;
-        height: 14px;
+        border-radius: 22px;
+        display: flex;
+        height: 72px;
+        justify-content: center;
+        margin-bottom: 24px;
         position: relative;
-        width: 14px;
+        width: 72px;
       }
-      #kinetix-boot .kb-pin::after {
-        animation: kb-pulse 1.4s cubic-bezier(0.33, 1, 0.68, 1) infinite;
-        border: 1px solid rgba(183, 244, 106, 0.5);
+      #kinetix-boot .kb-badge::before {
+        background: rgba(92, 230, 160, 0.12);
         border-radius: 50%;
         content: '';
-        inset: -4px;
+        height: 150px;
         position: absolute;
+        width: 150px;
+        z-index: -1;
       }
       #kinetix-boot .kb-brand {
         color: #F2FBF6;
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 24px;
+        font-size: 32px;
         font-weight: 800;
-        letter-spacing: -0.5px;
+        letter-spacing: -0.6px;
       }
       #kinetix-boot .kb-sub {
         color: #93BAA8;
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
-        margin-top: -12px;
+        letter-spacing: 0.2px;
+        margin-top: 6px;
       }
-      @keyframes kb-pulse {
-        0% { opacity: 0.9; transform: scale(1); }
-        100% { opacity: 0; transform: scale(2.6); }
+      #kinetix-boot .kb-track {
+        background: rgba(183, 244, 106, 0.16);
+        border-radius: 999px;
+        bottom: 72px;
+        height: 3px;
+        overflow: hidden;
+        position: absolute;
+        width: 128px;
+      }
+      #kinetix-boot .kb-track::after {
+        animation: kb-load 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        background: #B7F46A;
+        border-radius: 999px;
+        content: '';
+        display: block;
+        height: 3px;
+        width: 100%;
+      }
+      @keyframes kb-load {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
       }
       @media (prefers-reduced-motion: reduce) {
-        #kinetix-boot .kb-pin::after { animation: none; opacity: 0.4; }
+        #kinetix-boot .kb-track::after { animation: none; }
       }
     </style>`;
 
+// SVG-стрелка навигации (lucide navigation) графитом на лайм-значке.
 const bootMarkup = `
     <div id="kinetix-boot">
-      <div class="kb-glow"></div>
-      <div class="kb-pin"></div>
+      <div class="kb-badge">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="#0A1411" stroke="#0A1411" stroke-width="2" stroke-linejoin="round">
+          <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+        </svg>
+      </div>
       <div class="kb-brand">Kinetix</div>
       <div class="kb-sub">Такси Партнёр</div>
+      <div class="kb-track"></div>
     </div>`;
 
 const html = await readFile(distIndexPath, 'utf8');
