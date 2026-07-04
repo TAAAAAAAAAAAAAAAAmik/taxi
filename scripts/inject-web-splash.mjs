@@ -13,7 +13,7 @@ const bootStyles = `
       body { background: #0A1411; }
       #kinetix-boot {
         align-items: center;
-        background: #0A1411;
+        background: radial-gradient(circle at 50% 42%, #12271E 0%, #0A1411 55%, #050D09 100%);
         display: flex;
         flex-direction: column;
         inset: 0;
@@ -38,6 +38,21 @@ const bootStyles = `
         position: absolute;
         width: 190px;
         z-index: -1;
+      }
+      #kinetix-boot .kb-radar {
+        border: 1.5px solid rgba(183, 244, 106, 0.5);
+        border-radius: 50%;
+        height: 82px;
+        position: absolute;
+        width: 82px;
+        animation: kb-radar 2.7s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+      }
+      #kinetix-boot .kb-radar.r2 { animation-delay: 0.9s; }
+      #kinetix-boot .kb-radar.r3 { animation-delay: 1.8s; }
+      @keyframes kb-radar {
+        0% { opacity: 0; transform: scale(0.7); }
+        15% { opacity: 0.4; }
+        100% { opacity: 0; transform: scale(3.1); }
       }
       #kinetix-boot .kb-badge {
         align-items: center;
@@ -77,28 +92,18 @@ const bootStyles = `
         letter-spacing: 3.4px;
         margin-top: 9px;
       }
-      #kinetix-boot .kb-spin {
-        border: 2px solid rgba(183, 244, 106, 0.16);
-        border-radius: 50%;
-        border-top-color: #B7F46A;
-        bottom: 76px;
-        height: 22px;
-        position: absolute;
-        width: 22px;
-        animation: kb-spin 1s linear infinite;
-      }
-      @keyframes kb-spin {
-        to { transform: rotate(360deg); }
-      }
       @media (prefers-reduced-motion: reduce) {
-        #kinetix-boot .kb-spin { animation: none; }
+        #kinetix-boot .kb-radar { animation: none; opacity: 0; }
       }
     </style>`;
 
-// Тёмно-стеклянный значок с лайм-обводкой и лайм-стрелкой навигации.
+// Ночная сцена: радар-кольца поиска + тёмно-стеклянный значок с лайм-стрелкой.
 const bootMarkup = `
     <div id="kinetix-boot">
       <div class="kb-badge-wrap">
+        <div class="kb-radar r1"></div>
+        <div class="kb-radar r2"></div>
+        <div class="kb-radar r3"></div>
         <div class="kb-badge">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
             <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
@@ -107,7 +112,6 @@ const bootMarkup = `
       </div>
       <div class="kb-brand">Kinetix</div>
       <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
-      <div class="kb-spin"></div>
     </div>`;
 
 const html = await readFile(distIndexPath, 'utf8');
