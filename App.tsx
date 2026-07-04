@@ -334,23 +334,18 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
           />
           <Animated.View
             style={[
-              styles.cometHalo,
-              {
-                opacity: carOpacity,
-                transform: [{ translateX: carTranslateX }, { translateY: carTranslateY }],
-              },
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.comet,
+              styles.cometGroup,
               {
                 opacity: carOpacity,
                 transform: [{ translateX: carTranslateX }, { translateY: carTranslateY }],
               },
             ]}
           >
-            <View style={styles.cometCore} />
+            <View style={styles.cometHalo} />
+            <View style={styles.cometGlow} />
+            <View style={styles.cometCore}>
+              <View style={styles.cometSpark} />
+            </View>
           </Animated.View>
           <Animated.View
             style={[
@@ -434,37 +429,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 28,
   },
-  comet: {
+  // Едет одним transform-узлом без box-shadow (тень на движущемся объекте
+  // роняет FPS в вебе). Свечение — концентрические круги на backgroundColor,
+  // они композитятся на GPU и не требуют перерисовки при движении.
+  cometGroup: {
+    alignItems: 'center',
+    height: 14,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    top: 0,
+    width: 14,
+  },
+  cometHalo: {
+    backgroundColor: 'rgba(183, 244, 106, 0.12)',
+    borderRadius: 999,
+    height: 40,
+    left: -13,
+    position: 'absolute',
+    top: -13,
+    width: 40,
+  },
+  cometGlow: {
+    backgroundColor: 'rgba(183, 244, 106, 0.34)',
+    borderRadius: 999,
+    height: 24,
+    left: -5,
+    position: 'absolute',
+    top: -5,
+    width: 24,
+  },
+  cometCore: {
     alignItems: 'center',
     backgroundColor: splashColors.route,
     borderRadius: 999,
     height: 14,
     justifyContent: 'center',
-    left: 0,
-    position: 'absolute',
-    shadowColor: splashColors.route,
-    shadowOffset: { height: 0, width: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 12,
-    top: 0,
     width: 14,
   },
-  cometCore: {
+  cometSpark: {
     backgroundColor: '#F2FBF6',
     borderRadius: 999,
     height: 5,
     width: 5,
-  },
-  cometHalo: {
-    backgroundColor: splashColors.routeSoft,
-    borderRadius: 999,
-    height: 36,
-    left: 0,
-    marginLeft: -11,
-    marginTop: -11,
-    position: 'absolute',
-    top: 0,
-    width: 36,
   },
   glowBlob: {
     backgroundColor: splashColors.glow,
@@ -588,10 +595,6 @@ const styles = StyleSheet.create({
     backgroundColor: splashColors.route,
     borderRadius: 999,
     position: 'absolute',
-    shadowColor: splashColors.routeGlow,
-    shadowOffset: { height: 0, width: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
   },
   routeSegmentEnd: {
     height: 4,
