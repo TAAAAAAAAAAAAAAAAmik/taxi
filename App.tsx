@@ -75,17 +75,50 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
 
   useEffect(() => {
     if (reducedMotion) {
-      // Без хореографии: короткий статичный кадр бренда и сразу в приложение.
-      backgroundProgress.setValue(1);
+      // Reduced-motion = меньше и мягче движения, а не мгновенный кадр.
+      // Маршрут показываем сразу целиком (без «езды»), но сцену спокойно
+      // проявляем и держим, чтобы не мелькала как слайд-шоу.
       routeStartProgress.setValue(1);
       routeTurnProgress.setValue(1);
       routeEndProgress.setValue(1);
       markerProgress.setValue(1);
       driveProgress.setValue(1);
-      brandProgress.setValue(1);
-      sloganProgress.setValue(1);
-      const timer = setTimeout(onDone, 420);
-      return () => clearTimeout(timer);
+
+      const calm = Animated.sequence([
+        Animated.timing(backgroundProgress, {
+          duration: 460,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(brandProgress, {
+          duration: 520,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sloganProgress, {
+          duration: 420,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.delay(1100),
+        Animated.timing(exitProgress, {
+          duration: 480,
+          easing: Easing.bezier(0.4, 0, 0.2, 1),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+      ]);
+
+      calm.start(({ finished }) => {
+        if (finished) {
+          onDone();
+        }
+      });
+
+      return () => calm.stop();
     }
 
     const pulseLoop = Animated.loop(
@@ -106,7 +139,7 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
 
     const intro = Animated.sequence([
       Animated.timing(backgroundProgress, {
-        duration: 360,
+        duration: 520,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
         useNativeDriver: true,
@@ -114,59 +147,59 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       Animated.parallel([
         Animated.sequence([
           Animated.timing(routeStartProgress, {
-            duration: 520,
+            duration: 900,
             easing: Easing.bezier(0.2, 0, 0, 1),
             toValue: 1,
             useNativeDriver: true,
           }),
           Animated.timing(routeTurnProgress, {
-            duration: 360,
+            duration: 620,
             easing: Easing.inOut(Easing.cubic),
             toValue: 1,
             useNativeDriver: true,
           }),
           Animated.timing(routeEndProgress, {
-            duration: 520,
+            duration: 900,
             easing: Easing.bezier(0.16, 1, 0.3, 1),
             toValue: 1,
             useNativeDriver: true,
           }),
         ]),
         Animated.sequence([
-          Animated.delay(820),
+          Animated.delay(1520),
           Animated.timing(markerProgress, {
-            duration: 460,
+            duration: 560,
             easing: Easing.out(Easing.back(1.35)),
             toValue: 1,
             useNativeDriver: true,
           }),
         ]),
-        // Фара едет ровно за прорисовкой линии (520+360+520 = 1400мс),
+        // Фара едет ровно за прорисовкой линии (900+620+900 = 2420мс),
         // сегментные скорости заданы точками inputRange в carX/carY.
         Animated.timing(driveProgress, {
-          duration: 1400,
+          duration: 2420,
           easing: Easing.linear,
           toValue: 1,
           useNativeDriver: true,
         }),
       ]),
-      Animated.stagger(140, [
+      Animated.stagger(160, [
         Animated.timing(brandProgress, {
-          duration: 560,
+          duration: 720,
           easing: Easing.bezier(0.16, 1, 0.3, 1),
           toValue: 1,
           useNativeDriver: true,
         }),
         Animated.timing(sloganProgress, {
-          duration: 520,
+          duration: 640,
           easing: Easing.out(Easing.cubic),
           toValue: 1,
           useNativeDriver: true,
         }),
       ]),
-      Animated.delay(560),
+      Animated.delay(760),
       Animated.timing(exitProgress, {
-        duration: 420,
+        duration: 520,
         easing: Easing.bezier(0.4, 0, 0.2, 1),
         toValue: 1,
         useNativeDriver: true,
