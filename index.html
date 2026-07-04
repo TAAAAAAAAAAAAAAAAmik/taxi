@@ -23,7 +23,67 @@
         flex: 1;
       }
     </style>
-  <link rel="icon" href="/taxi/favicon.ico" /></head>
+  <link rel="icon" href="/taxi/favicon.ico" />
+    <style id="kinetix-boot-style">
+      body { background: #0A1411; }
+      #kinetix-boot {
+        align-items: center;
+        background: #0A1411;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        inset: 0;
+        justify-content: center;
+        position: fixed;
+        z-index: 9999;
+      }
+      #kinetix-boot .kb-glow {
+        background: rgba(92, 230, 160, 0.10);
+        border-radius: 50%;
+        height: 260px;
+        position: absolute;
+        right: -70px;
+        top: -60px;
+        width: 260px;
+      }
+      #kinetix-boot .kb-pin {
+        background: #B7F46A;
+        border-radius: 50%;
+        height: 14px;
+        position: relative;
+        width: 14px;
+      }
+      #kinetix-boot .kb-pin::after {
+        animation: kb-pulse 1.4s cubic-bezier(0.33, 1, 0.68, 1) infinite;
+        border: 1px solid rgba(183, 244, 106, 0.5);
+        border-radius: 50%;
+        content: '';
+        inset: -4px;
+        position: absolute;
+      }
+      #kinetix-boot .kb-brand {
+        color: #F2FBF6;
+        font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+      }
+      #kinetix-boot .kb-sub {
+        color: #93BAA8;
+        font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: -12px;
+      }
+      @keyframes kb-pulse {
+        0% { opacity: 0.9; transform: scale(1); }
+        100% { opacity: 0; transform: scale(2.6); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #kinetix-boot .kb-pin::after { animation: none; opacity: 0.4; }
+      }
+    </style>
+</head>
 
   <body>
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
@@ -32,6 +92,12 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/taxi/_expo/static/js/web/index-eb76d268f546bfdc858e1887e74b773f.js" defer></script>
+    <div id="kinetix-boot">
+      <div class="kb-glow"></div>
+      <div class="kb-pin"></div>
+      <div class="kb-brand">Kinetix</div>
+      <div class="kb-sub">Такси Партнёр</div>
+    </div>
+  <script src="/taxi/_expo/static/js/web/index-db8a2986671cdc137c25988781495520.js" defer></script>
 </body>
 </html>
