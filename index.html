@@ -36,6 +36,16 @@
         position: fixed;
         z-index: 9999;
       }
+      #kinetix-boot .kb-content {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        animation: kb-enter 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      @keyframes kb-enter {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
       #kinetix-boot .kb-badge-wrap {
         align-items: center;
         display: flex;
@@ -111,16 +121,18 @@
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
     <div id="kinetix-boot">
-      <div class="kb-badge-wrap">
-        <div class="kb-badge">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
-            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-          </svg>
+      <div class="kb-content">
+        <div class="kb-badge-wrap">
+          <div class="kb-badge">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
+              <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+            </svg>
+          </div>
         </div>
+        <div class="kb-brand">Kinetix</div>
+        <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
       </div>
-      <div class="kb-brand">Kinetix</div>
-      <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
     </div>
-  <script src="/taxi/_expo/static/js/web/index-031f4a013ef345e67b94e68861acc2ca.js" defer></script>
+  <script src="/taxi/_expo/static/js/web/index-65bc6afc6637d1965153e2d40366fc18.js" defer></script>
 </body>
 </html>
