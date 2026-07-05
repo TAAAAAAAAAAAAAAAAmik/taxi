@@ -21,6 +21,16 @@ const bootStyles = `
         position: fixed;
         z-index: 9999;
       }
+      #kinetix-boot .kb-content {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        animation: kb-enter 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      @keyframes kb-enter {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
       #kinetix-boot .kb-badge-wrap {
         align-items: center;
         display: flex;
@@ -92,15 +102,17 @@ const bootStyles = `
 // передаче эстафеты они не двоились.
 const bootMarkup = `
     <div id="kinetix-boot">
-      <div class="kb-badge-wrap">
-        <div class="kb-badge">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
-            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-          </svg>
+      <div class="kb-content">
+        <div class="kb-badge-wrap">
+          <div class="kb-badge">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
+              <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+            </svg>
+          </div>
         </div>
+        <div class="kb-brand">Kinetix</div>
+        <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
       </div>
-      <div class="kb-brand">Kinetix</div>
-      <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
     </div>`;
 
 const html = await readFile(distIndexPath, 'utf8');

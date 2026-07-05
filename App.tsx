@@ -57,9 +57,9 @@ export default function App() {
       return;
     }
 
-    boot.style.transition = 'opacity 320ms ease';
+    boot.style.transition = 'opacity 520ms ease';
     boot.style.opacity = '0';
-    const timer = setTimeout(() => boot.remove(), 360);
+    const timer = setTimeout(() => boot.remove(), 560);
     return () => clearTimeout(timer);
   }, []);
 
@@ -106,8 +106,8 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       const calm = Animated.sequence([
         Animated.delay(1300),
         Animated.timing(exitProgress, {
-          duration: 520,
-          easing: Easing.bezier(0.4, 0, 0.2, 1),
+          duration: 760,
+          easing: Easing.inOut(Easing.cubic),
           toValue: 1,
           useNativeDriver: true,
         }),
@@ -122,10 +122,10 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
     const radarLoops = radars.map((value, index) =>
       Animated.loop(
         Animated.sequence([
-          Animated.delay(index * 900),
+          Animated.delay(index * 1200),
           Animated.timing(value, {
-            duration: 2700,
-            easing: Easing.out(Easing.cubic),
+            duration: 3600,
+            easing: Easing.inOut(Easing.sin),
             toValue: 1,
             useNativeDriver: true,
           }),
@@ -151,12 +151,13 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       ]),
     );
 
-    // Держим кадр (радар пульсирует, свет дышит), затем плавный выход.
+    // Держим кадр (радар пульсирует, свет дышит), затем долгий мягкий выход
+    // (ease-in-out) — сплэш плавно растворяется в приложении, без рывка.
     const intro = Animated.sequence([
-      Animated.delay(1900),
+      Animated.delay(2000),
       Animated.timing(exitProgress, {
-        duration: 520,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
+        duration: 820,
+        easing: Easing.inOut(Easing.cubic),
         toValue: 1,
         useNativeDriver: true,
       }),
@@ -190,7 +191,8 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
   ]);
 
   const splashOpacity = exitProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const splashScale = exitProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
+  // Едва заметный зум на выходе — «раскрытие в приложение» без резкого прыжка.
+  const splashScale = exitProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
   const sceneOpacity = sceneProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
   const badgeOpacity = badgeProgress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 1] });
   const badgeScale = badgeProgress.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] });
@@ -258,8 +260,8 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       <View style={styles.center}>
         <View style={styles.badgeWrap}>
           {radars.map((value, index) => {
-            const scale = value.interpolate({ inputRange: [0, 1], outputRange: [0.7, 3.1] });
-            const opacity = value.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.4, 0] });
+            const scale = value.interpolate({ inputRange: [0, 1], outputRange: [0.75, 3] });
+            const opacity = value.interpolate({ inputRange: [0, 0.2, 0.75, 1], outputRange: [0, 0.34, 0.12, 0] });
             return (
               <Animated.View
                 key={`radar-${index}`}
