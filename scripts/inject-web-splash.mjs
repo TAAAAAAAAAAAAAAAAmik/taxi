@@ -25,16 +25,16 @@ function buildSceneSvg() {
   ]
     .map(
       ([x1, y1, x2, y2, o]) =>
-        `<line x1="${x1}" y1="${round(y1)}" x2="${x2}" y2="${round(y2)}" stroke="#5CE6A0" stroke-opacity="${o}" stroke-width="1"/>`,
+        `<line x1="${x1}" y1="${round(y1)}" x2="${x2}" y2="${round(y2)}" stroke="#008D49" stroke-opacity="${o}" stroke-width="1"/>`,
     )
     .join('');
 
   const ry = round(h * 0.72);
   const route =
     `<path d="M ${cx - 96} ${ry} L ${cx + 8} ${ry} L ${cx + 8} ${ry - 54} L ${cx + 92} ${ry - 54}" ` +
-    `fill="none" stroke="#B7F46A" stroke-opacity="0.28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<circle cx="${cx - 96}" cy="${ry}" r="5" fill="#0A1411" stroke="#B7F46A" stroke-opacity="0.6" stroke-width="2"/>` +
-    `<circle cx="${cx + 92}" cy="${ry - 54}" r="4" fill="#B7F46A" fill-opacity="0.7"/>`;
+    `fill="none" stroke="#008D49" stroke-opacity="0.32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<circle cx="${cx - 96}" cy="${ry}" r="5" fill="#FFFFFF" stroke="#008D49" stroke-opacity="0.65" stroke-width="2"/>` +
+    `<circle cx="${cx + 92}" cy="${ry - 54}" r="4" fill="#008D49" fill-opacity="0.75"/>`;
 
   const lightSeeds = [
     [0.14, 0.18], [0.86, 0.12], [0.32, 0.1], [0.68, 0.24], [0.08, 0.5],
@@ -44,19 +44,19 @@ function buildSceneSvg() {
   const lights = lightSeeds
     .map(([fx, fy], i) => {
       const r = i % 3 === 0 ? 1.6 : 1.1;
-      const o = i % 4 === 0 ? 0.5 : 0.28;
-      return `<circle cx="${round(fx * w)}" cy="${round(fy * h)}" r="${r}" fill="#5CE6A0" fill-opacity="${o}"/>`;
+      const o = i % 4 === 0 ? 0.4 : 0.22;
+      return `<circle cx="${round(fx * w)}" cy="${round(fy * h)}" r="${r}" fill="#008D49" fill-opacity="${o}"/>`;
     })
     .join('');
 
   return (
     `<svg class="kb-scene" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">` +
     `<defs>` +
-    `<radialGradient id="kbBg" cx="50%" cy="42%" r="78%">` +
-    `<stop offset="0" stop-color="#12271E"/><stop offset="0.55" stop-color="#0A1411"/><stop offset="1" stop-color="#050D09"/>` +
+    `<radialGradient id="kbBg" cx="50%" cy="42%" r="80%">` +
+    `<stop offset="0" stop-color="#FFFFFF"/><stop offset="0.5" stop-color="#F3F7F2"/><stop offset="1" stop-color="#E4EEE7"/>` +
     `</radialGradient>` +
     `<radialGradient id="kbGlow" cx="50%" cy="42%" r="30%">` +
-    `<stop offset="0" stop-color="#5CE6A0" stop-opacity="0.16"/><stop offset="1" stop-color="#5CE6A0" stop-opacity="0"/>` +
+    `<stop offset="0" stop-color="#008D49" stop-opacity="0.12"/><stop offset="1" stop-color="#008D49" stop-opacity="0"/>` +
     `</radialGradient>` +
     `</defs>` +
     `<rect width="${w}" height="${h}" fill="url(#kbBg)"/>` +
@@ -74,10 +74,10 @@ function round(n) {
 
 const bootStyles = `
     <style id="kinetix-boot-style">
-      body { background: #0A1411; }
+      body { background: #F3F7F2; }
       #kinetix-boot {
         align-items: center;
-        background: #0A1411;
+        background: #F3F7F2;
         display: flex;
         flex-direction: column;
         inset: 0;
@@ -114,7 +114,7 @@ const bootStyles = `
         width: 82px;
       }
       #kinetix-boot .kb-badge-wrap::before {
-        background: rgba(92, 230, 160, 0.14);
+        background: rgba(0, 141, 73, 0.12);
         border-radius: 50%;
         content: '';
         height: 150px;
@@ -124,11 +124,11 @@ const bootStyles = `
         animation: kb-breathe 4s ease-in-out infinite;
       }
       @keyframes kb-breathe {
-        0%, 100% { opacity: 0.75; transform: scale(1); }
+        0%, 100% { opacity: 0.7; transform: scale(1); }
         50% { opacity: 1; transform: scale(1.1); }
       }
       #kinetix-boot .kb-radar {
-        border: 1.5px solid rgba(183, 244, 106, 0.5);
+        border: 1.5px solid rgba(0, 141, 73, 0.32);
         border-radius: 50%;
         height: 82px;
         position: absolute;
@@ -139,16 +139,15 @@ const bootStyles = `
       #kinetix-boot .kb-radar.r3 { animation-delay: 2.4s; }
       @keyframes kb-radar {
         0% { opacity: 0; transform: scale(0.75); }
-        20% { opacity: 0.34; }
-        75% { opacity: 0.12; }
+        20% { opacity: 0.32; }
+        75% { opacity: 0.1; }
         100% { opacity: 0; transform: scale(3); }
       }
       #kinetix-boot .kb-badge {
         align-items: center;
-        background: rgba(183, 244, 106, 0.06);
-        border: 1px solid rgba(183, 244, 106, 0.42);
+        background: #008D49;
         border-radius: 22px;
-        box-shadow: 0 0 22px rgba(183, 244, 106, 0.24);
+        box-shadow: 0 10px 20px rgba(0, 111, 58, 0.34);
         display: flex;
         height: 74px;
         justify-content: center;
@@ -157,7 +156,7 @@ const bootStyles = `
         width: 74px;
       }
       #kinetix-boot .kb-badge::before {
-        background: rgba(255, 255, 255, 0.10);
+        background: rgba(255, 255, 255, 0.22);
         border-radius: 50%;
         content: '';
         height: 60px;
@@ -167,14 +166,14 @@ const bootStyles = `
         width: 86px;
       }
       #kinetix-boot .kb-brand {
-        color: #F4FBF7;
+        color: #12382C;
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
         font-size: 33px;
         font-weight: 800;
         letter-spacing: -0.5px;
       }
       #kinetix-boot .kb-sub {
-        color: rgba(159, 196, 178, 0.9);
+        color: #6E8579;
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
         font-size: 11px;
         font-weight: 700;
@@ -197,7 +196,7 @@ const bootMarkup = `
           <div class="kb-radar r2"></div>
           <div class="kb-radar r3"></div>
           <div class="kb-badge">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round">
               <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
             </svg>
           </div>

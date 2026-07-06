@@ -23,20 +23,20 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { AppStateProvider } from './src/state/AppState';
 import { useReducedMotionPreference } from './src/hooks/useReducedMotionPreference';
 
-// Кинематографичный запуск: ночная сцена-карта с градиентной виньеткой и
-// городскими огнями, радар-пульс поиска машины из центра и премиальный
-// тёмно-стеклянный значок. Графит и лайм из токенов hero — переход в
-// Welcome бесшовный.
+// Светлый запуск в стиле приложения: мятный фон, приглушённая зелёная
+// карта с городскими огнями, радар-пульс поиска машины и зелёный значок-
+// кнопка с белой стрелкой (как CTA приложения). Токены из kinetix light.
 const splashColors = {
-  background: '#0A1411',
-  brand: '#F4FBF7',
-  lime: '#B7F46A',
-  mint: '#5CE6A0',
-  badgeFill: 'rgba(183, 244, 106, 0.06)',
-  badgeBorder: 'rgba(183, 244, 106, 0.42)',
-  badgeHighlight: 'rgba(255, 255, 255, 0.10)',
-  ring: 'rgba(183, 244, 106, 0.5)',
-  caption: 'rgba(159, 196, 178, 0.9)',
+  background: '#F3F7F2',
+  brand: '#12382C',
+  green: '#008D49',
+  glyph: '#FFFFFF',
+  map: '#008D49',
+  badgeShadow: 'rgba(0, 111, 58, 0.34)',
+  badgeHighlight: 'rgba(255, 255, 255, 0.22)',
+  glow: 'rgba(0, 141, 73, 0.12)',
+  ring: 'rgba(0, 141, 73, 0.32)',
+  caption: '#6E8579',
 } as const;
 
 export default function App() {
@@ -244,14 +244,14 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: sceneOpacity }]}>
         <Svg width="100%" height="100%" viewBox={`0 0 ${scene.w} ${scene.h}`} preserveAspectRatio="xMidYMid slice">
           <Defs>
-            <RadialGradient id="bg" cx="50%" cy="42%" r="78%">
-              <Stop offset="0" stopColor="#12271E" />
-              <Stop offset="0.55" stopColor="#0A1411" />
-              <Stop offset="1" stopColor="#050D09" />
+            <RadialGradient id="bg" cx="50%" cy="42%" r="80%">
+              <Stop offset="0" stopColor="#FFFFFF" />
+              <Stop offset="0.5" stopColor="#F3F7F2" />
+              <Stop offset="1" stopColor="#E4EEE7" />
             </RadialGradient>
             <RadialGradient id="glow" cx="50%" cy="42%" r="30%">
-              <Stop offset="0" stopColor={splashColors.mint} stopOpacity="0.16" />
-              <Stop offset="1" stopColor={splashColors.mint} stopOpacity="0" />
+              <Stop offset="0" stopColor={splashColors.green} stopOpacity="0.12" />
+              <Stop offset="1" stopColor={splashColors.green} stopOpacity="0" />
             </RadialGradient>
           </Defs>
 
@@ -261,7 +261,7 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
           {scene.streets.map((s, i) => (
             <Line
               key={`st-${i}`}
-              stroke={splashColors.mint}
+              stroke={splashColors.map}
               strokeOpacity={s.o}
               strokeWidth={s.w}
               x1={s.x1}
@@ -274,17 +274,17 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
           <Path
             d={scene.route}
             fill="none"
-            stroke={splashColors.lime}
+            stroke={splashColors.green}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeOpacity={0.28}
+            strokeOpacity={0.32}
             strokeWidth={2}
           />
-          <Circle cx={scene.routeStart.x} cy={scene.routeStart.y} fill="#0A1411" r={5} stroke={splashColors.lime} strokeOpacity={0.6} strokeWidth={2} />
-          <Circle cx={scene.routeEnd.x} cy={scene.routeEnd.y} fill={splashColors.lime} fillOpacity={0.7} r={4} />
+          <Circle cx={scene.routeStart.x} cy={scene.routeStart.y} fill="#FFFFFF" r={5} stroke={splashColors.green} strokeOpacity={0.65} strokeWidth={2} />
+          <Circle cx={scene.routeEnd.x} cy={scene.routeEnd.y} fill={splashColors.green} fillOpacity={0.75} r={4} />
 
           {scene.lights.map((p, i) => (
-            <Circle key={`lt-${i}`} cx={p.x} cy={p.y} fill={splashColors.mint} fillOpacity={p.o} r={p.r} />
+            <Circle key={`lt-${i}`} cx={p.x} cy={p.y} fill={splashColors.map} fillOpacity={p.o} r={p.r} />
           ))}
         </Svg>
       </Animated.View>
@@ -306,7 +306,7 @@ function SalavatSplash({ onDone }: { onDone: () => void }) {
             style={[styles.badge, { opacity: badgeOpacity, transform: [{ scale: badgeScale }] }]}
           >
             <View style={styles.badgeHighlight} />
-            <Navigation color={splashColors.lime} fill={splashColors.lime} size={30} strokeWidth={2} />
+            <Navigation color={splashColors.glyph} fill={splashColors.glyph} size={30} strokeWidth={2} />
           </Animated.View>
         </View>
 
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     width: 82,
   },
   glow: {
-    backgroundColor: 'rgba(92, 230, 160, 0.16)',
+    backgroundColor: splashColors.glow,
     borderRadius: 999,
     height: 150,
     position: 'absolute',
@@ -402,17 +402,15 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignItems: 'center',
-    backgroundColor: splashColors.badgeFill,
-    borderColor: splashColors.badgeBorder,
+    backgroundColor: splashColors.green,
     borderRadius: 22,
-    borderWidth: 1,
     height: 74,
     justifyContent: 'center',
     overflow: 'hidden',
-    shadowColor: splashColors.lime,
-    shadowOffset: { height: 0, width: 0 },
-    shadowOpacity: 0.28,
-    shadowRadius: 22,
+    shadowColor: splashColors.badgeShadow,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 20,
     width: 74,
   },
   badgeHighlight: {
