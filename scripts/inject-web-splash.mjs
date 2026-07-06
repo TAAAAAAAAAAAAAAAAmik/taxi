@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 // Пост-экспортный шаг web-сборки: вставляет в dist/index.html единственный
 // экран загрузки в стиле Яндекс Go — крупный wordmark «Kinetix» почти во
@@ -129,13 +129,38 @@ const bootMarkup = `
       <div class="kb-track"></div>
     </div>`;
 
-// index.html не должен кэшироваться браузером: JS версионируется хэшем, а
-// сам HTML при кэше отдаёт старую версию, и «обновить страницу» показывает
-// прошлую сборку. no-cache заставляет браузер перепроверять HTML.
-const cacheMeta = `
+// Уникальный id сборки — записываем в build-id.txt рядом с index.html и
+// вшиваем в страницу. Мета no-cache браузеры для документа игнорируют, а на
+// GitHub Pages нельзя задать HTTP-заголовки, поэтому свежесть обеспечивает
+// клиентский скрипт ниже.
+const buildId = Date.now().toString(36);
+
+// Скрипт-само-обновлятор: тянет свежий build-id.txt (без кэша), и если он не
+// совпадает с вшитым (значит открыта старая закэшированная страница) —
+// перезагружает с ?v=<id>, что гарантированно берёт свежий HTML из сети.
+const cacheBuster = `
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />`;
+    <meta http-equiv="Expires" content="0" />
+    <script>
+      window.__KX_BUILD__ = '${buildId}';
+      (function () {
+        try {
+          var url = new URL(location.href);
+          fetch('build-id.txt?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.text() : null; })
+            .then(function (t) {
+              if (!t) return;
+              var latest = t.trim();
+              if (latest && latest !== window.__KX_BUILD__ && url.searchParams.get('v') !== latest) {
+                url.searchParams.set('v', latest);
+                location.replace(url.toString());
+              }
+            })
+            .catch(function () {});
+        } catch (e) {}
+      })();
+    </script>`;
 
 const html = await readFile(distIndexPath, 'utf8');
 
@@ -153,8 +178,9 @@ if (!html.includes(headAnchor) || !html.includes(rootAnchor)) {
 }
 
 const patched = html
-  .replace(headAnchor, `${cacheMeta}\n${bootStyles}\n${headAnchor}`)
+  .replace(headAnchor, `${cacheBuster}\n${bootStyles}\n${headAnchor}`)
   .replace(rootAnchor, `${rootAnchor}${bootMarkup}`);
 
 await writeFile(distIndexPath, patched);
-console.log('Boot splash injected into', distIndexPath);
+await writeFile(join(dirname(distIndexPath), 'build-id.txt'), buildId, 'utf8');
+console.log('Boot splash injected into', distIndexPath, '(build', buildId + ')');
