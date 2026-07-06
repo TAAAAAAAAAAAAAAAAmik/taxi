@@ -41,13 +41,15 @@ const splashColors = {
 } as const;
 
 export default function App() {
-  const [splashVisible, setSplashVisible] = useState(true);
+  const isWeb = Platform.OS === 'web';
+  // На web единственный экран загрузки — boot-splash из index.html (полная
+  // сцена на HTML+SVG). React-оверлея нет, поэтому переход только один и
+  // плавный. На native boot-DOM нет — там показываем React-сплэш.
+  const [splashVisible, setSplashVisible] = useState(!isWeb);
   const handleSplashDone = useCallback(() => setSplashVisible(false), []);
 
-  // Статичный boot-splash из index.html (виден, пока грузится бандл) гаснет,
-  // как только React-сплэш с той же сценой смонтирован — стык невидим.
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+    if (!isWeb || typeof document === 'undefined') {
       return;
     }
 
@@ -57,11 +59,20 @@ export default function App() {
       return;
     }
 
-    boot.style.transition = 'opacity 520ms ease';
-    boot.style.opacity = '0';
-    const timer = setTimeout(() => boot.remove(), 560);
-    return () => clearTimeout(timer);
-  }, []);
+    let removeTimer: ReturnType<typeof setTimeout>;
+    // Держим сцену, пока приложение готовится под ней, затем долгий мягкий
+    // fade в приложение — единственный, плавный переход.
+    const holdTimer = setTimeout(() => {
+      boot.style.transition = 'opacity 760ms cubic-bezier(0.4, 0, 0.2, 1)';
+      boot.style.opacity = '0';
+      removeTimer = setTimeout(() => boot.remove(), 820);
+    }, 1700);
+
+    return () => {
+      clearTimeout(holdTimer);
+      clearTimeout(removeTimer);
+    };
+  }, [isWeb]);
 
   return (
     <AppStateProvider>

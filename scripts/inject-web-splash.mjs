@@ -1,31 +1,104 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-// Пост-экспортный шаг web-сборки: вставляет в dist/index.html статичный
-// тёмный boot-splash, который виден с первого кадра, пока грузится JS-бандл
-// (вместо белого экрана). React-сплэш рисует ту же ночную сцену и гасит
-// boot-слой сразу после монтирования (см. App.tsx, #kinetix-boot).
+// Пост-экспортный шаг web-сборки: вставляет в dist/index.html единственный
+// экран загрузки — полную ночную сцену (градиент, карта, маршрут, огни,
+// радар, значок, лого) на чистом HTML+CSS+inline SVG. Он виден с первого
+// кадра и плавно гаснет, когда приложение готово (см. App.tsx, #kinetix-boot).
+// На web React-сплэша поверх нет — поэтому переход только один и плавный.
 const distIndexPath = resolve(process.cwd(), process.argv[2] || 'dist/index.html');
 const bootMarker = 'id="kinetix-boot"';
+
+// Ночная сцена в координатах 390x844 (растягивается slice под любой экран).
+function buildSceneSvg() {
+  const w = 390;
+  const h = 844;
+  const cx = w / 2;
+
+  const streets = [
+    [-40, h * 0.26, w + 40, h * 0.2, 0.06],
+    [-40, h * 0.44, w + 40, h * 0.36, 0.05],
+    [-40, h * 0.62, w + 40, h * 0.54, 0.06],
+    [-40, h * 0.8, w + 40, h * 0.72, 0.05],
+    [w * 0.24, -40, w * 0.16, h + 40, 0.04],
+    [w * 0.72, -40, w * 0.8, h + 40, 0.04],
+  ]
+    .map(
+      ([x1, y1, x2, y2, o]) =>
+        `<line x1="${x1}" y1="${round(y1)}" x2="${x2}" y2="${round(y2)}" stroke="#5CE6A0" stroke-opacity="${o}" stroke-width="1"/>`,
+    )
+    .join('');
+
+  const ry = round(h * 0.72);
+  const route =
+    `<path d="M ${cx - 96} ${ry} L ${cx + 8} ${ry} L ${cx + 8} ${ry - 54} L ${cx + 92} ${ry - 54}" ` +
+    `fill="none" stroke="#B7F46A" stroke-opacity="0.28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<circle cx="${cx - 96}" cy="${ry}" r="5" fill="#0A1411" stroke="#B7F46A" stroke-opacity="0.6" stroke-width="2"/>` +
+    `<circle cx="${cx + 92}" cy="${ry - 54}" r="4" fill="#B7F46A" fill-opacity="0.7"/>`;
+
+  const lightSeeds = [
+    [0.14, 0.18], [0.86, 0.12], [0.32, 0.1], [0.68, 0.24], [0.08, 0.5],
+    [0.92, 0.46], [0.2, 0.86], [0.8, 0.9], [0.5, 0.08], [0.4, 0.9],
+    [0.12, 0.68], [0.9, 0.7], [0.6, 0.86], [0.26, 0.6],
+  ];
+  const lights = lightSeeds
+    .map(([fx, fy], i) => {
+      const r = i % 3 === 0 ? 1.6 : 1.1;
+      const o = i % 4 === 0 ? 0.5 : 0.28;
+      return `<circle cx="${round(fx * w)}" cy="${round(fy * h)}" r="${r}" fill="#5CE6A0" fill-opacity="${o}"/>`;
+    })
+    .join('');
+
+  return (
+    `<svg class="kb-scene" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">` +
+    `<defs>` +
+    `<radialGradient id="kbBg" cx="50%" cy="42%" r="78%">` +
+    `<stop offset="0" stop-color="#12271E"/><stop offset="0.55" stop-color="#0A1411"/><stop offset="1" stop-color="#050D09"/>` +
+    `</radialGradient>` +
+    `<radialGradient id="kbGlow" cx="50%" cy="42%" r="30%">` +
+    `<stop offset="0" stop-color="#5CE6A0" stop-opacity="0.16"/><stop offset="1" stop-color="#5CE6A0" stop-opacity="0"/>` +
+    `</radialGradient>` +
+    `</defs>` +
+    `<rect width="${w}" height="${h}" fill="url(#kbBg)"/>` +
+    `<rect width="${w}" height="${h}" fill="url(#kbGlow)"/>` +
+    streets +
+    route +
+    lights +
+    `</svg>`
+  );
+}
+
+function round(n) {
+  return Math.round(n);
+}
 
 const bootStyles = `
     <style id="kinetix-boot-style">
       body { background: #0A1411; }
       #kinetix-boot {
         align-items: center;
-        background: radial-gradient(circle at 50% 42%, #12271E 0%, #0A1411 55%, #050D09 100%);
+        background: #0A1411;
         display: flex;
         flex-direction: column;
         inset: 0;
         justify-content: center;
+        overflow: hidden;
         position: fixed;
         z-index: 9999;
+      }
+      #kinetix-boot .kb-scene {
+        height: 100%;
+        left: 0;
+        position: absolute;
+        top: 0;
+        width: 100%;
       }
       #kinetix-boot .kb-content {
         align-items: center;
         display: flex;
         flex-direction: column;
-        animation: kb-enter 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        position: relative;
+        animation: kb-enter 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       @keyframes kb-enter {
         from { opacity: 0; transform: translateY(8px); }
@@ -44,15 +117,31 @@ const bootStyles = `
         background: rgba(92, 230, 160, 0.14);
         border-radius: 50%;
         content: '';
-        height: 190px;
+        height: 150px;
         position: absolute;
-        width: 190px;
+        width: 150px;
         z-index: -1;
         animation: kb-breathe 4s ease-in-out infinite;
       }
       @keyframes kb-breathe {
         0%, 100% { opacity: 0.75; transform: scale(1); }
         50% { opacity: 1; transform: scale(1.1); }
+      }
+      #kinetix-boot .kb-radar {
+        border: 1.5px solid rgba(183, 244, 106, 0.5);
+        border-radius: 50%;
+        height: 82px;
+        position: absolute;
+        width: 82px;
+        animation: kb-radar 3.6s ease-in-out infinite;
+      }
+      #kinetix-boot .kb-radar.r2 { animation-delay: 1.2s; }
+      #kinetix-boot .kb-radar.r3 { animation-delay: 2.4s; }
+      @keyframes kb-radar {
+        0% { opacity: 0; transform: scale(0.75); }
+        20% { opacity: 0.34; }
+        75% { opacity: 0.12; }
+        100% { opacity: 0; transform: scale(3); }
       }
       #kinetix-boot .kb-badge {
         align-items: center;
@@ -93,17 +182,20 @@ const bootStyles = `
         margin-top: 9px;
       }
       @media (prefers-reduced-motion: reduce) {
-        #kinetix-boot .kb-badge-wrap::before { animation: none; }
+        #kinetix-boot .kb-badge-wrap::before,
+        #kinetix-boot .kb-radar { animation: none; }
+        #kinetix-boot .kb-radar { opacity: 0; }
       }
     </style>`;
 
-// Ночная сцена: тёмно-стеклянный значок со свечением и лайм-стрелкой.
-// Радар-кольца добавляет React-splash поверх — в boot их нет, чтобы при
-// передаче эстафеты они не двоились.
 const bootMarkup = `
     <div id="kinetix-boot">
+      ${buildSceneSvg()}
       <div class="kb-content">
         <div class="kb-badge-wrap">
+          <div class="kb-radar r1"></div>
+          <div class="kb-radar r2"></div>
+          <div class="kb-radar r3"></div>
           <div class="kb-badge">
             <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
               <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
