@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import {
+  ArrowLeft,
   BarChart3,
   Bell,
   BriefcaseBusiness,
@@ -456,6 +457,13 @@ export function PostRegistrationMenu({
                 menuButton={driverMobileTopless}
                 onAcceptDriverOrder={onAcceptDriverOrder}
                 onActionTarget={handleActionTarget}
+                // Кнопка «Назад» — только для sub-страниц из ☰ (не для нижних
+                // вкладок): возвращает на главную.
+                onBack={
+                  bottomMenuItems.some((item) => item.id === activeItem.id)
+                    ? undefined
+                    : () => setActiveItemId(config.menuItems[0].id)
+                }
                 onOpenMenu={() => setDrawerOpen(true)}
                 page={activePage}
               />
@@ -802,12 +810,14 @@ function ClientPageHeader({
 function DriverPageHero({
   Icon,
   menuButton,
+  onBack,
   onOpenMenu,
   subtitle,
   title,
 }: {
   Icon: ComponentType<LucideProps>;
   menuButton?: boolean;
+  onBack?: () => void;
   onOpenMenu?: () => void;
   subtitle?: string;
   title: string;
@@ -816,9 +826,20 @@ function DriverPageHero({
     <View style={styles.clientPageHero}>
       <View style={styles.clientHeroGlow} />
       <View style={styles.clientPageHeroRow}>
-        <View style={styles.clientPageHeroIcon}>
-          <Icon color={kinetixColors.lime} size={22} strokeWidth={2.3} />
-        </View>
+        {onBack ? (
+          <PressableScale
+            accessibilityLabel="Назад"
+            accessibilityRole="button"
+            onPress={onBack}
+            style={styles.clientHeroMenu}
+          >
+            <ArrowLeft color={kinetixColors.lime} size={22} strokeWidth={2.4} />
+          </PressableScale>
+        ) : (
+          <View style={styles.clientPageHeroIcon}>
+            <Icon color={kinetixColors.lime} size={22} strokeWidth={2.3} />
+          </View>
+        )}
         <View style={styles.clientPageHeroCopy}>
           <Text style={styles.clientPageHeroTitle}>{title}</Text>
           {subtitle ? (
@@ -2316,6 +2337,7 @@ type SectionPageViewProps = {
   menuButton?: boolean;
   onAcceptDriverOrder?: (orderId: string) => void | Promise<void>;
   onActionTarget: (target?: MenuActionTarget, supportCategory?: string) => void;
+  onBack?: () => void;
   onOpenMenu?: () => void;
   page: SectionPage;
 };
@@ -2330,6 +2352,7 @@ function SectionPageView({
   menuButton,
   onAcceptDriverOrder,
   onActionTarget,
+  onBack,
   onOpenMenu,
   page,
 }: SectionPageViewProps) {
@@ -2342,6 +2365,7 @@ function SectionPageView({
         <DriverPageHero
           Icon={Wallet}
           menuButton={menuButton}
+          onBack={onBack}
           onOpenMenu={onOpenMenu}
           subtitle="Оплата доступа и статистика — без процента с заказов"
           title="Доход"
@@ -2358,6 +2382,7 @@ function SectionPageView({
         <DriverPageHero
           Icon={User}
           menuButton={menuButton}
+          onBack={onBack}
           onOpenMenu={onOpenMenu}
           subtitle="Данные, документы и настройки водителя"
           title="Профиль"
@@ -2378,6 +2403,7 @@ function SectionPageView({
         <DriverPageHero
           Icon={Route}
           menuButton={menuButton}
+          onBack={onBack}
           onOpenMenu={onOpenMenu}
           subtitle="Заказы рядом — расстояние, адрес и цена"
           title="Лента заказов"
@@ -2399,6 +2425,7 @@ function SectionPageView({
       <DriverPageHero
         Icon={Icon}
         menuButton={menuButton}
+        onBack={onBack}
         onOpenMenu={onOpenMenu}
         subtitle={page.subtitle}
         title={page.title}
