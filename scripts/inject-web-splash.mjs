@@ -2,18 +2,20 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 // Пост-экспортный шаг web-сборки: вставляет в dist/index.html единственный
-// экран загрузки в стиле Яндекс Go — полноэкранная фирменная зелёная заливка,
-// крупный белый значок с пульсом, белые радар-кольца и бегущая полоса. Виден
-// с первого кадра и плавно гаснет, когда приложение готово (App.tsx).
+// экран загрузки — современный минимал: чистый светлый фон с мягким
+// свечением, крупный wordmark с бегущим бликом (shimmer) и тонкий
+// индикатор. Виден с первого кадра, плавно гаснет, когда приложение готово.
 const distIndexPath = resolve(process.cwd(), process.argv[2] || 'dist/index.html');
 const bootMarker = 'id="kinetix-boot"';
 
 const bootStyles = `
     <style id="kinetix-boot-style">
-      body { background: #008D49; }
+      body { background: #F7FAF7; }
       #kinetix-boot {
         align-items: center;
-        background: linear-gradient(158deg, #00A65A 0%, #008D49 55%, #027A3F 100%);
+        background:
+          radial-gradient(120% 80% at 50% 38%, rgba(0, 141, 73, 0.06) 0%, rgba(0, 141, 73, 0) 60%),
+          #F7FAF7;
         display: flex;
         flex-direction: column;
         inset: 0;
@@ -26,106 +28,72 @@ const bootStyles = `
         align-items: center;
         display: flex;
         flex-direction: column;
-        position: relative;
-        animation: kb-enter 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation: kb-enter 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       @keyframes kb-enter {
-        from { opacity: 0; transform: translateY(10px); }
+        from { opacity: 0; transform: translateY(8px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      #kinetix-boot .kb-badge-wrap {
+      #kinetix-boot .kb-mark {
         align-items: center;
         display: flex;
-        height: 108px;
         justify-content: center;
-        margin-bottom: 30px;
-        position: relative;
-        width: 108px;
+        height: 30px;
+        margin-bottom: 18px;
       }
-      /* Белые радар-кольца расходятся на зелёном — контрастно и заметно. */
-      #kinetix-boot .kb-radar {
-        border: 2px solid rgba(255, 255, 255, 0.55);
-        border-radius: 50%;
-        height: 96px;
-        position: absolute;
-        width: 96px;
-        animation: kb-radar 2s ease-out infinite;
-      }
-      #kinetix-boot .kb-radar.r2 { animation-delay: 0.66s; }
-      #kinetix-boot .kb-radar.r3 { animation-delay: 1.33s; }
-      @keyframes kb-radar {
-        0% { opacity: 0; transform: scale(0.65); }
-        16% { opacity: 0.6; }
-        70% { opacity: 0.15; }
-        100% { opacity: 0; transform: scale(2.7); }
-      }
-      /* Крупный белый значок «бьётся» — заметная пульсация. */
-      #kinetix-boot .kb-badge {
-        align-items: center;
-        background: #FFFFFF;
-        border-radius: 28px;
-        box-shadow: 0 14px 34px rgba(0, 60, 30, 0.35);
-        display: flex;
-        height: 96px;
-        justify-content: center;
-        position: relative;
-        width: 96px;
-        animation: kb-pop 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
-                   kb-pulse 1.5s ease-in-out 620ms infinite;
-      }
-      @keyframes kb-pop {
-        from { opacity: 0; transform: scale(0.6); }
-        to { opacity: 1; transform: scale(1); }
-      }
-      @keyframes kb-pulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.08); }
-      }
+      #kinetix-boot .kb-mark svg { display: block; }
+      /* Wordmark с бегущим бликом: базовый тёмно-зелёный, сквозь него
+         проходит светлая полоса — современный, сдержанный приём. */
       #kinetix-boot .kb-brand {
-        color: #FFFFFF;
+        background: linear-gradient(100deg,
+          #12382C 0%, #12382C 38%, #4FC07E 48%, #A9EE8B 52%, #4FC07E 56%, #12382C 66%, #12382C 100%);
+        background-size: 260% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 38px;
+        font-size: 40px;
         font-weight: 800;
-        letter-spacing: -0.6px;
+        letter-spacing: -0.8px;
+        animation: kb-shine 2.4s linear infinite;
+      }
+      @keyframes kb-shine {
+        0% { background-position: 130% 0; }
+        100% { background-position: -30% 0; }
       }
       #kinetix-boot .kb-sub {
-        color: rgba(255, 255, 255, 0.78);
+        color: #7C948A;
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
-        letter-spacing: 3.6px;
-        margin-top: 10px;
+        letter-spacing: 4px;
+        margin-top: 12px;
       }
-      /* Бегущая полоса загрузки внизу. */
+      /* Тонкий индикатор: сегмент скользит по дорожке. */
       #kinetix-boot .kb-track {
-        background: rgba(255, 255, 255, 0.22);
+        background: rgba(0, 141, 73, 0.12);
         border-radius: 999px;
-        bottom: 74px;
-        height: 4px;
+        bottom: 78px;
+        height: 2px;
         overflow: hidden;
         position: absolute;
-        width: 150px;
+        width: 116px;
       }
       #kinetix-boot .kb-track::after {
-        animation: kb-load 1.15s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-        background: #FFFFFF;
+        animation: kb-load 1.25s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+        background: #008D49;
         border-radius: 999px;
         content: '';
         display: block;
-        height: 4px;
-        width: 45%;
+        height: 2px;
+        width: 40%;
       }
       @keyframes kb-load {
-        0% { transform: translateX(-120%); }
-        100% { transform: translateX(370%); }
+        0% { transform: translateX(-130%); }
+        100% { transform: translateX(360%); }
       }
-      /* Reduced-motion: без «полёта», но оставляем мягкое мигание значка и
-         полосы — это допустимая opacity-анимация и не мёртвая статика. */
       @media (prefers-reduced-motion: reduce) {
-        #kinetix-boot .kb-radar { animation: none; opacity: 0; }
-        #kinetix-boot .kb-badge {
-          animation: kb-blink 1.6s ease-in-out infinite;
-        }
+        #kinetix-boot .kb-brand { animation: none; color: #12382C; }
         #kinetix-boot .kb-track::after {
           animation: kb-blink 1.6s ease-in-out infinite;
           transform: none;
@@ -134,23 +102,18 @@ const bootStyles = `
       }
       @keyframes kb-blink {
         0%, 100% { opacity: 1; }
-        50% { opacity: 0.55; }
+        50% { opacity: 0.4; }
       }
     </style>`;
 
-// Значок: белый с зелёной стрелкой навигации (инверсия на зелёном фоне).
+// Небольшой лаконичный знак-стрелка над wordmark (лайм-акцент).
 const bootMarkup = `
     <div id="kinetix-boot">
       <div class="kb-content">
-        <div class="kb-badge-wrap">
-          <div class="kb-radar r1"></div>
-          <div class="kb-radar r2"></div>
-          <div class="kb-radar r3"></div>
-          <div class="kb-badge">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="#008D49" stroke="#008D49" stroke-width="2" stroke-linejoin="round">
-              <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-            </svg>
-          </div>
+        <div class="kb-mark">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="#008D49" stroke="#008D49" stroke-width="2" stroke-linejoin="round">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+          </svg>
         </div>
         <div class="kb-brand">Kinetix</div>
         <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
