@@ -5,7 +5,6 @@ import {
   Easing,
   Platform,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -59,17 +58,39 @@ export default function App() {
       return;
     }
 
+    const startedAt =
+      typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const MIN_SHOW_MS = 1100;
+    let raf1 = 0;
+    let raf2 = 0;
+    let fadeTimer: ReturnType<typeof setTimeout>;
     let removeTimer: ReturnType<typeof setTimeout>;
-    // Держим сцену, пока приложение готовится под ней, затем долгий мягкий
-    // fade в приложение — единственный, плавный переход.
-    const holdTimer = setTimeout(() => {
-      boot.style.transition = 'opacity 760ms cubic-bezier(0.4, 0, 0.2, 1)';
+
+    const beginFade = () => {
+      // pointer-events: none — пока сплэш растворяется (opacity 1→0), тапы
+      // должны проходить сквозь него в приложение, а не глотаться оверлеем.
+      boot.style.pointerEvents = 'none';
+      boot.style.transition = 'opacity 620ms cubic-bezier(0.4, 0, 0.2, 1)';
       boot.style.opacity = '0';
-      removeTimer = setTimeout(() => boot.remove(), 820);
-    }, 1700);
+      removeTimer = setTimeout(() => boot.remove(), 680);
+    };
+
+    // Скрываем сцену, когда приложение реально отрисовано под ней (двойной
+    // rAF = кадр закоммичен и отрисован), но не раньше минимального показа —
+    // чтобы бренд успели увидеть и не было ни лишней задержки, ни мелькания.
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const now =
+          typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const wait = Math.max(0, MIN_SHOW_MS - (now - startedAt));
+        fadeTimer = setTimeout(beginFade, wait);
+      });
+    });
 
     return () => {
-      clearTimeout(holdTimer);
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(fadeTimer);
       clearTimeout(removeTimer);
     };
   }, [isWeb]);
