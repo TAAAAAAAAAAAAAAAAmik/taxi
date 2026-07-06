@@ -25,10 +25,10 @@
     </style>
   <link rel="icon" href="/taxi/favicon.ico" />
     <style id="kinetix-boot-style">
-      body { background: #F3F7F2; }
+      body { background: #008D49; }
       #kinetix-boot {
         align-items: center;
-        background: #F3F7F2;
+        background: linear-gradient(158deg, #00A65A 0%, #008D49 55%, #027A3F 100%);
         display: flex;
         flex-direction: column;
         inset: 0;
@@ -37,119 +37,119 @@
         position: fixed;
         z-index: 9999;
       }
-      #kinetix-boot .kb-scene {
-        height: 100%;
-        left: 0;
-        position: absolute;
-        top: 0;
-        width: 100%;
-      }
       #kinetix-boot .kb-content {
         align-items: center;
         display: flex;
         flex-direction: column;
         position: relative;
-        animation: kb-enter 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation: kb-enter 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       @keyframes kb-enter {
-        from { opacity: 0; transform: translateY(8px); }
+        from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
       #kinetix-boot .kb-badge-wrap {
         align-items: center;
         display: flex;
-        height: 82px;
+        height: 108px;
         justify-content: center;
-        margin-bottom: 26px;
+        margin-bottom: 30px;
         position: relative;
-        width: 82px;
+        width: 108px;
       }
-      #kinetix-boot .kb-badge-wrap::before {
-        background: rgba(0, 141, 73, 0.12);
-        border-radius: 50%;
-        content: '';
-        height: 150px;
-        position: absolute;
-        width: 150px;
-        z-index: -1;
-        animation: kb-breathe 3s ease-in-out infinite;
-      }
-      @keyframes kb-breathe {
-        0%, 100% { opacity: 0.65; transform: scale(1); }
-        50% { opacity: 1; transform: scale(1.12); }
-      }
+      /* Белые радар-кольца расходятся на зелёном — контрастно и заметно. */
       #kinetix-boot .kb-radar {
-        border: 1.5px solid rgba(0, 141, 73, 0.4);
+        border: 2px solid rgba(255, 255, 255, 0.55);
         border-radius: 50%;
-        height: 82px;
+        height: 96px;
         position: absolute;
-        width: 82px;
-        animation: kb-radar 2.4s ease-out infinite;
+        width: 96px;
+        animation: kb-radar 2s ease-out infinite;
       }
-      #kinetix-boot .kb-radar.r2 { animation-delay: 0.8s; }
-      #kinetix-boot .kb-radar.r3 { animation-delay: 1.6s; }
+      #kinetix-boot .kb-radar.r2 { animation-delay: 0.66s; }
+      #kinetix-boot .kb-radar.r3 { animation-delay: 1.33s; }
       @keyframes kb-radar {
-        0% { opacity: 0; transform: scale(0.7); }
-        18% { opacity: 0.4; }
-        70% { opacity: 0.12; }
-        100% { opacity: 0; transform: scale(3); }
+        0% { opacity: 0; transform: scale(0.65); }
+        16% { opacity: 0.6; }
+        70% { opacity: 0.15; }
+        100% { opacity: 0; transform: scale(2.7); }
       }
+      /* Крупный белый значок «бьётся» — заметная пульсация. */
       #kinetix-boot .kb-badge {
         align-items: center;
-        background: #008D49;
-        border-radius: 22px;
-        box-shadow: 0 10px 20px rgba(0, 111, 58, 0.34);
+        background: #FFFFFF;
+        border-radius: 28px;
+        box-shadow: 0 14px 34px rgba(0, 60, 30, 0.35);
         display: flex;
-        height: 74px;
+        height: 96px;
         justify-content: center;
-        overflow: hidden;
         position: relative;
-        width: 74px;
-        /* Заметное появление значка — «влетает» лёгким пружинным масштабом. */
-        animation: kb-badge-in 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        width: 96px;
+        animation: kb-pop 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+                   kb-pulse 1.5s ease-in-out 620ms infinite;
       }
-      @keyframes kb-badge-in {
-        from { opacity: 0; transform: scale(0.7); }
+      @keyframes kb-pop {
+        from { opacity: 0; transform: scale(0.6); }
         to { opacity: 1; transform: scale(1); }
       }
-      #kinetix-boot .kb-badge::before {
-        background: rgba(255, 255, 255, 0.22);
-        border-radius: 50%;
-        content: '';
-        height: 60px;
-        left: -6px;
-        position: absolute;
-        top: -34px;
-        width: 86px;
+      @keyframes kb-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
       }
       #kinetix-boot .kb-brand {
-        color: #12382C;
+        color: #FFFFFF;
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 33px;
+        font-size: 38px;
         font-weight: 800;
-        letter-spacing: -0.5px;
+        letter-spacing: -0.6px;
       }
       #kinetix-boot .kb-sub {
-        color: #6E8579;
+        color: rgba(255, 255, 255, 0.78);
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 700;
-        letter-spacing: 3.4px;
-        margin-top: 9px;
+        letter-spacing: 3.6px;
+        margin-top: 10px;
       }
+      /* Бегущая полоса загрузки внизу. */
+      #kinetix-boot .kb-track {
+        background: rgba(255, 255, 255, 0.22);
+        border-radius: 999px;
+        bottom: 74px;
+        height: 4px;
+        overflow: hidden;
+        position: absolute;
+        width: 150px;
+      }
+      #kinetix-boot .kb-track::after {
+        animation: kb-load 1.15s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        background: #FFFFFF;
+        border-radius: 999px;
+        content: '';
+        display: block;
+        height: 4px;
+        width: 45%;
+      }
+      @keyframes kb-load {
+        0% { transform: translateX(-120%); }
+        100% { transform: translateX(370%); }
+      }
+      /* Reduced-motion: без «полёта», но оставляем мягкое мигание значка и
+         полосы — это допустимая opacity-анимация и не мёртвая статика. */
       @media (prefers-reduced-motion: reduce) {
-        /* Reduced-motion: без «движения» (радар и масштаб выключены), но
-           оставляем деликатное дыхание свечения (только opacity) как мягкий
-           признак загрузки — не мёртвая статика. */
         #kinetix-boot .kb-radar { animation: none; opacity: 0; }
-        #kinetix-boot .kb-badge { animation: none; }
-        #kinetix-boot .kb-badge-wrap::before {
-          animation: kb-breathe-soft 3s ease-in-out infinite;
+        #kinetix-boot .kb-badge {
+          animation: kb-blink 1.6s ease-in-out infinite;
+        }
+        #kinetix-boot .kb-track::after {
+          animation: kb-blink 1.6s ease-in-out infinite;
+          transform: none;
+          width: 100%;
         }
       }
-      @keyframes kb-breathe-soft {
-        0%, 100% { opacity: 0.6; }
-        50% { opacity: 1; }
+      @keyframes kb-blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.55; }
       }
     </style>
 </head>
@@ -162,14 +162,13 @@
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
     <div id="kinetix-boot">
-      <svg class="kb-scene" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="kbBg" cx="50%" cy="42%" r="80%"><stop offset="0" stop-color="#FFFFFF"/><stop offset="0.5" stop-color="#F3F7F2"/><stop offset="1" stop-color="#E4EEE7"/></radialGradient><radialGradient id="kbGlow" cx="50%" cy="42%" r="30%"><stop offset="0" stop-color="#008D49" stop-opacity="0.12"/><stop offset="1" stop-color="#008D49" stop-opacity="0"/></radialGradient></defs><rect width="390" height="844" fill="url(#kbBg)"/><rect width="390" height="844" fill="url(#kbGlow)"/><line x1="-40" y1="219" x2="430" y2="169" stroke="#008D49" stroke-opacity="0.06" stroke-width="1"/><line x1="-40" y1="371" x2="430" y2="304" stroke="#008D49" stroke-opacity="0.05" stroke-width="1"/><line x1="-40" y1="523" x2="430" y2="456" stroke="#008D49" stroke-opacity="0.06" stroke-width="1"/><line x1="-40" y1="675" x2="430" y2="608" stroke="#008D49" stroke-opacity="0.05" stroke-width="1"/><line x1="93.6" y1="-40" x2="62.4" y2="884" stroke="#008D49" stroke-opacity="0.04" stroke-width="1"/><line x1="280.8" y1="-40" x2="312" y2="884" stroke="#008D49" stroke-opacity="0.04" stroke-width="1"/><path d="M 99 608 L 203 608 L 203 554 L 287 554" fill="none" stroke="#008D49" stroke-opacity="0.32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="99" cy="608" r="5" fill="#FFFFFF" stroke="#008D49" stroke-opacity="0.65" stroke-width="2"/><circle cx="287" cy="554" r="4" fill="#008D49" fill-opacity="0.75"/><circle cx="55" cy="152" r="1.6" fill="#008D49" fill-opacity="0.4"/><circle cx="335" cy="101" r="1.1" fill="#008D49" fill-opacity="0.22"/><circle cx="125" cy="84" r="1.1" fill="#008D49" fill-opacity="0.22"/><circle cx="265" cy="203" r="1.6" fill="#008D49" fill-opacity="0.22"/><circle cx="31" cy="422" r="1.1" fill="#008D49" fill-opacity="0.4"/><circle cx="359" cy="388" r="1.1" fill="#008D49" fill-opacity="0.22"/><circle cx="78" cy="726" r="1.6" fill="#008D49" fill-opacity="0.22"/><circle cx="312" cy="760" r="1.1" fill="#008D49" fill-opacity="0.22"/><circle cx="195" cy="68" r="1.1" fill="#008D49" fill-opacity="0.4"/><circle cx="156" cy="760" r="1.6" fill="#008D49" fill-opacity="0.22"/><circle cx="47" cy="574" r="1.1" fill="#008D49" fill-opacity="0.22"/><circle cx="351" cy="591" r="1.1" fill="#008D49" fill-opacity="0.22"/><circle cx="234" cy="726" r="1.6" fill="#008D49" fill-opacity="0.4"/><circle cx="101" cy="506" r="1.1" fill="#008D49" fill-opacity="0.22"/></svg>
       <div class="kb-content">
         <div class="kb-badge-wrap">
           <div class="kb-radar r1"></div>
           <div class="kb-radar r2"></div>
           <div class="kb-radar r3"></div>
           <div class="kb-badge">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="#008D49" stroke="#008D49" stroke-width="2" stroke-linejoin="round">
               <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
             </svg>
           </div>
@@ -177,6 +176,7 @@
         <div class="kb-brand">Kinetix</div>
         <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
       </div>
+      <div class="kb-track"></div>
     </div>
   <script src="/taxi/_expo/static/js/web/index-7e23babaa246fc33ce856e9275ae574a.js" defer></script>
 </body>
