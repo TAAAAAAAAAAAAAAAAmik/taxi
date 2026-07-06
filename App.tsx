@@ -60,9 +60,8 @@ export default function App() {
 
     const startedAt =
       typeof performance !== 'undefined' ? performance.now() : Date.now();
-    // Держим сцену достаточно долго, чтобы анимация запуска (радар-кольца,
-    // дыхание, появление значка) реально успела проиграться, а не мелькнула.
-    const MIN_SHOW_MS = 2400;
+    // Короткий минимальный показ — сплэш не должен задерживать вход.
+    const MIN_SHOW_MS = 1300;
     let raf1 = 0;
     let raf2 = 0;
     let fadeTimer: ReturnType<typeof setTimeout>;

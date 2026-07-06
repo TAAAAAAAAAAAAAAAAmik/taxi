@@ -133,18 +133,12 @@ const bootStyles = `
         0% { transform: translateX(-130%); }
         100% { transform: translateX(360%); }
       }
+      /* Декоративное движение (aurora, блик) выключаем при reduced-motion,
+         а бегущую полосу-индикатор оставляем: это функциональный статус
+         загрузки, а не декор. */
       @media (prefers-reduced-motion: reduce) {
         #kinetix-boot .kb-blob { animation: none; }
         #kinetix-boot .kb-brand { animation: none; color: #0F3226; }
-        #kinetix-boot .kb-track::after {
-          animation: kb-blink 1.6s ease-in-out infinite;
-          transform: none;
-          width: 100%;
-        }
-      }
-      @keyframes kb-blink {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.4; }
       }
     </style>`;
 
