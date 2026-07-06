@@ -28,19 +28,28 @@
       body { background: #0A1411; }
       #kinetix-boot {
         align-items: center;
-        background: radial-gradient(circle at 50% 42%, #12271E 0%, #0A1411 55%, #050D09 100%);
+        background: #0A1411;
         display: flex;
         flex-direction: column;
         inset: 0;
         justify-content: center;
+        overflow: hidden;
         position: fixed;
         z-index: 9999;
+      }
+      #kinetix-boot .kb-scene {
+        height: 100%;
+        left: 0;
+        position: absolute;
+        top: 0;
+        width: 100%;
       }
       #kinetix-boot .kb-content {
         align-items: center;
         display: flex;
         flex-direction: column;
-        animation: kb-enter 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        position: relative;
+        animation: kb-enter 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       @keyframes kb-enter {
         from { opacity: 0; transform: translateY(8px); }
@@ -59,15 +68,31 @@
         background: rgba(92, 230, 160, 0.14);
         border-radius: 50%;
         content: '';
-        height: 190px;
+        height: 150px;
         position: absolute;
-        width: 190px;
+        width: 150px;
         z-index: -1;
         animation: kb-breathe 4s ease-in-out infinite;
       }
       @keyframes kb-breathe {
         0%, 100% { opacity: 0.75; transform: scale(1); }
         50% { opacity: 1; transform: scale(1.1); }
+      }
+      #kinetix-boot .kb-radar {
+        border: 1.5px solid rgba(183, 244, 106, 0.5);
+        border-radius: 50%;
+        height: 82px;
+        position: absolute;
+        width: 82px;
+        animation: kb-radar 3.6s ease-in-out infinite;
+      }
+      #kinetix-boot .kb-radar.r2 { animation-delay: 1.2s; }
+      #kinetix-boot .kb-radar.r3 { animation-delay: 2.4s; }
+      @keyframes kb-radar {
+        0% { opacity: 0; transform: scale(0.75); }
+        20% { opacity: 0.34; }
+        75% { opacity: 0.12; }
+        100% { opacity: 0; transform: scale(3); }
       }
       #kinetix-boot .kb-badge {
         align-items: center;
@@ -108,7 +133,9 @@
         margin-top: 9px;
       }
       @media (prefers-reduced-motion: reduce) {
-        #kinetix-boot .kb-badge-wrap::before { animation: none; }
+        #kinetix-boot .kb-badge-wrap::before,
+        #kinetix-boot .kb-radar { animation: none; }
+        #kinetix-boot .kb-radar { opacity: 0; }
       }
     </style>
 </head>
@@ -121,8 +148,12 @@
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
     <div id="kinetix-boot">
+      <svg class="kb-scene" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="kbBg" cx="50%" cy="42%" r="78%"><stop offset="0" stop-color="#12271E"/><stop offset="0.55" stop-color="#0A1411"/><stop offset="1" stop-color="#050D09"/></radialGradient><radialGradient id="kbGlow" cx="50%" cy="42%" r="30%"><stop offset="0" stop-color="#5CE6A0" stop-opacity="0.16"/><stop offset="1" stop-color="#5CE6A0" stop-opacity="0"/></radialGradient></defs><rect width="390" height="844" fill="url(#kbBg)"/><rect width="390" height="844" fill="url(#kbGlow)"/><line x1="-40" y1="219" x2="430" y2="169" stroke="#5CE6A0" stroke-opacity="0.06" stroke-width="1"/><line x1="-40" y1="371" x2="430" y2="304" stroke="#5CE6A0" stroke-opacity="0.05" stroke-width="1"/><line x1="-40" y1="523" x2="430" y2="456" stroke="#5CE6A0" stroke-opacity="0.06" stroke-width="1"/><line x1="-40" y1="675" x2="430" y2="608" stroke="#5CE6A0" stroke-opacity="0.05" stroke-width="1"/><line x1="93.6" y1="-40" x2="62.4" y2="884" stroke="#5CE6A0" stroke-opacity="0.04" stroke-width="1"/><line x1="280.8" y1="-40" x2="312" y2="884" stroke="#5CE6A0" stroke-opacity="0.04" stroke-width="1"/><path d="M 99 608 L 203 608 L 203 554 L 287 554" fill="none" stroke="#B7F46A" stroke-opacity="0.28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="99" cy="608" r="5" fill="#0A1411" stroke="#B7F46A" stroke-opacity="0.6" stroke-width="2"/><circle cx="287" cy="554" r="4" fill="#B7F46A" fill-opacity="0.7"/><circle cx="55" cy="152" r="1.6" fill="#5CE6A0" fill-opacity="0.5"/><circle cx="335" cy="101" r="1.1" fill="#5CE6A0" fill-opacity="0.28"/><circle cx="125" cy="84" r="1.1" fill="#5CE6A0" fill-opacity="0.28"/><circle cx="265" cy="203" r="1.6" fill="#5CE6A0" fill-opacity="0.28"/><circle cx="31" cy="422" r="1.1" fill="#5CE6A0" fill-opacity="0.5"/><circle cx="359" cy="388" r="1.1" fill="#5CE6A0" fill-opacity="0.28"/><circle cx="78" cy="726" r="1.6" fill="#5CE6A0" fill-opacity="0.28"/><circle cx="312" cy="760" r="1.1" fill="#5CE6A0" fill-opacity="0.28"/><circle cx="195" cy="68" r="1.1" fill="#5CE6A0" fill-opacity="0.5"/><circle cx="156" cy="760" r="1.6" fill="#5CE6A0" fill-opacity="0.28"/><circle cx="47" cy="574" r="1.1" fill="#5CE6A0" fill-opacity="0.28"/><circle cx="351" cy="591" r="1.1" fill="#5CE6A0" fill-opacity="0.28"/><circle cx="234" cy="726" r="1.6" fill="#5CE6A0" fill-opacity="0.5"/><circle cx="101" cy="506" r="1.1" fill="#5CE6A0" fill-opacity="0.28"/></svg>
       <div class="kb-content">
         <div class="kb-badge-wrap">
+          <div class="kb-radar r1"></div>
+          <div class="kb-radar r2"></div>
+          <div class="kb-radar r3"></div>
           <div class="kb-badge">
             <svg width="30" height="30" viewBox="0 0 24 24" fill="#B7F46A" stroke="#B7F46A" stroke-width="2" stroke-linejoin="round">
               <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
@@ -133,6 +164,6 @@
         <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
       </div>
     </div>
-  <script src="/taxi/_expo/static/js/web/index-65bc6afc6637d1965153e2d40366fc18.js" defer></script>
+  <script src="/taxi/_expo/static/js/web/index-6de938efcfb83e404e2d50e6864d15a9.js" defer></script>
 </body>
 </html>
