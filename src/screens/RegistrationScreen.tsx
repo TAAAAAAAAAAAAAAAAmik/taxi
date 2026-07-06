@@ -10,6 +10,7 @@ import {
   FileText,
   Link as LinkIcon,
   type LucideProps,
+  Navigation,
   ShieldCheck,
   UserRound,
 } from 'lucide-react-native';
@@ -376,11 +377,11 @@ export function RegistrationScreen({ navigation, route }: Props) {
         {activeStep.id === 'role' ? (
           <View style={styles.brandHeader}>
             <View style={styles.brandMark}>
-              <Car color={kinetixColors.textPrimary} size={24} strokeWidth={2.4} />
+              <Navigation color="#FFFFFF" fill="#FFFFFF" size={22} strokeWidth={2} />
             </View>
             <View style={styles.brandCopy}>
-              <Text style={styles.brandTitle}>Такси Салават</Text>
-              <Text style={styles.brandSubtitle}>Регистрация</Text>
+              <Text style={styles.brandTitle}>Kinetix</Text>
+              <Text style={styles.brandSubtitle}>Такси Партнёр · Регистрация</Text>
             </View>
           </View>
         ) : null}
