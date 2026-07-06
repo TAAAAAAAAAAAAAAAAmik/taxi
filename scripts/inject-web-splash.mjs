@@ -129,39 +129,6 @@ const bootMarkup = `
       <div class="kb-track"></div>
     </div>`;
 
-// Уникальный id сборки — записываем в build-id.txt рядом с index.html и
-// вшиваем в страницу. Мета no-cache браузеры для документа игнорируют, а на
-// GitHub Pages нельзя задать HTTP-заголовки, поэтому свежесть обеспечивает
-// клиентский скрипт ниже.
-const buildId = Date.now().toString(36);
-
-// Скрипт-само-обновлятор: тянет свежий build-id.txt (без кэша), и если он не
-// совпадает с вшитым (значит открыта старая закэшированная страница) —
-// перезагружает с ?v=<id>, что гарантированно берёт свежий HTML из сети.
-const cacheBuster = `
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <script>
-      window.__KX_BUILD__ = '${buildId}';
-      (function () {
-        try {
-          var url = new URL(location.href);
-          fetch('build-id.txt?_=' + Date.now(), { cache: 'no-store' })
-            .then(function (r) { return r.ok ? r.text() : null; })
-            .then(function (t) {
-              if (!t) return;
-              var latest = t.trim();
-              if (latest && latest !== window.__KX_BUILD__ && url.searchParams.get('v') !== latest) {
-                url.searchParams.set('v', latest);
-                location.replace(url.toString());
-              }
-            })
-            .catch(function () {});
-        } catch (e) {}
-      })();
-    </script>`;
-
 const html = await readFile(distIndexPath, 'utf8');
 
 if (html.includes(bootMarker)) {
@@ -176,6 +143,52 @@ if (!html.includes(headAnchor) || !html.includes(rootAnchor)) {
   console.error('inject-web-splash: expected anchors not found in', distIndexPath);
   process.exit(1);
 }
+
+// Уникальный id сборки — записываем в build-id.txt рядом с index.html и
+// вшиваем в страницу. Мета no-cache браузеры для документа игнорируют, а на
+// GitHub Pages нельзя задать HTTP-заголовки, поэтому свежесть обеспечивает
+// клиентский скрипт ниже.
+const buildId = Date.now().toString(36);
+
+// База приложения из абсолютного пути бандла (напр. "/taxi/") — чтобы
+// build-id.txt тянулся с корня приложения на любом под-роуте, а не по
+// хрупкому относительному пути.
+const bundleMatch = html.match(/<script src="([^"]*?)\/_expo\//);
+const appBase = bundleMatch ? `${bundleMatch[1]}/` : '/';
+
+// Скрипт-само-обновлятор: тянет свежий build-id.txt (без кэша), и если он не
+// совпадает с вшитым (значит открыта старая закэшированная страница) —
+// перезагружает с ?v=<id>, что гарантированно берёт свежий HTML из сети.
+// Когда версия свежая — убирает служебный ?v из адресной строки.
+const cacheBuster = `
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <script>
+      window.__KX_BUILD__ = '${buildId}';
+      (function () {
+        try {
+          var url = new URL(location.href);
+          fetch('${appBase}build-id.txt?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.text() : null; })
+            .then(function (t) {
+              if (!t) return;
+              var latest = t.trim();
+              if (!latest) return;
+              if (latest !== window.__KX_BUILD__) {
+                if (url.searchParams.get('v') !== latest) {
+                  url.searchParams.set('v', latest);
+                  location.replace(url.toString());
+                }
+              } else if (url.searchParams.has('v')) {
+                url.searchParams.delete('v');
+                history.replaceState(null, '', url.pathname + (url.search || '') + url.hash);
+              }
+            })
+            .catch(function () {});
+        } catch (e) {}
+      })();
+    </script>`;
 
 const patched = html
   .replace(headAnchor, `${cacheBuster}\n${bootStyles}\n${headAnchor}`)
