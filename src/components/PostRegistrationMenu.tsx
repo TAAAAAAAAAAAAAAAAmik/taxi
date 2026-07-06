@@ -30,7 +30,6 @@ import {
   Plus,
   RefreshCw,
   Route,
-  Search,
   Settings,
   ShieldCheck,
   Star,
@@ -741,6 +740,8 @@ function ClientHomePage({
         </StaggerView>
 
         <StaggerView index={4} style={styles.clientMapGrow}>
+          {/* Карта — живое превью «машины рядом», а не второй вход в заказ:
+              явные входы выше (карточки услуг), дубль-строку убрали. */}
           <View style={styles.clientMapCard}>
             <NearbyCarsMap cars={carPoints} height="100%" />
             <View style={styles.clientMapChip}>
@@ -749,18 +750,6 @@ function ClientHomePage({
                 {availableCarsCount > 0 ? `${availableCarsCount} ${formatCarsWord(availableCarsCount)} рядом` : 'Ищем машины рядом'}
               </Text>
             </View>
-            <PressableScale
-              accessibilityLabel="Выбрать, куда едем"
-              accessibilityRole="button"
-              onPress={onOpenOrderFlow}
-              style={styles.clientMapWhere}
-            >
-              <View style={styles.clientMapSearchIcon}>
-                <Search color={kinetixColors.lime} size={18} strokeWidth={2.3} />
-              </View>
-              <Text style={styles.clientMapWhereText}>Куда едем?</Text>
-              <ChevronRight color="#B7C8BF" size={22} strokeWidth={2.4} />
-            </PressableScale>
           </View>
         </StaggerView>
       </View>

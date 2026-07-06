@@ -245,8 +245,11 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     color: '#12382C',
-    fontSize: 22,
-    fontWeight: '800',
+    // 19/700 вместо 22/800 — длинные адреса («…Коммунистическая, 65»)
+    // помещаются в поле целиком, крупный кегль остаётся для simpleMode.
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: -0.2,
     minHeight: 62,
     paddingHorizontal: 16,
   },
@@ -925,14 +928,16 @@ export const styles = StyleSheet.create({
     width: 42,
   },
   orderSceneTitle: {
-    color: '#F2FBF6',
+    color: '#0A1411',
     flex: 1,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '900',
     letterSpacing: -0.4,
-    textShadowColor: 'rgba(10, 20, 17, 0.55)',
-    textShadowOffset: { height: 1, width: 0 },
-    textShadowRadius: 8,
+    // Светлый ореол: тёмный заголовок читается и над светлым фолбэком карты,
+    // и над реальными тайлами (они тоже светлые), без тяжёлого scrim.
+    textShadowColor: 'rgba(244, 250, 246, 0.85)',
+    textShadowOffset: { height: 0, width: 0 },
+    textShadowRadius: 10,
   },
   orderSceneAa: {
     alignItems: 'center',
@@ -984,6 +989,8 @@ export const styles = StyleSheet.create({
     gap: 13,
     marginTop: -24,
     padding: 16,
+    // Запас снизу, чтобы последняя строка не липла к фиксированной панели CTA.
+    paddingBottom: 24,
     paddingTop: 12,
   },
   orderSheetGrab: {

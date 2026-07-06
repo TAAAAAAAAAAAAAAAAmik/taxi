@@ -835,11 +835,21 @@ export function OrderFlowScreen({ navigation, route }: Props) {
       activeAddressFieldId === 'pickup' || activeAddressFieldId === 'destination'
         ? activeAddressFieldId
         : null;
+    const clientAddressFieldKey = clientAddressFieldId
+      ? normalizeAddressKey(values[clientAddressFieldId] ?? '')
+      : '';
     const clientAddressSuggestions = clientAddressFieldId
       ? mergeAddressSuggestions([
           ...findSalavatAddressSuggestions(values[clientAddressFieldId] ?? '', 6),
           ...serverAddressSuggestions,
-        ]).slice(0, 4)
+        ])
+          // Не показываем подсказку, которая совпадает с уже введённым адресом —
+          // это лишний дубль под полем.
+          .filter(
+            (suggestion) =>
+              normalizeAddressKey(formatSalavatAddress(suggestion)) !== clientAddressFieldKey,
+          )
+          .slice(0, 4)
       : [];
     const clientRealtimeLabel = formatClientRealtimeLabel(realtimeMessage, realtimeStatus);
     const deliveryPackageReady = !isDeliveryOrder || Boolean(values.deliveryPackageType || values.packageDescription?.trim());

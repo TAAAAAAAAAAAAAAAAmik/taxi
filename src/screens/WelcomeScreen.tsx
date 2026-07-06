@@ -297,7 +297,7 @@ function NightHero({ onAdmin, styles, theme }: NightHeroProps) {
             onLongPress={onAdmin}
             style={({ pressed }) => [styles.heroEmblem, pressed && styles.pressed]}
           >
-            <BashkortostanEmblem size={34} />
+            <BashkortostanEmblem size={34} tone="muted" />
           </Pressable>
         </View>
 
@@ -393,12 +393,14 @@ function CarArt({ dark, theme }: { dark: boolean; theme: Theme }) {
   const body = dark ? '#0B5C33' : '#FFFFFF';
   const bodyStroke = dark ? alpha(theme.onBrand, 0.45) : alpha(theme.text, 0.18);
   const cabin = dark ? '#0E6B3B' : '#F1F5F3';
-  const glass = dark ? alpha(theme.onBrand, 0.34) : '#CFE0EA';
+  // Нейтрально-мятное стекло вместо голубого (#CFE0EA выбивался на зелёном
+  // бренде и делал машину «клипартовой»); фары/фонари чуть приглушены.
+  const glass = dark ? alpha(theme.onBrand, 0.34) : '#D5E3DB';
   const tire = dark ? '#08160F' : '#262F2A';
   const rim = dark ? alpha(theme.onBrand, 0.85) : '#C9D2CE';
   const accent = theme.brand;
-  const head = dark ? '#FBE6A6' : '#FBE6A6';
-  const tail = '#E24B4A';
+  const head = dark ? '#F4DA95' : '#F4DA95';
+  const tail = '#D0524F';
   const shadow = dark ? 'rgba(0,0,0,0.32)' : 'rgba(18,56,44,0.16)';
 
   return (
@@ -739,8 +741,10 @@ function createStyles(theme: Theme) {
       overflow: 'hidden',
     },
     roleCardDark: {
-      backgroundColor: theme.brand,
-      borderColor: theme.brand,
+      // Глубокий спокойный зелёный вместо неонового theme.brand (#00A65A) —
+      // карточка «Водитель» перестаёт «кричать» рядом с графитовой «Пассажир».
+      backgroundColor: '#0B7C48',
+      borderColor: '#0B7C48',
     },
     roleScene: {
       paddingVertical: 16,
