@@ -121,26 +121,26 @@ const bootStyles = `
         position: absolute;
         width: 150px;
         z-index: -1;
-        animation: kb-breathe 4s ease-in-out infinite;
+        animation: kb-breathe 3s ease-in-out infinite;
       }
       @keyframes kb-breathe {
-        0%, 100% { opacity: 0.7; transform: scale(1); }
-        50% { opacity: 1; transform: scale(1.1); }
+        0%, 100% { opacity: 0.65; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.12); }
       }
       #kinetix-boot .kb-radar {
-        border: 1.5px solid rgba(0, 141, 73, 0.32);
+        border: 1.5px solid rgba(0, 141, 73, 0.4);
         border-radius: 50%;
         height: 82px;
         position: absolute;
         width: 82px;
-        animation: kb-radar 3.6s ease-in-out infinite;
+        animation: kb-radar 2.4s ease-out infinite;
       }
-      #kinetix-boot .kb-radar.r2 { animation-delay: 1.2s; }
-      #kinetix-boot .kb-radar.r3 { animation-delay: 2.4s; }
+      #kinetix-boot .kb-radar.r2 { animation-delay: 0.8s; }
+      #kinetix-boot .kb-radar.r3 { animation-delay: 1.6s; }
       @keyframes kb-radar {
-        0% { opacity: 0; transform: scale(0.75); }
-        20% { opacity: 0.32; }
-        75% { opacity: 0.1; }
+        0% { opacity: 0; transform: scale(0.7); }
+        18% { opacity: 0.4; }
+        70% { opacity: 0.12; }
         100% { opacity: 0; transform: scale(3); }
       }
       #kinetix-boot .kb-badge {
@@ -154,6 +154,12 @@ const bootStyles = `
         overflow: hidden;
         position: relative;
         width: 74px;
+        /* Заметное появление значка — «влетает» лёгким пружинным масштабом. */
+        animation: kb-badge-in 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      }
+      @keyframes kb-badge-in {
+        from { opacity: 0; transform: scale(0.7); }
+        to { opacity: 1; transform: scale(1); }
       }
       #kinetix-boot .kb-badge::before {
         background: rgba(255, 255, 255, 0.22);
@@ -181,9 +187,18 @@ const bootStyles = `
         margin-top: 9px;
       }
       @media (prefers-reduced-motion: reduce) {
-        #kinetix-boot .kb-badge-wrap::before,
-        #kinetix-boot .kb-radar { animation: none; }
-        #kinetix-boot .kb-radar { opacity: 0; }
+        /* Reduced-motion: без «движения» (радар и масштаб выключены), но
+           оставляем деликатное дыхание свечения (только opacity) как мягкий
+           признак загрузки — не мёртвая статика. */
+        #kinetix-boot .kb-radar { animation: none; opacity: 0; }
+        #kinetix-boot .kb-badge { animation: none; }
+        #kinetix-boot .kb-badge-wrap::before {
+          animation: kb-breathe-soft 3s ease-in-out infinite;
+        }
+      }
+      @keyframes kb-breathe-soft {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
       }
     </style>`;
 
