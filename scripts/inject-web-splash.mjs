@@ -129,6 +129,14 @@ const bootMarkup = `
       <div class="kb-track"></div>
     </div>`;
 
+// index.html не должен кэшироваться браузером: JS версионируется хэшем, а
+// сам HTML при кэше отдаёт старую версию, и «обновить страницу» показывает
+// прошлую сборку. no-cache заставляет браузер перепроверять HTML.
+const cacheMeta = `
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />`;
+
 const html = await readFile(distIndexPath, 'utf8');
 
 if (html.includes(bootMarker)) {
@@ -145,7 +153,7 @@ if (!html.includes(headAnchor) || !html.includes(rootAnchor)) {
 }
 
 const patched = html
-  .replace(headAnchor, `${bootStyles}\n${headAnchor}`)
+  .replace(headAnchor, `${cacheMeta}\n${bootStyles}\n${headAnchor}`)
   .replace(rootAnchor, `${rootAnchor}${bootMarkup}`);
 
 await writeFile(distIndexPath, patched);
