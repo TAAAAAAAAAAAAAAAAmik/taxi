@@ -28,18 +28,24 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-      window.__KX_BUILD__ = 'mr9t3w7z';
+      window.__KX_BUILD__ = 'mr9td2eb';
       (function () {
         try {
           var url = new URL(location.href);
-          fetch('build-id.txt?_=' + Date.now(), { cache: 'no-store' })
+          fetch('/taxi/build-id.txt?_=' + Date.now(), { cache: 'no-store' })
             .then(function (r) { return r.ok ? r.text() : null; })
             .then(function (t) {
               if (!t) return;
               var latest = t.trim();
-              if (latest && latest !== window.__KX_BUILD__ && url.searchParams.get('v') !== latest) {
-                url.searchParams.set('v', latest);
-                location.replace(url.toString());
+              if (!latest) return;
+              if (latest !== window.__KX_BUILD__) {
+                if (url.searchParams.get('v') !== latest) {
+                  url.searchParams.set('v', latest);
+                  location.replace(url.toString());
+                }
+              } else if (url.searchParams.has('v')) {
+                url.searchParams.delete('v');
+                history.replaceState(null, '', url.pathname + (url.search || '') + url.hash);
               }
             })
             .catch(function () {});
