@@ -80,7 +80,7 @@ const skyline = [22, 38, 30, 54, 26, 46, 34, 60, 28, 42, 24, 50, 32];
 
 export function WelcomeScreen({ navigation }: Props) {
   const { loginAccount } = useAppState();
-  const [themeName, setThemeName] = useState<ThemeName>('dark');
+  const [themeName, setThemeName] = useState<ThemeName>('light');
   const [demoBusy, setDemoBusy] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
   const theme = themes[themeName];
