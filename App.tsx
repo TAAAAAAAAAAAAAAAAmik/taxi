@@ -60,8 +60,8 @@ export default function App() {
 
     const startedAt =
       typeof performance !== 'undefined' ? performance.now() : Date.now();
-    // Короткий минимальный показ — сплэш не должен задерживать вход.
-    const MIN_SHOW_MS = 1300;
+    // Баланс: aurora и бегущая линия успевают проявиться, но вход не тянется.
+    const MIN_SHOW_MS = 1900;
     let raf1 = 0;
     let raf2 = 0;
     let fadeTimer: ReturnType<typeof setTimeout>;
