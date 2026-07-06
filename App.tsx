@@ -68,12 +68,16 @@ export default function App() {
     let removeTimer: ReturnType<typeof setTimeout>;
 
     const beginFade = () => {
-      // pointer-events: none — пока сплэш растворяется (opacity 1→0), тапы
-      // должны проходить сквозь него в приложение, а не глотаться оверлеем.
+      // pointer-events: none — пока сплэш растворяется, тапы проходят сквозь.
       boot.style.pointerEvents = 'none';
-      boot.style.transition = 'opacity 620ms cubic-bezier(0.4, 0, 0.2, 1)';
+      // «Раскрытие в приложение» в стиле Яндекс Go: буквы плавно зумятся на
+      // весь экран и растворяются, открывая приложение под собой.
+      boot.style.transition =
+        'opacity 640ms cubic-bezier(0.4, 0, 0.2, 1), transform 640ms cubic-bezier(0.4, 0, 0.2, 1)';
+      boot.style.transformOrigin = '50% 46%';
+      boot.style.transform = 'scale(1.6)';
       boot.style.opacity = '0';
-      removeTimer = setTimeout(() => boot.remove(), 680);
+      removeTimer = setTimeout(() => boot.remove(), 700);
     };
 
     // Скрываем сцену, когда приложение реально отрисовано под ней (двойной
