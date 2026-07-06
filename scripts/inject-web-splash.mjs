@@ -2,82 +2,18 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 // Пост-экспортный шаг web-сборки: вставляет в dist/index.html единственный
-// экран загрузки — полную ночную сцену (градиент, карта, маршрут, огни,
-// радар, значок, лого) на чистом HTML+CSS+inline SVG. Он виден с первого
-// кадра и плавно гаснет, когда приложение готово (см. App.tsx, #kinetix-boot).
-// На web React-сплэша поверх нет — поэтому переход только один и плавный.
+// экран загрузки в стиле Яндекс Go — полноэкранная фирменная зелёная заливка,
+// крупный белый значок с пульсом, белые радар-кольца и бегущая полоса. Виден
+// с первого кадра и плавно гаснет, когда приложение готово (App.tsx).
 const distIndexPath = resolve(process.cwd(), process.argv[2] || 'dist/index.html');
 const bootMarker = 'id="kinetix-boot"';
 
-// Ночная сцена в координатах 390x844 (растягивается slice под любой экран).
-function buildSceneSvg() {
-  const w = 390;
-  const h = 844;
-  const cx = w / 2;
-
-  const streets = [
-    [-40, h * 0.26, w + 40, h * 0.2, 0.06],
-    [-40, h * 0.44, w + 40, h * 0.36, 0.05],
-    [-40, h * 0.62, w + 40, h * 0.54, 0.06],
-    [-40, h * 0.8, w + 40, h * 0.72, 0.05],
-    [w * 0.24, -40, w * 0.16, h + 40, 0.04],
-    [w * 0.72, -40, w * 0.8, h + 40, 0.04],
-  ]
-    .map(
-      ([x1, y1, x2, y2, o]) =>
-        `<line x1="${x1}" y1="${round(y1)}" x2="${x2}" y2="${round(y2)}" stroke="#008D49" stroke-opacity="${o}" stroke-width="1"/>`,
-    )
-    .join('');
-
-  const ry = round(h * 0.72);
-  const route =
-    `<path d="M ${cx - 96} ${ry} L ${cx + 8} ${ry} L ${cx + 8} ${ry - 54} L ${cx + 92} ${ry - 54}" ` +
-    `fill="none" stroke="#008D49" stroke-opacity="0.32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<circle cx="${cx - 96}" cy="${ry}" r="5" fill="#FFFFFF" stroke="#008D49" stroke-opacity="0.65" stroke-width="2"/>` +
-    `<circle cx="${cx + 92}" cy="${ry - 54}" r="4" fill="#008D49" fill-opacity="0.75"/>`;
-
-  const lightSeeds = [
-    [0.14, 0.18], [0.86, 0.12], [0.32, 0.1], [0.68, 0.24], [0.08, 0.5],
-    [0.92, 0.46], [0.2, 0.86], [0.8, 0.9], [0.5, 0.08], [0.4, 0.9],
-    [0.12, 0.68], [0.9, 0.7], [0.6, 0.86], [0.26, 0.6],
-  ];
-  const lights = lightSeeds
-    .map(([fx, fy], i) => {
-      const r = i % 3 === 0 ? 1.6 : 1.1;
-      const o = i % 4 === 0 ? 0.4 : 0.22;
-      return `<circle cx="${round(fx * w)}" cy="${round(fy * h)}" r="${r}" fill="#008D49" fill-opacity="${o}"/>`;
-    })
-    .join('');
-
-  return (
-    `<svg class="kb-scene" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">` +
-    `<defs>` +
-    `<radialGradient id="kbBg" cx="50%" cy="42%" r="80%">` +
-    `<stop offset="0" stop-color="#FFFFFF"/><stop offset="0.5" stop-color="#F3F7F2"/><stop offset="1" stop-color="#E4EEE7"/>` +
-    `</radialGradient>` +
-    `<radialGradient id="kbGlow" cx="50%" cy="42%" r="30%">` +
-    `<stop offset="0" stop-color="#008D49" stop-opacity="0.12"/><stop offset="1" stop-color="#008D49" stop-opacity="0"/>` +
-    `</radialGradient>` +
-    `</defs>` +
-    `<rect width="${w}" height="${h}" fill="url(#kbBg)"/>` +
-    `<rect width="${w}" height="${h}" fill="url(#kbGlow)"/>` +
-    streets +
-    route +
-    lights +
-    `</svg>`
-  );
-}
-
-function round(n) {
-  return Math.round(n);
-}
-
 const bootStyles = `
     <style id="kinetix-boot-style">
-      body { background: #F3F7F2; }
+      body { background: #008D49; }
       #kinetix-boot {
         align-items: center;
-        background: #F3F7F2;
+        background: linear-gradient(158deg, #00A65A 0%, #008D49 55%, #027A3F 100%);
         display: flex;
         flex-direction: column;
         inset: 0;
@@ -86,132 +22,132 @@ const bootStyles = `
         position: fixed;
         z-index: 9999;
       }
-      #kinetix-boot .kb-scene {
-        height: 100%;
-        left: 0;
-        position: absolute;
-        top: 0;
-        width: 100%;
-      }
       #kinetix-boot .kb-content {
         align-items: center;
         display: flex;
         flex-direction: column;
         position: relative;
-        animation: kb-enter 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation: kb-enter 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       @keyframes kb-enter {
-        from { opacity: 0; transform: translateY(8px); }
+        from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
       #kinetix-boot .kb-badge-wrap {
         align-items: center;
         display: flex;
-        height: 82px;
+        height: 108px;
         justify-content: center;
-        margin-bottom: 26px;
+        margin-bottom: 30px;
         position: relative;
-        width: 82px;
+        width: 108px;
       }
-      #kinetix-boot .kb-badge-wrap::before {
-        background: rgba(0, 141, 73, 0.12);
-        border-radius: 50%;
-        content: '';
-        height: 150px;
-        position: absolute;
-        width: 150px;
-        z-index: -1;
-        animation: kb-breathe 3s ease-in-out infinite;
-      }
-      @keyframes kb-breathe {
-        0%, 100% { opacity: 0.65; transform: scale(1); }
-        50% { opacity: 1; transform: scale(1.12); }
-      }
+      /* Белые радар-кольца расходятся на зелёном — контрастно и заметно. */
       #kinetix-boot .kb-radar {
-        border: 1.5px solid rgba(0, 141, 73, 0.4);
+        border: 2px solid rgba(255, 255, 255, 0.55);
         border-radius: 50%;
-        height: 82px;
+        height: 96px;
         position: absolute;
-        width: 82px;
-        animation: kb-radar 2.4s ease-out infinite;
+        width: 96px;
+        animation: kb-radar 2s ease-out infinite;
       }
-      #kinetix-boot .kb-radar.r2 { animation-delay: 0.8s; }
-      #kinetix-boot .kb-radar.r3 { animation-delay: 1.6s; }
+      #kinetix-boot .kb-radar.r2 { animation-delay: 0.66s; }
+      #kinetix-boot .kb-radar.r3 { animation-delay: 1.33s; }
       @keyframes kb-radar {
-        0% { opacity: 0; transform: scale(0.7); }
-        18% { opacity: 0.4; }
-        70% { opacity: 0.12; }
-        100% { opacity: 0; transform: scale(3); }
+        0% { opacity: 0; transform: scale(0.65); }
+        16% { opacity: 0.6; }
+        70% { opacity: 0.15; }
+        100% { opacity: 0; transform: scale(2.7); }
       }
+      /* Крупный белый значок «бьётся» — заметная пульсация. */
       #kinetix-boot .kb-badge {
         align-items: center;
-        background: #008D49;
-        border-radius: 22px;
-        box-shadow: 0 10px 20px rgba(0, 111, 58, 0.34);
+        background: #FFFFFF;
+        border-radius: 28px;
+        box-shadow: 0 14px 34px rgba(0, 60, 30, 0.35);
         display: flex;
-        height: 74px;
+        height: 96px;
         justify-content: center;
-        overflow: hidden;
         position: relative;
-        width: 74px;
-        /* Заметное появление значка — «влетает» лёгким пружинным масштабом. */
-        animation: kb-badge-in 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        width: 96px;
+        animation: kb-pop 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+                   kb-pulse 1.5s ease-in-out 620ms infinite;
       }
-      @keyframes kb-badge-in {
-        from { opacity: 0; transform: scale(0.7); }
+      @keyframes kb-pop {
+        from { opacity: 0; transform: scale(0.6); }
         to { opacity: 1; transform: scale(1); }
       }
-      #kinetix-boot .kb-badge::before {
-        background: rgba(255, 255, 255, 0.22);
-        border-radius: 50%;
-        content: '';
-        height: 60px;
-        left: -6px;
-        position: absolute;
-        top: -34px;
-        width: 86px;
+      @keyframes kb-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
       }
       #kinetix-boot .kb-brand {
-        color: #12382C;
+        color: #FFFFFF;
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 33px;
+        font-size: 38px;
         font-weight: 800;
-        letter-spacing: -0.5px;
+        letter-spacing: -0.6px;
       }
       #kinetix-boot .kb-sub {
-        color: #6E8579;
+        color: rgba(255, 255, 255, 0.78);
         font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 700;
-        letter-spacing: 3.4px;
-        margin-top: 9px;
+        letter-spacing: 3.6px;
+        margin-top: 10px;
       }
+      /* Бегущая полоса загрузки внизу. */
+      #kinetix-boot .kb-track {
+        background: rgba(255, 255, 255, 0.22);
+        border-radius: 999px;
+        bottom: 74px;
+        height: 4px;
+        overflow: hidden;
+        position: absolute;
+        width: 150px;
+      }
+      #kinetix-boot .kb-track::after {
+        animation: kb-load 1.15s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        background: #FFFFFF;
+        border-radius: 999px;
+        content: '';
+        display: block;
+        height: 4px;
+        width: 45%;
+      }
+      @keyframes kb-load {
+        0% { transform: translateX(-120%); }
+        100% { transform: translateX(370%); }
+      }
+      /* Reduced-motion: без «полёта», но оставляем мягкое мигание значка и
+         полосы — это допустимая opacity-анимация и не мёртвая статика. */
       @media (prefers-reduced-motion: reduce) {
-        /* Reduced-motion: без «движения» (радар и масштаб выключены), но
-           оставляем деликатное дыхание свечения (только opacity) как мягкий
-           признак загрузки — не мёртвая статика. */
         #kinetix-boot .kb-radar { animation: none; opacity: 0; }
-        #kinetix-boot .kb-badge { animation: none; }
-        #kinetix-boot .kb-badge-wrap::before {
-          animation: kb-breathe-soft 3s ease-in-out infinite;
+        #kinetix-boot .kb-badge {
+          animation: kb-blink 1.6s ease-in-out infinite;
+        }
+        #kinetix-boot .kb-track::after {
+          animation: kb-blink 1.6s ease-in-out infinite;
+          transform: none;
+          width: 100%;
         }
       }
-      @keyframes kb-breathe-soft {
-        0%, 100% { opacity: 0.6; }
-        50% { opacity: 1; }
+      @keyframes kb-blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.55; }
       }
     </style>`;
 
+// Значок: белый с зелёной стрелкой навигации (инверсия на зелёном фоне).
 const bootMarkup = `
     <div id="kinetix-boot">
-      ${buildSceneSvg()}
       <div class="kb-content">
         <div class="kb-badge-wrap">
           <div class="kb-radar r1"></div>
           <div class="kb-radar r2"></div>
           <div class="kb-radar r3"></div>
           <div class="kb-badge">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="#008D49" stroke="#008D49" stroke-width="2" stroke-linejoin="round">
               <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
             </svg>
           </div>
@@ -219,6 +155,7 @@ const bootMarkup = `
         <div class="kb-brand">Kinetix</div>
         <div class="kb-sub">ТАКСИ · ПАРТНЁР</div>
       </div>
+      <div class="kb-track"></div>
     </div>`;
 
 const html = await readFile(distIndexPath, 'utf8');
