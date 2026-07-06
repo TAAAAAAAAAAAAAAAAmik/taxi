@@ -420,6 +420,11 @@ export function PostRegistrationMenu({
                 activeItemId={activeItem.id}
                 availableCarsCount={availableCarsCount}
                 displayName={displayName}
+                onBack={
+                  bottomMenuItems.some((item) => item.id === activeItem.id)
+                    ? undefined
+                    : () => setActiveItemId(config.menuItems[0].id)
+                }
                 onDeleteAccount={onDeleteAccount}
                 onOpenActiveOrder={onOpenActiveOrder}
                 onOpenDelivery={onOpenDelivery}
@@ -565,6 +570,7 @@ type ClientPageViewProps = {
   displayName: string;
   orderSummary?: ClientOrderSummary;
   savedHomeAddressLabel?: string;
+  onBack?: () => void;
   onDeleteAccount: () => void;
   onOpenActiveOrder?: () => void;
   onOpenDelivery: () => void;
@@ -581,6 +587,7 @@ function ClientPageView({
   activeItemId,
   availableCarsCount,
   displayName,
+  onBack,
   onDeleteAccount,
   onOpenActiveOrder,
   onOpenDelivery,
@@ -609,7 +616,7 @@ function ClientPageView({
   }
 
   if (activeItemId === 'about') {
-    return <ClientAboutPage onOpenMenu={onOpenMenu} onOpenSupportChat={onOpenSupportChat} />;
+    return <ClientAboutPage onBack={onBack} onOpenMenu={onOpenMenu} onOpenSupportChat={onOpenSupportChat} />;
   }
 
   if (activeItemId === 'profile' || activeItemId === 'settings') {
@@ -768,11 +775,13 @@ function ClientHomePage({
 function ClientPageHeader({
   title,
   subtitle,
+  onBack,
   onOpenMenu,
   Icon,
 }: {
   title: string;
   subtitle?: string;
+  onBack?: () => void;
   onOpenMenu: () => void;
   Icon?: ComponentType<LucideProps>;
 }) {
@@ -780,7 +789,16 @@ function ClientPageHeader({
     <View style={styles.clientPageHero}>
       <View style={styles.clientHeroGlow} />
       <View style={styles.clientPageHeroRow}>
-        {Icon ? (
+        {onBack ? (
+          <PressableScale
+            accessibilityLabel="Назад"
+            accessibilityRole="button"
+            onPress={onBack}
+            style={styles.clientHeroMenu}
+          >
+            <ArrowLeft color={kinetixColors.lime} size={22} strokeWidth={2.4} />
+          </PressableScale>
+        ) : Icon ? (
           <View style={styles.clientPageHeroIcon}>
             <Icon color={kinetixColors.lime} size={22} strokeWidth={2.3} />
           </View>
@@ -1223,9 +1241,11 @@ function ClientAccountPage({
 }
 
 function ClientAboutPage({
+  onBack,
   onOpenMenu,
   onOpenSupportChat,
 }: {
+  onBack?: () => void;
   onOpenMenu: () => void;
   onOpenSupportChat: () => void;
 }) {
@@ -1240,6 +1260,7 @@ function ClientAboutPage({
     <View style={styles.clientFocusPage}>
       <ClientPageHeader
         Icon={Star}
+        onBack={onBack}
         onOpenMenu={onOpenMenu}
         subtitle="Kinetix · Салаватский район"
         title="О приложении"

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { KeyRound, Mail, MessageSquareText, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, KeyRound, Mail, MessageSquareText, ShieldCheck } from 'lucide-react-native';
 import {
   Pressable,
   SafeAreaView,
@@ -88,6 +88,14 @@ export function PasswordResetScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <Pressable
+        accessibilityLabel="Назад"
+        accessibilityRole="button"
+        onPress={() => navigation.goBack()}
+        style={styles.backButton}
+      >
+        <ArrowLeft color="#12382C" size={22} strokeWidth={2.3} />
+      </Pressable>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <View style={styles.iconWrap}>
@@ -334,6 +342,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
+  },
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(18, 56, 44, 0.12)',
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: 'center',
+    left: 16,
+    position: 'absolute',
+    top: 16,
+    width: 42,
+    zIndex: 5,
   },
   page: {
     backgroundColor: '#F4FAF6',
