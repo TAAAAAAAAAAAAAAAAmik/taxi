@@ -12,6 +12,7 @@ import {
   Info,
   MapPinned,
   MessageCircle,
+  Navigation,
   Package,
   Phone,
   ReceiptText,
@@ -584,6 +585,24 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                     <Text style={styles.primaryButtonText}>
                       {isCancelled ? 'Заказ отменён' : isCompleted ? 'Статус завершен' : primaryActionLabel}
                     </Text>
+                  </Pressable>
+                ) : null}
+                {isDriverRole && !isCompleted && !isCancelled ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() =>
+                      navigation.navigate('Navigator', {
+                        destination: displayedOrder.destination,
+                        firstName,
+                        phase: liveStatus === 'started' ? 'trip' : 'pickup',
+                        pickup: displayedOrder.pickup,
+                        role,
+                      })
+                    }
+                    style={({ pressed }) => [styles.navigatorButton, pressed && styles.pressed]}
+                  >
+                    <Navigation color="#B7F46A" size={18} strokeWidth={2.4} />
+                    <Text style={styles.navigatorButtonText}>Навигатор</Text>
                   </Pressable>
                 ) : null}
                 <Pressable
@@ -1656,6 +1675,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,
+  },
+  navigatorButton: {
+    alignItems: 'center',
+    backgroundColor: '#0A1411',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: 18,
+  },
+  navigatorButtonText: {
+    color: '#B7F46A',
+    fontSize: 14,
+    fontWeight: '900',
   },
   safetyPanel: {
     backgroundColor: '#F7FBF8',

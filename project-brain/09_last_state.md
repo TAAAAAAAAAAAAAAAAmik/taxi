@@ -8,6 +8,16 @@
 
 клиент создает заказ → водитель видит заказ → водитель принимает заказ → статус меняется → заказ завершается.
 
+## 2026-07-07 (Claude) — встроенный навигатор водителя (как у Яндекс Go)
+
+- Новый полноэкранный **навигатор** для водителя: `src/screens/NavigatorScreen.tsx` + `src/components/DriverNavigatorMap.tsx`. Внутри iframe — Leaflet + OSM-тайлы + маршрут по дорогам (OSRM `steps=true`), живой GPS (`watchPosition`, `allow="geolocation"`), поворот маркера-стрелки по heading, режим следования (drag отключает, кнопка «прицел» возвращает), пере-построение маршрута при уходе с него (>60 м ×3). Без GPS (демо/desktop) — автоматическая **симуляция движения** по маршруту (чип «Демо GPS»). Связь iframe↔RN: `postMessage` (state наружу, `recenter` внутрь).
+- Весь продуктовый UI — RN-оверлеи в тёмном премиум-стиле: баннер следующего манёвра (лаймовая иконка поворота, «260 м», «Поверните направо», улица), ETA-панель (мин/км/время прибытия/цель), чипы фаз «Подача»/«Поездка» (remount iframe по фазе), выход. Русские инструкции манёвров (turn/fork/merge/roundabout/uturn/arrive).
+- **Graceful-деградация для слабого интернета**: без Leaflet/тайлов навигация живёт (сетка-плейсхолдер «Карта появится при подключении», баннер и ETA работают); без OSRM — прямая линия до цели. Ретик состояния каждые 1.5с (единичный GPS-фикс не оставляет баннер пустым).
+- Вход: кнопка «Навигатор» (графит+лайм) на экране заказа у водителя (активные статусы; фаза: `started`→Поездка, иначе Подача). Прямой вход для демо/QA: `/?screen=navigator` — `getInitialWebState` отрефакторен (`mapEntryScreen`), поддержка `?screen=` для всех entry-путей (admin/invite/order/navigator) — работает на статичном хостинге, где SPA-пути дают 404.
+- Native (APK): экран-заглушка «доступен в web-версии»; позже тот же HTML — в `react-native-webview`.
+- Затронуты: `src/screens/NavigatorScreen.tsx` (новый), `src/components/DriverNavigatorMap.tsx` (новый), `src/navigation/types.ts`, `src/navigation/AppNavigator.tsx`, `src/screens/OrderStatusScreen.tsx`.
+- Проверено: typecheck зелёный; Playwright — сценарий с granted-геолокацией (баннер манёвра), без геолокации (симуляция+«Демо GPS»+ETA), переключение фаз. Кнопку «Навигатор» на экране заказа живьём не прогонял (нужен активный заказ водителя) — код тривиален. Деплой в gh-pages.
+
 ## 2026-07-07 (Claude) — нативные пуши: конфиг-хук FCM (код уже готов)
 
 - Ревизия нативных пушей: инфраструктура **code-complete** и не была задокументирована как готовая. Клиент — `src/services/pushNotifications.ts` (запрос разрешения, нативный токен FCM/APNs, категория `driver_order_offer` с кнопками «Принять/Пропустить`»), вызывается на логине (`AppState` ~566). Бэк — `POST /push-tokens` + хранение, `sendPushToDriver/User/Admins`, реальная отправка `sendFcmPush` (через `firebase-admin`) и `sendApnsPush` (через `apn`); диспетчеризация на событиях заказа (создание/назначение/статус/отмена). Зависимости `firebase-admin`, `apn`, `expo-notifications`, `expo-device` — в `package.json`; плагин `expo-notifications` — в `app.config.js`.

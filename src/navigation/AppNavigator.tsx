@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AdminPanelScreen } from '../screens/AdminPanelScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { DriverDocumentsScreen } from '../screens/DriverDocumentsScreen';
+import { NavigatorScreen } from '../screens/NavigatorScreen';
 import { OrderFlowScreen } from '../screens/OrderFlowScreen';
 import { OrderHistoryScreen } from '../screens/OrderHistoryScreen';
 import { OrderStatusScreen } from '../screens/OrderStatusScreen';
@@ -107,7 +108,23 @@ function getInitialWebState(): InitialState | undefined {
     .filter(Boolean);
 
   const [screen, value] = segments;
+  const fromPath = mapEntryScreen(screen, value);
 
+  if (fromPath) {
+    return fromPath;
+  }
+
+  // Статичный хостинг (GitHub Pages, python http.server) не знает SPA-путей —
+  // поддерживаем эквивалент через query: /?screen=navigator, /?screen=admin.
+  if (window.location.search) {
+    const params = new URLSearchParams(window.location.search);
+    return mapEntryScreen(params.get('screen') || '', params.get('value') || '');
+  }
+
+  return undefined;
+}
+
+function mapEntryScreen(screen: string | undefined, value: string | undefined): InitialState | undefined {
   if (screen === 'admin') {
     return { routes: [{ name: 'AdminPanel' }] };
   }
@@ -133,6 +150,23 @@ function getInitialWebState(): InitialState | undefined {
         {
           name: 'OrderFlow',
           params: { role: normalizeRoleParam(value || 'client') },
+        },
+      ],
+    };
+  }
+
+  // Прямой вход в навигатор водителя (демо/QA): /navigator
+  if (screen === 'navigator') {
+    return {
+      routes: [
+        {
+          name: 'Navigator',
+          params: {
+            destination: 'Малояз, администрация',
+            phase: 'trip',
+            pickup: 'Малояз, центр',
+            role: normalizeRoleParam('self_employed_driver'),
+          },
         },
       ],
     };
@@ -169,13 +203,14 @@ export function AppNavigator() {
         <Stack.Screen component={SavedPlaceScreen} name="SavedPlace" />
         <Stack.Screen component={SupportChatScreen} name="SupportChat" />
         <Stack.Screen component={ReferralScreen} name="Referral" />
+        <Stack.Screen component={NavigatorScreen} name="Navigator" />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
 function getScreenAnimation(routeName: keyof RootStackParamList) {
-  if (['AdminPanel', 'Welcome'].includes(routeName)) {
+  if (['AdminPanel', 'Navigator', 'Welcome'].includes(routeName)) {
     return 'fade' as const;
   }
 

@@ -102,4 +102,11 @@ export type RootStackParamList = {
     role: AccountRole;
     firstName?: string;
   };
+  Navigator: {
+    role: AccountRole;
+    firstName?: string;
+    pickup: string;
+    destination: string;
+    phase?: 'pickup' | 'trip';
+  };
 };
