@@ -2,17 +2,22 @@ import { type ComponentType, useEffect, useMemo, useRef, useState } from 'react'
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   AlertCircle,
+  ArrowLeft,
+  AtSign,
   Building2,
   Car,
   Check,
   ChevronRight,
   ClipboardCheck,
   FileText,
+  KeyRound,
   Link as LinkIcon,
   type LucideProps,
   Navigation,
+  Phone,
   ShieldCheck,
   UserRound,
+  Wallet,
 } from 'lucide-react-native';
 import {
   Animated,
@@ -85,6 +90,25 @@ const roleLeadCopy: Record<AccountRole, string> = {
   self_employed_driver: 'Принимать заказы',
 };
 type RegistrationStepId = 'confirm' | 'contact' | 'details' | 'password' | 'role';
+
+// Иконки в тёмном hero — по активному шагу.
+const stepHeroIcons: Record<RegistrationStepId, ComponentType<LucideProps>> = {
+  confirm: ClipboardCheck,
+  contact: UserRound,
+  details: Car,
+  password: KeyRound,
+  role: Navigation,
+};
+
+// Иконки секций анкеты — в светло-зелёном сквиркле, как по всему приложению.
+const sectionIcons: Record<(typeof sectionOrder)[number], ComponentType<LucideProps>> = {
+  account: UserRound,
+  business: Building2,
+  identity: FileText,
+  legal: ShieldCheck,
+  payments: Wallet,
+  vehicle: Car,
+};
 
 export function RegistrationScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
@@ -374,25 +398,79 @@ export function RegistrationScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-        {activeStep.id === 'role' ? (
-          <View style={styles.brandHeader}>
-            <View style={styles.brandMark}>
-              <Navigation color="#FFFFFF" fill="#FFFFFF" size={22} strokeWidth={2} />
-            </View>
-            <View style={styles.brandCopy}>
-              <Text style={styles.brandTitle}>Kinetix</Text>
-              <Text style={styles.brandSubtitle}>Такси Партнёр · Регистрация</Text>
+        <View style={styles.hero}>
+          <View style={styles.heroGlow} />
+          <View style={styles.heroTop}>
+            <Pressable
+              accessibilityLabel="Назад"
+              accessibilityRole="button"
+              onPress={() => (activeStepIndex > 0 ? goToPreviousStep() : navigation.navigate('Welcome'))}
+              style={({ pressed }) => [styles.heroBack, pressed && styles.pressedButton]}
+            >
+              <ArrowLeft color={kinetixColors.lime} size={21} strokeWidth={2.3} />
+            </Pressable>
+            <View style={styles.heroBrand}>
+              <Navigation color={kinetixColors.lime} fill={kinetixColors.lime} size={13} strokeWidth={2} />
+              <Text style={styles.heroBrandText}>KINETIX</Text>
             </View>
           </View>
-        ) : null}
 
-        <View style={styles.screenHeader}>
-          <Text style={styles.screenTitle}>
-            {activeStep.id === 'role' ? 'Аккаунт' : activeStep.title}
-          </Text>
-          <Text style={styles.screenHint}>
-            {activeStep.id === 'role' ? 'Выберите роль' : activeStep.hint}
-          </Text>
+          <View style={styles.heroMain}>
+            <View style={styles.heroIcon}>
+              {(() => {
+                const StepIcon = stepHeroIcons[activeStep.id];
+                return <StepIcon color={kinetixColors.lime} size={23} strokeWidth={2.3} />;
+              })()}
+            </View>
+            <View style={styles.heroCopy}>
+              <Text style={styles.heroTitle}>
+                {activeStep.id === 'role' ? 'Регистрация' : activeStep.title}
+              </Text>
+              <Text numberOfLines={2} style={styles.heroSub}>
+                {activeStep.id === 'role' ? 'Минута — и вы в Kinetix' : activeStep.hint}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.heroProgressTrack}>
+            <View
+              style={[
+                styles.heroProgressFill,
+                { width: `${Math.round(((activeStepIndex + 1) / registrationSteps.length) * 100)}%` },
+              ]}
+            />
+          </View>
+          <View style={styles.heroSteps}>
+            {registrationSteps.map((step, index) => {
+              const done = index < activeStepIndex;
+              const active = step.id === activeStep.id;
+
+              return (
+                <View key={step.id} style={styles.heroStep}>
+                  <View
+                    style={[
+                      styles.heroStepDot,
+                      done && styles.heroStepDotDone,
+                      active && styles.heroStepDotActive,
+                    ]}
+                  >
+                    {done ? (
+                      <Check color="#0A1411" size={12} strokeWidth={3.2} />
+                    ) : (
+                      <Text style={[styles.heroStepNum, active && styles.heroStepNumActive]}>
+                        {index + 1}
+                      </Text>
+                    )}
+                  </View>
+                  {active ? (
+                    <Text numberOfLines={1} style={[styles.heroStepLabel, styles.heroStepLabelActive]}>
+                      {step.title}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
         </View>
 
         <View style={[styles.contentGrid, showSidebar && styles.contentGridWide]}>
@@ -444,31 +522,6 @@ export function RegistrationScreen({ navigation, route }: Props) {
               </View>
             ) : null}
 
-            {activeStep.id !== 'role' ? (
-              <View style={styles.steps}>
-                {registrationSteps.map((step, index) => {
-                  const active = step.id === activeStep.id;
-                  const done = index < activeStepIndex;
-
-                  return (
-                    <View key={step.id} style={[styles.stepRow, active && styles.stepRowActive]}>
-                      <View style={[styles.stepBadge, done && styles.stepBadgeDone, active && styles.stepBadgeActive]}>
-                        <Text style={[styles.stepBadgeText, (active || done) && styles.stepBadgeTextActive]}>
-                          {done ? '✓' : index + 1}
-                        </Text>
-                      </View>
-                      <View style={styles.stepCopy}>
-                        <Text numberOfLines={1} style={[styles.stepText, active && styles.stepTextActive]}>
-                          {step.title}
-                        </Text>
-                        <Text numberOfLines={1} style={styles.stepHint}>{step.hint}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : null}
-
             <Animated.View style={[styles.stepPane, stepAnimatedStyle]}>
               {activeStep.id === 'role' ? (
                 <>
@@ -511,10 +564,16 @@ export function RegistrationScreen({ navigation, route }: Props) {
                 </>
               ) : null}
 
-              {visibleFieldSections.map((group) => (
+              {visibleFieldSections.map((group) => {
+                const SectionIcon =
+                  activeStep.id === 'password' ? KeyRound : sectionIcons[group.section];
+
+                return (
                 <View key={group.section} style={styles.formSection}>
                   <View style={styles.formSectionHeader}>
-                    <FileText color={kinetixColors.amber} size={18} strokeWidth={2.4} />
+                    <View style={styles.sectionIconWrap}>
+                      <SectionIcon color={kinetixColors.amber} size={18} strokeWidth={2.4} />
+                    </View>
                     <Text style={styles.formSectionTitle}>
                       {activeStep.id === 'password' ? 'Пароль для приложения' : sectionTitles[group.section]}
                     </Text>
@@ -531,18 +590,23 @@ export function RegistrationScreen({ navigation, route }: Props) {
                     ))}
                   </View>
                 </View>
-              ))}
+                );
+              })}
 
               {activeStep.id === 'confirm' ? (
                 <>
                   <View style={styles.formSection}>
                     <View style={styles.formSectionHeader}>
-                      <ClipboardCheck color={kinetixColors.amber} size={18} strokeWidth={2.4} />
+                      <View style={styles.sectionIconWrap}>
+                        <ClipboardCheck color={kinetixColors.amber} size={18} strokeWidth={2.4} />
+                      </View>
                       <Text style={styles.formSectionTitle}>Проверка перед отправкой</Text>
                     </View>
-                    <Text style={styles.panelText}>Роль: {roleCopy[role].title}</Text>
-                    <Text style={styles.panelText}>Телефон: {values.phone || 'не указан'}</Text>
-                    <Text style={styles.panelText}>Почта: {values.email || 'не указана'}</Text>
+                    <View style={styles.summaryRows}>
+                      <SummaryRow Icon={UserRound} label="Роль" value={roleCopy[role].title} />
+                      <SummaryRow Icon={Phone} label="Телефон" value={values.phone || 'не указан'} />
+                      <SummaryRow Icon={AtSign} label="Почта" value={values.email || 'не указана'} />
+                    </View>
                     <Text style={styles.panelTextMuted}>
                       После отправки откроется подтверждение {skipPhoneVerification ? 'почты' : 'телефона'}.
                     </Text>
@@ -550,7 +614,9 @@ export function RegistrationScreen({ navigation, route }: Props) {
 
                   <View style={styles.formSection}>
                     <View style={styles.formSectionHeader}>
-                      <ClipboardCheck color={kinetixColors.amber} size={18} strokeWidth={2.4} />
+                      <View style={styles.sectionIconWrap}>
+                        <ShieldCheck color={kinetixColors.amber} size={18} strokeWidth={2.4} />
+                      </View>
                       <Text style={styles.formSectionTitle}>Согласия</Text>
                     </View>
                     <View>
@@ -586,15 +652,6 @@ export function RegistrationScreen({ navigation, route }: Props) {
             ) : null}
 
             <View style={styles.actionRow}>
-              {activeStepIndex > 0 ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={goToPreviousStep}
-                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressedButton]}
-                >
-                  <Text style={styles.secondaryButtonText}>Назад</Text>
-                </Pressable>
-              ) : null}
               <Pressable
                 accessibilityRole="button"
                 disabled={isSavingApplication}
@@ -606,15 +663,34 @@ export function RegistrationScreen({ navigation, route }: Props) {
                   pressed && styles.pressedButton,
                 ]}
               >
-                <Text style={styles.submitText}>{nextButtonLabel}</Text>
+                <Text style={styles.submitText}>
+                  {activeStep.id === 'confirm' && !isSavingApplication
+                    ? 'Создать аккаунт'
+                    : nextButtonLabel}
+                </Text>
+                {!isSavingApplication ? (
+                  <ChevronRight color="#F4FAF6" size={19} strokeWidth={2.6} />
+                ) : null}
               </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => navigation.navigate('Welcome')}
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressedButton]}
-              >
-                <Text style={styles.secondaryButtonText}>Уже есть аккаунт</Text>
-              </Pressable>
+
+              <View style={styles.quietRow}>
+                {activeStepIndex > 0 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={goToPreviousStep}
+                    style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressedButton]}
+                  >
+                    <Text style={styles.secondaryButtonText}>Назад</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => navigation.navigate('Welcome')}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressedButton]}
+                >
+                  <Text style={styles.secondaryButtonText}>Уже есть аккаунт</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </View>
@@ -648,22 +724,52 @@ function RoleChoiceCard({ active, Icon, onPress, subtitle, title, wide }: RoleCh
     >
       {active ? (
         <View style={styles.roleCheck}>
-          <Check color={kinetixColors.surface} size={14} strokeWidth={3} />
+          <Check color="#0A1411" size={14} strokeWidth={3.2} />
         </View>
       ) : null}
 
       <View style={[styles.roleIconWrap, active && styles.roleIconWrapActive]}>
         <Icon
-          color={active ? kinetixColors.surface : kinetixColors.amber}
+          color={active ? '#F4FAF6' : kinetixColors.amber}
           size={kinetixIconography.sizes.regular}
           strokeWidth={2.3}
         />
       </View>
       <View style={styles.roleChoiceCopy}>
-        <Text style={styles.roleChoiceTitle}>{title}</Text>
-        <Text numberOfLines={2} style={styles.roleChoiceSubtitle}>{subtitle}</Text>
+        <Text style={[styles.roleChoiceTitle, active && styles.roleChoiceTitleActive]}>{title}</Text>
+        <Text
+          numberOfLines={2}
+          style={[styles.roleChoiceSubtitle, active && styles.roleChoiceSubtitleActive]}
+        >
+          {subtitle}
+        </Text>
+      </View>
+
+      {/* Фирменный рельс маршрута — точка → линия → пин */}
+      <View style={styles.roleRoute}>
+        <View style={[styles.roleRouteDot, active && styles.roleRouteDotActive]} />
+        <View style={[styles.roleRouteLine, active && styles.roleRouteLineActive]} />
+        <View style={[styles.roleRoutePin, active && styles.roleRoutePinActive]} />
       </View>
     </Pressable>
+  );
+}
+
+type SummaryRowProps = {
+  Icon: ComponentType<LucideProps>;
+  label: string;
+  value: string;
+};
+
+function SummaryRow({ Icon, label, value }: SummaryRowProps) {
+  return (
+    <View style={styles.summaryRow}>
+      <View style={styles.summaryIcon}>
+        <Icon color={kinetixColors.amber} size={16} strokeWidth={2.4} />
+      </View>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.summaryValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -733,41 +839,147 @@ const styles = StyleSheet.create({
   actionRow: {
     gap: kinetixSpacing.sm,
   },
-  brandCopy: {
-    flex: 1,
-    justifyContent: 'center',
-    minWidth: 0,
+  hero: {
+    backgroundColor: '#0A1411',
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
+    gap: 14,
+    marginHorizontal: -kinetixSpacing.md,
+    marginTop: -kinetixSpacing.md,
+    overflow: 'hidden',
+    paddingBottom: 18,
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    position: 'relative',
   },
-  brandHeader: {
+  heroBack: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(92, 230, 160, 0.22)',
+    borderRadius: 13,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  heroBrand: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: kinetixSpacing.sm,
-    paddingHorizontal: kinetixSpacing.xs,
-    paddingTop: kinetixSpacing.sm,
+    gap: 6,
   },
-  brandMark: {
-    alignItems: 'center',
-    backgroundColor: kinetixColors.amber,
-    borderRadius: kinetixRadii.control,
-    height: kinetixTouchTargets.iconLarge,
-    justifyContent: 'center',
-    shadowColor: kinetixColors.amberPressed,
-    shadowOffset: { height: 8, width: 0 },
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
-    width: kinetixTouchTargets.iconLarge,
-  },
-  brandSubtitle: {
-    color: kinetixColors.textSecondary,
-    fontSize: kinetixTypography.sizes.body,
-    fontWeight: kinetixTypography.weights.medium,
-    lineHeight: kinetixTypography.lineHeights.body,
-  },
-  brandTitle: {
-    color: kinetixColors.textPrimary,
-    fontSize: kinetixTypography.sizes.title,
+  heroBrandText: {
+    color: 'rgba(183, 244, 106, 0.85)',
+    fontSize: 12,
     fontWeight: '900',
-    lineHeight: kinetixTypography.lineHeights.title,
+    letterSpacing: 3,
+  },
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  heroGlow: {
+    backgroundColor: 'rgba(92, 230, 160, 0.10)',
+    borderRadius: 90,
+    height: 180,
+    position: 'absolute',
+    right: -40,
+    top: -30,
+    width: 180,
+  },
+  heroIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(92, 230, 160, 0.12)',
+    borderColor: 'rgba(92, 230, 160, 0.22)',
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 50,
+    justifyContent: 'center',
+    width: 50,
+  },
+  heroMain: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 14,
+    position: 'relative',
+    zIndex: 1,
+  },
+  heroProgressTrack: {
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    borderRadius: 999,
+    height: 4,
+    overflow: 'hidden',
+  },
+  heroProgressFill: {
+    backgroundColor: kinetixColors.lime,
+    borderRadius: 999,
+    height: 4,
+  },
+  heroStep: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: 6,
+    minWidth: 0,
+  },
+  heroStepDot: {
+    alignItems: 'center',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    height: 22,
+    justifyContent: 'center',
+    width: 22,
+  },
+  heroStepDotActive: {
+    backgroundColor: 'rgba(183, 244, 106, 0.16)',
+    borderColor: kinetixColors.lime,
+  },
+  heroStepDotDone: {
+    backgroundColor: kinetixColors.lime,
+    borderColor: kinetixColors.lime,
+  },
+  heroStepLabel: {
+    color: 'rgba(244, 250, 246, 0.45)',
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  heroStepLabelActive: {
+    color: '#F2FBF6',
+  },
+  heroStepNum: {
+    color: 'rgba(244, 250, 246, 0.55)',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  heroStepNumActive: {
+    color: kinetixColors.lime,
+  },
+  heroSteps: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    position: 'relative',
+    zIndex: 1,
+  },
+  heroSub: {
+    color: '#93BAA8',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  heroTitle: {
+    color: '#F2FBF6',
+    fontSize: 23,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  heroTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    position: 'relative',
+    zIndex: 1,
   },
   contentGrid: {
     gap: kinetixSpacing.md,
@@ -792,21 +1004,31 @@ const styles = StyleSheet.create({
   },
   formSection: {
     backgroundColor: kinetixColors.surface,
-    borderColor: kinetixColors.line,
-    borderRadius: kinetixRadii.card,
-    borderWidth: kinetixBorders.hairline,
-    elevation: 1,
+    borderColor: 'rgba(11, 47, 37, 0.10)',
+    borderRadius: 20,
+    borderWidth: 1,
+    elevation: 2,
     gap: kinetixSpacing.sm,
     padding: kinetixSpacing.md,
-    shadowColor: kinetixColors.shadow,
-    shadowOffset: { height: 7, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
+    shadowColor: '#0B2F25',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
   },
   formSectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: kinetixSpacing.xs,
+    gap: kinetixSpacing.sm,
+  },
+  sectionIconWrap: {
+    alignItems: 'center',
+    backgroundColor: kinetixColors.surfaceLight,
+    borderColor: 'rgba(0, 141, 73, 0.16)',
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
   },
   formSectionTitle: {
     color: kinetixColors.textPrimary,
@@ -817,11 +1039,11 @@ const styles = StyleSheet.create({
   page: {
     backgroundColor: kinetixColors.graphite,
     flexGrow: 1,
-    gap: kinetixSpacing.lg,
+    gap: kinetixSpacing.md,
     minHeight: '100%',
     paddingBottom: kinetixSpacing.xxl,
     paddingHorizontal: kinetixSpacing.md,
-    paddingTop: kinetixSpacing.xl,
+    paddingTop: kinetixSpacing.md,
   },
   panelText: {
     color: kinetixColors.textPrimary,
@@ -849,8 +1071,10 @@ const styles = StyleSheet.create({
   },
   quickIcon: {
     alignItems: 'center',
-    backgroundColor: kinetixColors.surfaceRaised,
-    borderRadius: kinetixRadii.control,
+    backgroundColor: kinetixColors.surfaceLight,
+    borderColor: 'rgba(0, 141, 73, 0.16)',
+    borderRadius: 14,
+    borderWidth: 1,
     height: kinetixTouchTargets.iconLarge,
     justifyContent: 'center',
     width: kinetixTouchTargets.iconLarge,
@@ -858,19 +1082,19 @@ const styles = StyleSheet.create({
   quickRow: {
     alignItems: 'center',
     backgroundColor: kinetixColors.surface,
-    borderColor: kinetixColors.line,
-    borderRadius: kinetixRadii.card,
-    borderWidth: kinetixBorders.hairline,
-    elevation: 1,
+    borderColor: 'rgba(11, 47, 37, 0.10)',
+    borderRadius: 18,
+    borderWidth: 1,
+    elevation: 2,
     flexDirection: 'row',
     gap: kinetixSpacing.md,
     minHeight: 80,
     paddingHorizontal: kinetixSpacing.md,
     paddingVertical: kinetixSpacing.sm,
-    shadowColor: kinetixColors.shadow,
-    shadowOffset: { height: 7, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
+    shadowColor: '#0B2F25',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
   },
   quickRows: {
     gap: kinetixSpacing.sm,
@@ -896,39 +1120,41 @@ const styles = StyleSheet.create({
   },
   roleCheck: {
     alignItems: 'center',
-    backgroundColor: kinetixColors.amber,
+    backgroundColor: kinetixColors.lime,
     borderRadius: kinetixRadii.mapPin,
-    height: 24,
+    height: 26,
     justifyContent: 'center',
     position: 'absolute',
     right: kinetixSpacing.sm,
     top: kinetixSpacing.sm,
-    width: 24,
+    width: 26,
+    zIndex: 1,
   },
   roleChoice: {
     alignItems: 'center',
     backgroundColor: kinetixColors.surface,
-    borderColor: kinetixColors.line,
-    borderRadius: 12,
-    borderWidth: kinetixBorders.hairline,
-    elevation: 1,
+    borderColor: 'rgba(11, 47, 37, 0.10)',
+    borderRadius: 20,
+    borderWidth: 1,
+    elevation: 2,
     flex: 1,
-    gap: kinetixSpacing.md,
+    gap: kinetixSpacing.sm,
     justifyContent: 'center',
-    minHeight: 178,
+    minHeight: 196,
     minWidth: 0,
     overflow: 'hidden',
     padding: kinetixSpacing.md,
     paddingTop: kinetixSpacing.xl,
-    shadowColor: kinetixColors.shadow,
-    shadowOffset: { height: 7, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
+    shadowColor: '#0B2F25',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
   },
   roleChoiceActive: {
-    backgroundColor: kinetixColors.surfaceLight,
-    borderColor: kinetixColors.lineStrong,
-    borderWidth: kinetixBorders.active,
+    backgroundColor: '#0B7C48',
+    borderColor: '#0B7C48',
+    shadowColor: '#0B7C48',
+    shadowOpacity: 0.3,
   },
   roleChoiceCopy: {
     alignItems: 'center',
@@ -942,12 +1168,18 @@ const styles = StyleSheet.create({
     lineHeight: kinetixTypography.lineHeights.meta,
     textAlign: 'center',
   },
+  roleChoiceSubtitleActive: {
+    color: 'rgba(244, 250, 246, 0.75)',
+  },
   roleChoiceTitle: {
     color: kinetixColors.textPrimary,
     fontSize: kinetixTypography.sizes.bodyLarge,
     fontWeight: '900',
     lineHeight: kinetixTypography.lineHeights.bodyLarge,
     textAlign: 'center',
+  },
+  roleChoiceTitleActive: {
+    color: '#F4FAF6',
   },
   roleChoiceWide: {
     flex: 1,
@@ -960,14 +1192,53 @@ const styles = StyleSheet.create({
   },
   roleIconWrap: {
     alignItems: 'center',
-    backgroundColor: kinetixColors.surfaceRaised,
-    borderRadius: kinetixRadii.card,
-    height: 52,
+    backgroundColor: kinetixColors.surfaceLight,
+    borderColor: 'rgba(0, 141, 73, 0.16)',
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 54,
     justifyContent: 'center',
-    width: 52,
+    width: 54,
   },
   roleIconWrapActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  roleRoute: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    marginTop: 2,
+  },
+  roleRouteDot: {
+    backgroundColor: kinetixColors.surface,
+    borderColor: kinetixColors.amber,
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 9,
+    width: 9,
+  },
+  roleRouteDotActive: {
+    backgroundColor: '#0B7C48',
+    borderColor: kinetixColors.lime,
+  },
+  roleRouteLine: {
+    backgroundColor: 'rgba(0, 141, 73, 0.3)',
+    borderRadius: 999,
+    height: 2,
+    width: 34,
+  },
+  roleRouteLineActive: {
+    backgroundColor: 'rgba(183, 244, 106, 0.45)',
+  },
+  roleRoutePin: {
     backgroundColor: kinetixColors.amber,
+    borderRadius: 3,
+    height: 9,
+    width: 9,
+  },
+  roleRoutePinActive: {
+    backgroundColor: kinetixColors.lime,
   },
   roleSection: {
     gap: kinetixSpacing.md,
@@ -976,43 +1247,60 @@ const styles = StyleSheet.create({
     backgroundColor: kinetixColors.graphite,
     flex: 1,
   },
-  screenEyebrow: {
-    color: kinetixColors.amber,
-    fontSize: kinetixTypography.sizes.meta,
-    fontWeight: kinetixTypography.weights.bold,
-    lineHeight: kinetixTypography.lineHeights.meta,
-  },
-  screenHeader: {
-    gap: kinetixSpacing.xxs,
-    paddingHorizontal: kinetixSpacing.xxs,
-  },
-  screenHint: {
-    color: kinetixColors.textSecondary,
-    fontSize: kinetixTypography.sizes.body,
-    fontWeight: kinetixTypography.weights.bold,
-    lineHeight: kinetixTypography.lineHeights.body,
-    maxWidth: 620,
-  },
-  screenTitle: {
-    color: kinetixColors.textPrimary,
-    fontSize: 30,
-    fontWeight: '900',
-    lineHeight: kinetixTypography.lineHeights.headline,
+  quietRow: {
+    flexDirection: 'row',
+    gap: kinetixSpacing.sm,
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: kinetixComponentTokens.secondaryButton.backgroundColor,
-    borderColor: 'rgba(0, 141, 73, 0.28)',
-    borderRadius: kinetixComponentTokens.secondaryButton.borderRadius,
-    borderWidth: kinetixBorders.hairline,
+    backgroundColor: kinetixColors.surface,
+    borderColor: 'rgba(11, 47, 37, 0.12)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
     justifyContent: 'center',
-    minHeight: kinetixComponentTokens.secondaryButton.minHeight,
+    minHeight: 50,
     paddingHorizontal: kinetixSpacing.md,
   },
   secondaryButtonText: {
     color: kinetixColors.textPrimary,
     fontSize: kinetixTypography.sizes.meta,
     fontWeight: '900',
+  },
+  summaryIcon: {
+    alignItems: 'center',
+    backgroundColor: kinetixColors.surfaceLight,
+    borderColor: 'rgba(0, 141, 73, 0.16)',
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  summaryLabel: {
+    color: kinetixColors.textMuted,
+    fontSize: kinetixTypography.sizes.meta,
+    fontWeight: kinetixTypography.weights.semibold,
+    width: 76,
+  },
+  summaryRow: {
+    alignItems: 'center',
+    backgroundColor: kinetixColors.surfaceLight,
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: kinetixSpacing.sm,
+    paddingHorizontal: kinetixSpacing.sm,
+    paddingVertical: kinetixSpacing.xs,
+  },
+  summaryRows: {
+    gap: kinetixSpacing.xs,
+  },
+  summaryValue: {
+    color: kinetixColors.textPrimary,
+    flex: 1,
+    fontSize: kinetixTypography.sizes.meta,
+    fontWeight: '800',
+    minWidth: 0,
   },
   sectionHeader: {
     gap: kinetixSpacing.xxs,
@@ -1036,88 +1324,29 @@ const styles = StyleSheet.create({
   sidebarWide: {
     width: 330,
   },
-  stepBadge: {
-    alignItems: 'center',
-    backgroundColor: kinetixColors.amberSoft,
-    borderRadius: kinetixRadii.control,
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-  },
-  stepBadgeActive: {
-    backgroundColor: kinetixColors.amber,
-  },
-  stepBadgeDone: {
-    backgroundColor: kinetixColors.brandDeep,
-  },
-  stepBadgeText: {
-    color: kinetixColors.amber,
-    fontSize: kinetixTypography.sizes.caption,
-    fontWeight: '900',
-  },
-  stepBadgeTextActive: {
-    color: kinetixColors.surfaceLight,
-  },
-  stepCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  stepHint: {
-    color: kinetixColors.textMuted,
-    fontSize: 11,
-    lineHeight: 15,
-  },
   stepPane: {
     gap: kinetixSpacing.sm,
   },
-  stepRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: kinetixSpacing.xs,
-  },
-  stepRowActive: {
-    backgroundColor: kinetixColors.amberSoft,
-    borderRadius: kinetixRadii.control,
-    marginHorizontal: -kinetixSpacing.xxs,
-    padding: kinetixSpacing.xxs,
-  },
-  stepText: {
-    color: kinetixColors.textPrimary,
-    flex: 1,
-    fontSize: kinetixTypography.sizes.meta,
-    fontWeight: kinetixTypography.weights.bold,
-    lineHeight: kinetixTypography.lineHeights.meta,
-  },
-  stepTextActive: {
-    color: kinetixColors.amber,
-    fontWeight: '900',
-  },
-  steps: {
-    backgroundColor: kinetixColors.surface,
-    borderColor: kinetixColors.line,
-    borderRadius: kinetixRadii.card,
-    borderWidth: kinetixBorders.hairline,
-    gap: kinetixSpacing.xs,
-    padding: kinetixSpacing.sm,
-  },
   submitButton: {
     alignItems: 'center',
-    backgroundColor: kinetixComponentTokens.primaryButton.backgroundColor,
-    borderRadius: kinetixComponentTokens.primaryButton.borderRadius,
+    backgroundColor: kinetixColors.amber,
+    borderRadius: 14,
     elevation: 2,
+    flexDirection: 'row',
+    gap: 8,
     justifyContent: 'center',
-    minHeight: kinetixComponentTokens.primaryButton.minHeight,
+    minHeight: 56,
     paddingHorizontal: kinetixSpacing.md,
-    shadowColor: kinetixColors.amberPressed,
-    shadowOffset: { height: 8, width: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
+    shadowColor: 'rgba(0, 111, 58, 0.28)',
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
   },
   submitButtonMuted: {
     backgroundColor: kinetixColors.disabled,
   },
   submitText: {
-    color: kinetixComponentTokens.primaryButton.textColor,
+    color: '#F4FAF6',
     flexShrink: 1,
     fontSize: kinetixTypography.sizes.body,
     fontWeight: '900',
