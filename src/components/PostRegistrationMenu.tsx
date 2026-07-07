@@ -23,6 +23,7 @@ import {
   Gift,
   Headphones,
   Home,
+  Info,
   LucideProps,
   MapPinned,
   Menu as MenuIcon,
@@ -2569,103 +2570,231 @@ function DriverFeedPreview({
     setDetailsOrderId((current) => (current === orderId ? undefined : orderId));
   }, []);
 
-  return (
-    <View style={styles.driverFeedPanel}>
-      <View style={styles.driverFeedHeader}>
-        <View>
-          <Text style={styles.driverFeedTitle}>Заказы рядом</Text>
-          <Text numberOfLines={1} style={styles.driverFeedSubtitle}>
-            Обновляется в реальном времени
-          </Text>
-        </View>
-        <Text style={styles.driverFeedCount}>{orders.length}</Text>
-      </View>
+  const hasOrders = visibleOrders.length > 0;
 
-      <View style={styles.driverFeedSignalRow}>
-        <Text style={styles.driverFeedSignal}>Такси + доставка</Text>
-        <Text style={styles.driverFeedSignal}>i = детали</Text>
-        <Text style={styles.driverFeedSignal}>1 тап принять</Text>
+  return (
+    <View style={styles.feedWrap}>
+      {/* Живой статус-блок: пульсирующая точка + счётчик заказов рядом. */}
+      <View style={styles.feedLive}>
+        <View style={styles.feedLiveLeft}>
+          <FeedPulseDot active={hasOrders} />
+          <View style={styles.feedLiveCopy}>
+            <Text style={styles.feedLiveTitle}>
+              {hasOrders ? 'Заказы рядом' : 'Ищем заказы рядом'}
+            </Text>
+            <Text numberOfLines={1} style={styles.feedLiveSub}>
+              Обновляется в реальном времени
+            </Text>
+          </View>
+        </View>
+        <View style={styles.feedCountPill}>
+          <Text style={styles.feedCountValue}>{orders.length}</Text>
+          <Text style={styles.feedCountLabel}>рядом</Text>
+        </View>
       </View>
 
       {lockedReason ? (
-        <View style={styles.driverFeedNotice}>
+        <View style={styles.feedNotice}>
           <KinetixStatus label={`Доступ: ${lockedReason}`} tone="warning" />
         </View>
       ) : null}
 
-      {visibleOrders.length ? (
-        <View style={styles.driverFeedList}>
+      {hasOrders ? (
+        <View style={styles.feedList}>
           {visibleOrders.map((order, orderIndex) => {
             const detailsOpen = detailsOrderId === order.id;
+            const [pickup, destination] = splitFeedRoute(order.address);
+            const isDelivery = order.serviceLabel === 'Доставка';
+            const ServiceIcon = isDelivery ? Package : Car;
+            const busy = busyId === order.id;
 
             return (
-              <StaggerView key={order.id} index={orderIndex} style={styles.driverFeedCard}>
-                <View style={styles.driverFeedCardTop}>
-                  <View style={styles.driverFeedCardTags}>
-                    <Text numberOfLines={1} style={styles.driverFeedService}>{order.serviceLabel ?? 'Такси'}</Text>
-                    <Text numberOfLines={1} style={styles.driverFeedDistance}>{order.distanceLabel}</Text>
+              <StaggerView key={order.id} index={orderIndex} style={styles.feedCard}>
+                <View style={styles.feedCardAccent} />
+                <View style={styles.feedCardTop}>
+                  <View style={styles.feedServiceBadge}>
+                    <ServiceIcon color="#008D49" size={14} strokeWidth={2.5} />
+                    <Text style={styles.feedServiceText}>{order.serviceLabel ?? 'Такси'}</Text>
                   </View>
-                  <Text numberOfLines={1} style={styles.driverFeedPrice}>{order.priceLabel}</Text>
+                  <Text numberOfLines={1} style={styles.feedPrice}>{order.priceLabel}</Text>
                 </View>
-                <View style={styles.driverFeedRouteRow}>
-                  <View style={styles.driverFeedRouteDot} />
-                  <Text numberOfLines={1} style={styles.driverFeedAddress}>{order.address}</Text>
+
+                {/* Визуализация маршрута: точка старта → линия → пин назначения. */}
+                <View style={styles.feedRoute}>
+                  <View style={styles.feedRouteRail}>
+                    <View style={styles.feedRouteDotStart} />
+                    <View style={styles.feedRouteLine} />
+                    <View style={styles.feedRouteDotEnd} />
+                  </View>
+                  <View style={styles.feedRouteCopy}>
+                    <Text numberOfLines={1} style={styles.feedRoutePickup}>{pickup}</Text>
+                    <Text numberOfLines={1} style={styles.feedRouteDest}>{destination}</Text>
+                  </View>
                 </View>
-                <View style={styles.driverFeedActions}>
+
+                <View style={styles.feedChipRow}>
+                  <View style={styles.feedChip}>
+                    <MapPinned color="#49665A" size={12} strokeWidth={2.4} />
+                    <Text style={styles.feedChipText}>{order.distanceLabel}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.feedActions}>
                   <PressableScale
                     accessibilityLabel="Информация о заказе"
                     accessibilityRole="button"
                     onPress={() => toggleDetailsOrder(order.id)}
-                    style={[styles.driverFeedInfoButton, detailsOpen && styles.driverFeedInfoButtonActive]}
+                    style={[styles.feedInfoBtn, detailsOpen && styles.feedInfoBtnActive]}
                   >
-                    <Text style={[styles.driverFeedInfoText, detailsOpen && styles.driverFeedInfoTextActive]}>i</Text>
+                    <Info color={detailsOpen ? '#F4FAF6' : '#008D49'} size={18} strokeWidth={2.4} />
                   </PressableScale>
                   <PressableScale
                     accessibilityLabel="Принять заказ"
                     accessibilityRole="button"
                     disabled={disabled}
                     onPress={() => onAcceptOrder?.(order.id)}
-                    style={[
-                      styles.driverFeedAcceptButton,
-                      styles.driverFeedAcceptButtonWide,
-                      disabled && styles.disabledButton,
-                    ]}
+                    style={[styles.feedAcceptBtn, disabled && styles.disabledButton]}
                   >
-                    <Text style={styles.driverFeedAcceptText}>
-                      {busyId === order.id ? '...' : 'Принять'}
-                    </Text>
+                    <Text style={styles.feedAcceptText}>{busy ? 'Принимаем…' : 'Принять заказ'}</Text>
                   </PressableScale>
                 </View>
-                {busyId === order.id ? <View style={styles.driverFeedAcceptProgress} /> : null}
+
+                {busy ? <View style={styles.feedAcceptProgress} /> : null}
+
                 {detailsOpen ? (
-                  <View style={styles.driverFeedDetails}>
-                    <Text numberOfLines={1} style={styles.driverFeedMeta}>{order.metaLabel}</Text>
-                    <View style={styles.driverFeedBadges}>
-                      {order.badges.slice(0, 4).map((badge) => (
-                        <Text key={badge} style={styles.driverFeedBadge}>{badge}</Text>
-                      ))}
-                    </View>
+                  <View style={styles.feedDetails}>
+                    <Text numberOfLines={2} style={styles.feedMeta}>{order.metaLabel}</Text>
+                    {order.badges.length ? (
+                      <View style={styles.feedBadges}>
+                        {order.badges.slice(0, 4).map((badge) => (
+                          <Text key={badge} style={styles.feedBadge}>{badge}</Text>
+                        ))}
+                      </View>
+                    ) : null}
                   </View>
                 ) : null}
               </StaggerView>
             );
           })}
+
+          <PressableScale
+            accessibilityLabel="Открыть полный экран ленты"
+            accessibilityRole="button"
+            onPress={onOpenFullFeed}
+            style={styles.feedFullLink}
+          >
+            <Text style={styles.feedFullLinkText}>Открыть полный экран</Text>
+          </PressableScale>
         </View>
       ) : (
-        <KinetixEmptyState
-          description="Как только клиент создаст поездку, здесь появится короткая карточка."
-          icon={<Route color="#008D49" size={20} strokeWidth={2.4} />}
-          title="Заказов рядом нет"
-        />
+        <FeedEmptyState onOpenFullFeed={onOpenFullFeed} />
       )}
+    </View>
+  );
+}
 
+// "pickup → destination" → две строки маршрута.
+function splitFeedRoute(address: string): [string, string] {
+  const parts = address.split(' → ');
+  if (parts.length >= 2) {
+    return [parts[0].trim(), parts.slice(1).join(' → ').trim()];
+  }
+  return [address, ''];
+}
+
+// Пульсирующая точка статуса: зелёная (есть заказы) / приглушённая (ищем).
+function FeedPulseDot({ active }: { active: boolean }) {
+  const reducedMotion = useReducedMotionPreference();
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(pulse, {
+        toValue: 1,
+        duration: 1600,
+        easing: kinetixEasing.easeOut,
+        useNativeDriver: false,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse, reducedMotion]);
+
+  const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.8, 2.6] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.35, 0] });
+
+  return (
+    <View style={styles.feedDotWrap}>
+      {!reducedMotion ? (
+        <Animated.View
+          style={[styles.feedDotRing, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]}
+        />
+      ) : null}
+      <View style={[styles.feedDotCore, !active && styles.feedDotCoreIdle]} />
+    </View>
+  );
+}
+
+// Кинематографичное пустое состояние: радар-кольца «сканируют» район.
+function FeedEmptyState({ onOpenFullFeed }: { onOpenFullFeed: () => void }) {
+  const reducedMotion = useReducedMotionPreference();
+  const rings = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      return;
+    }
+    const loops = rings.map((value, index) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(index * 900),
+          Animated.timing(value, {
+            toValue: 1,
+            duration: 2700,
+            easing: kinetixEasing.easeOut,
+            useNativeDriver: false,
+          }),
+          Animated.timing(value, { toValue: 0, duration: 0, useNativeDriver: false }),
+        ]),
+      ),
+    );
+    loops.forEach((l) => l.start());
+    return () => loops.forEach((l) => l.stop());
+  }, [reducedMotion, rings]);
+
+  return (
+    <View style={styles.feedEmpty}>
+      <View style={styles.feedRadar}>
+        {!reducedMotion
+          ? rings.map((value, index) => {
+              const scale = value.interpolate({ inputRange: [0, 1], outputRange: [0.5, 2.6] });
+              const opacity = value.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.3, 0] });
+              return (
+                <Animated.View
+                  key={index}
+                  style={[styles.feedRadarRing, { opacity, transform: [{ scale }] }]}
+                />
+              );
+            })
+          : null}
+        <View style={styles.feedRadarCore}>
+          <Route color="#008D49" size={26} strokeWidth={2.3} />
+        </View>
+      </View>
+      <Text style={styles.feedEmptyTitle}>Ищем заказы рядом</Text>
+      <Text style={styles.feedEmptyText}>
+        Оставайтесь на линии — как только клиент создаст поездку, карточка появится здесь.
+      </Text>
       <PressableScale
-        accessibilityLabel="Открыть полный экран"
+        accessibilityLabel="Открыть полный экран ленты"
         accessibilityRole="button"
         onPress={onOpenFullFeed}
-        style={styles.driverFeedFullButton}
+        style={styles.feedEmptyLink}
       >
-        <Text style={styles.driverFeedFullButtonText}>Открыть полный экран</Text>
+        <Text style={styles.feedEmptyLinkText}>Открыть полный экран</Text>
       </PressableScale>
     </View>
   );
