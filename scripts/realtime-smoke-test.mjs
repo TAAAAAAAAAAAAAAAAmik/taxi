@@ -74,6 +74,10 @@ try {
     'order_assigned event',
   );
   assert(assignedEvent.payload.order.status === 'accepted', 'Assigned event should carry accepted status');
+  assert(
+    assignedEvent.payload.order.driver?.payoutAccount === 'Сбербанк 2202 2020 1111 2222',
+    'Client-visible order.driver should carry driver payout requisites',
+  );
 
   await api(`/orders/${encodeURIComponent(order.id)}/status`, {
     body: { status: 'completed' },
@@ -351,6 +355,7 @@ async function createReadyDriver(adminToken, name, phone, plate) {
       name,
       phone,
       plate,
+      payoutAccount: 'Сбербанк 2202 2020 1111 2222',
       status: 'approved',
       subscriptionStatus: 'active',
       vehicle: 'Lada Vesta',

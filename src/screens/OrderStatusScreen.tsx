@@ -132,6 +132,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
           .filter(Boolean)
           .join(' · ') || config.participantMeta
       : config.participantMeta;
+  // Реквизиты водителя (указаны им при регистрации), куда клиент переводит оплату.
+  const driverPayoutAccount = ((driver as OrderParticipant).payoutAccount ?? '').trim();
   const existingReview = currentOrder?.review;
   const liveStatus = currentOrder?.status ?? (order as { status?: string }).status;
   const isCancelled = ['cancelled', 'canceled'].includes(liveStatus ?? '');
@@ -484,7 +486,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                   : 'Подключаем сервер'}
             </Text>
             <Text numberOfLines={2} style={styles.liveText}>
-              {notifications.find((item) => item.orderId === order.id)?.title || realtimeMessage}
+              {notifications.find((item) => item.orderId === order.id)?.title ||
+                friendlyRealtimeMessage(realtimeMessage, realtimeStatus)}
               {realtimeUpdatedAt ? ` · ${new Date(realtimeUpdatedAt).toLocaleTimeString('ru-RU')}` : ''}
             </Text>
           </View>
@@ -1057,8 +1060,16 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                       </View>
                       <InfoRow icon={<CreditCard color="#008D49" size={18} />} label="Способ" value={displayedOrder.paymentMethod} />
                       <InfoRow icon={<UserRound color="#008D49" size={18} />} label="Получатель" value={participantName} />
-                      <InfoRow icon={<ReceiptText color="#008D49" size={18} />} label="Карта" value="2200 24•• •••• 4011" />
-                      <Text style={styles.payHint}>Переведите сумму водителю и подтвердите оплату.</Text>
+                      <InfoRow
+                        icon={<ReceiptText color="#008D49" size={18} />}
+                        label="Реквизиты"
+                        value={driverPayoutAccount || 'Уточните у водителя'}
+                      />
+                      <Text style={styles.payHint}>
+                        {driverPayoutAccount
+                          ? 'Переведите сумму на реквизиты водителя и подтвердите оплату.'
+                          : 'Переведите сумму водителю и подтвердите оплату.'}
+                      </Text>
                       <Pressable
                         accessibilityRole="button"
                         onPress={confirmPayment}
@@ -1377,6 +1388,20 @@ function MiniAction({ icon, label, onPress }: MiniActionProps) {
       <Text style={styles.miniActionText}>{label}</Text>
     </Pressable>
   );
+}
+
+// Технические тексты ошибок сети (Failed to fetch, 404, timeout) не показываем
+// клиенту — заменяем на спокойный статус. Осмысленные сообщения оставляем.
+function friendlyRealtimeMessage(message: string | undefined, status: string) {
+  const raw = String(message || '').trim();
+  const isTechnical =
+    /failed to fetch|api request failed|networkerror|load failed|fetch|econn|timeout|abort|\b\d{3}\b/i.test(raw);
+
+  if (!raw || isTechnical) {
+    return status === 'live' ? 'Данные обновляются в реальном времени' : 'Обновляется автоматически';
+  }
+
+  return raw;
 }
 
 function getStepIndex(steps: Array<{ id: string }>, status?: string) {

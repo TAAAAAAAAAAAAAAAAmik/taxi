@@ -6242,6 +6242,8 @@ function makeDriverFromUser(user, payload, options = {}) {
     parkDriverStatus: isParkDriver ? 'invited' : undefined,
     parkId: options.parkId,
     vehicleDocumentsReady: String(payload.vehicleDocumentsReady || ''),
+    // Реквизиты водителя, куда клиент переводит оплату за поездку напрямую.
+    payoutAccount: String(payload.payoutAccount || payload.fleetPayoutAccount || '').trim(),
     userId: user.id,
     updatedAt: new Date().toISOString(),
   };
@@ -8472,6 +8474,7 @@ async function handleRequest(request, response) {
         status: payload.status === 'approved' ? 'approved' : 'pending',
         billingMode: normalizeBillingMode(payload.billingMode),
         documentUploads: {},
+        payoutAccount: String(payload.payoutAccount || '').trim(),
         subscriptionStatus: payload.subscriptionStatus === 'active' ? 'active' : 'inactive',
         updatedAt: now,
       };
@@ -9611,6 +9614,7 @@ async function handleRequest(request, response) {
           subscriptionStatus: driver.subscriptionStatus,
           vehicle: driver.vehicle,
           plate: driver.plate,
+          payoutAccount: driver.payoutAccount || '',
         };
         order.fulfilledByRole = normalizeFulfilledByRole(payload.fulfilledByRole, driver.employmentType === 'park_driver' ? 'park_driver' : 'self_employed_driver');
         order.parkId = payload.parkId ? String(payload.parkId) : driver.parkId || order.parkId;
