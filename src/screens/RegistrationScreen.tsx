@@ -47,9 +47,12 @@ import { driverAccessPlans } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
 import {
   ConsentValues,
+  FieldErrors,
   FormValues,
   createConsentState,
+  hasMissingConsent,
   validateRegistration,
+  validateRegistrationFields,
 } from '../utils/validation';
 import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
 import { validateReferralCode } from '../services/apiClient';
@@ -134,10 +137,17 @@ export function RegistrationScreen({ navigation, route }: Props) {
   const [isSavingApplication, setIsSavingApplication] = useState(false);
   const [serverNotice, setServerNotice] = useState<string | null>(null);
   const [activeStepId, setActiveStepId] = useState<RegistrationStepId>('role');
+  // Ошибки, показанные на текущем шаге (подсветка полей включается только
+  // после попытки продолжить — не пугаем красным во время набора).
+  const [stepErrors, setStepErrors] = useState<FieldErrors>({});
+  const [stepNotice, setStepNotice] = useState<string | null>(null);
   const stepTransition = useRef(new Animated.Value(1)).current;
+  const scrollRef = useRef<ScrollView>(null);
   const reducedMotion = useReducedMotionPreference();
 
   const fields = useMemo(() => getFieldsForRole(role), [role]);
+  const fieldErrors = useMemo(() => validateRegistrationFields(role, values), [role, values]);
+  const consentMissing = hasMissingConsent(consents);
   const validationErrors = useMemo(
     () => validateRegistration(role, values, consents),
     [consents, role, values],
@@ -262,6 +272,16 @@ export function RegistrationScreen({ navigation, route }: Props) {
   const updateValue = (id: string, nextValue: string) => {
     setSubmitted(false);
     setServerNotice(null);
+    // Поправил поле — красная подсветка гаснет сразу.
+    setStepErrors((current) => {
+      if (!current[id]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
     setValues((current) => ({ ...current, [id]: nextValue }));
   };
 
@@ -272,7 +292,49 @@ export function RegistrationScreen({ navigation, route }: Props) {
 
   const handleRoleChange = (nextRole: AccountRole) => {
     setSubmitted(false);
+    setStepErrors({});
+    setStepNotice(null);
     setRole(nextRole);
+  };
+
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ animated: !reducedMotion, y: 0 });
+  };
+
+  // Поля, видимые на текущем шаге, — их и проверяем перед переходом дальше.
+  const currentStepFieldIds = useMemo(
+    () => visibleFieldSections.flatMap((group) => group.fields.map((field) => field.id)),
+    [visibleFieldSections],
+  );
+
+  // Шаг, на котором живёт поле, — для перехода к ошибке с финального шага.
+  const stepForField = (fieldId: string): RegistrationStepId => {
+    if (passwordFieldIds.has(fieldId)) {
+      return hasPasswordStep ? 'password' : 'contact';
+    }
+
+    const field = fields.find((item) => item.id === fieldId);
+    return field?.section === 'account' ? 'contact' : 'details';
+  };
+
+  const errorSteps = useMemo(() => {
+    const stepIds = new Set(Object.keys(fieldErrors).map(stepForField));
+    return registrationSteps.filter((step) => stepIds.has(step.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldErrors, fields, hasPasswordStep, registrationSteps]);
+
+  const goToStep = (stepId: RegistrationStepId) => {
+    setStepErrors({});
+    setStepNotice(null);
+    setActiveStepId(stepId);
+  };
+
+  const jumpToFix = (stepId: RegistrationStepId) => {
+    // Открываем шаг сразу с подсвеченными проблемными полями.
+    setSubmitted(false);
+    setStepNotice('Поправьте подсвеченные поля.');
+    setStepErrors(fieldErrors);
+    setActiveStepId(stepId);
   };
 
   const goToNextStep = () => {
@@ -281,6 +343,27 @@ export function RegistrationScreen({ navigation, route }: Props) {
       return;
     }
 
+    // Пошаговая проверка: дальше пускаем только с валидным текущим шагом,
+    // ошибки показываем под конкретными полями.
+    const errorsForStep: FieldErrors = {};
+    currentStepFieldIds.forEach((id) => {
+      if (fieldErrors[id]) {
+        errorsForStep[id] = fieldErrors[id];
+      }
+    });
+
+    if (Object.keys(errorsForStep).length > 0) {
+      setStepErrors(errorsForStep);
+      setStepNotice(
+        Object.keys(errorsForStep).length === 1
+          ? 'Осталось одно поле — оно подсвечено.'
+          : 'Поправьте подсвеченные поля — и едем дальше.',
+      );
+      return;
+    }
+
+    setStepErrors({});
+    setStepNotice(null);
     const nextStep = registrationSteps[activeStepIndex + 1];
     if (nextStep) {
       setActiveStepId(nextStep.id);
@@ -288,11 +371,19 @@ export function RegistrationScreen({ navigation, route }: Props) {
   };
 
   const goToPreviousStep = () => {
+    setStepErrors({});
+    setStepNotice(null);
     const previousStep = registrationSteps[activeStepIndex - 1];
     if (previousStep) {
       setActiveStepId(previousStep.id);
     }
   };
+
+  // Новый шаг всегда начинается с начала экрана.
+  useEffect(() => {
+    scrollToTop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStep.id]);
 
   const handleSubmit = async () => {
     if (!canSubmit) {
@@ -397,7 +488,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" ref={scrollRef}>
         <View style={styles.hero}>
           <View style={styles.heroGlow} />
           <View style={styles.heroTop}>
@@ -446,7 +537,14 @@ export function RegistrationScreen({ navigation, route }: Props) {
               const active = step.id === activeStep.id;
 
               return (
-                <View key={step.id} style={styles.heroStep}>
+                <Pressable
+                  accessibilityLabel={`Шаг ${index + 1}: ${step.title}`}
+                  accessibilityRole="button"
+                  disabled={!done}
+                  key={step.id}
+                  onPress={() => goToStep(step.id)}
+                  style={({ pressed }) => [styles.heroStep, pressed && done && styles.pressedButton]}
+                >
                   <View
                     style={[
                       styles.heroStepDot,
@@ -467,7 +565,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
                       {step.title}
                     </Text>
                   ) : null}
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -582,6 +680,7 @@ export function RegistrationScreen({ navigation, route }: Props) {
                     {group.fields.map((field) => (
                       <View key={field.id} style={styles.fieldSlot}>
                         <FieldInput
+                          error={stepErrors[field.id]}
                           field={field}
                           onChangeText={(nextValue) => updateValue(field.id, nextValue)}
                           value={values[field.id] ?? ''}
@@ -635,6 +734,12 @@ export function RegistrationScreen({ navigation, route }: Props) {
               ) : null}
             </Animated.View>
 
+            {stepNotice && activeStep.id !== 'confirm' ? (
+              <InfoPanel Icon={AlertCircle} title="Почти готово" tone="warning">
+                <Text style={styles.panelText}>{stepNotice}</Text>
+              </InfoPanel>
+            ) : null}
+
             {submitted && validationErrors.length > 0 ? (
               <InfoPanel Icon={AlertCircle} title="Нужно проверить анкету" tone="warning">
                 {validationErrors.slice(0, 4).map((error) => (
@@ -642,6 +747,23 @@ export function RegistrationScreen({ navigation, route }: Props) {
                     {error}
                   </Text>
                 ))}
+                {errorSteps.length > 0 ? (
+                  <View style={styles.fixRow}>
+                    {errorSteps.map((step) => (
+                      <Pressable
+                        accessibilityRole="button"
+                        key={step.id}
+                        onPress={() => jumpToFix(step.id)}
+                        style={({ pressed }) => [styles.fixChip, pressed && styles.pressedButton]}
+                      >
+                        <Text style={styles.fixChipText}>Исправить: {step.title}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                {consentMissing && errorSteps.length === 0 ? (
+                  <Text style={styles.panelTextMuted}>Отметьте согласия выше — и можно отправлять.</Text>
+                ) : null}
               </InfoPanel>
             ) : null}
 
@@ -996,6 +1118,26 @@ const styles = StyleSheet.create({
   fieldSlot: {
     flex: 1,
     minWidth: 230,
+  },
+  fixChip: {
+    backgroundColor: kinetixColors.surface,
+    borderColor: 'rgba(0, 141, 73, 0.3)',
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 38,
+    paddingHorizontal: 14,
+  },
+  fixChipText: {
+    color: kinetixColors.amber,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  fixRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
   },
   formArea: {
     flex: 1,

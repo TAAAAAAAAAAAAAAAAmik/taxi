@@ -9,6 +9,8 @@ import {
 
 export type FormValues = Record<string, string>;
 export type ConsentValues = Record<ConsentId, boolean>;
+// Ошибки по полям: id поля → короткое сообщение под этим полем.
+export type FieldErrors = Record<string, string>;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^\+?[0-9\s()-]{10,20}$/;
@@ -21,113 +23,112 @@ export function createConsentState(): ConsentValues {
   }, {} as ConsentValues);
 }
 
+// По-полевая валидация — база для пошаговой проверки анкеты: каждый шаг
+// проверяет только свои поля и подсвечивает ошибки прямо под ними.
+export function validateRegistrationFields(role: AccountRole, values: FormValues): FieldErrors {
+  const errors: FieldErrors = {};
+  const fields = getFieldsForRole(role);
+  const setError = (id: string, message: string) => {
+    if (!errors[id]) {
+      errors[id] = message;
+    }
+  };
+
+  fields.forEach((field) => {
+    if (field.required && !values[field.id]?.trim()) {
+      setError(field.id, 'Заполните это поле');
+    }
+  });
+
+  if (values.email?.trim() && !emailPattern.test(values.email.trim())) {
+    setError('email', 'Похоже на опечатку — проверьте формат почты');
+  }
+
+  if (values.phone?.trim() && !phonePattern.test(values.phone.trim())) {
+    setError('phone', 'Проверьте номер — например, +7 900 000-00-00');
+  }
+
+  if (values.appPassword && values.appPassword.length < 8) {
+    setError('appPassword', 'Минимум 8 символов');
+  }
+
+  if (isSelfEmployedDriverRole(role)) {
+    const driverInn = onlyDigits(values.driverInn);
+
+    if (driverInn && driverInn.length !== 12) {
+      setError('driverInn', 'ИНН — ровно 12 цифр');
+    }
+
+    validateExperienceYear(values, setError);
+    requireAffirmation(values.vehicleDocumentsReady, 'vehicleDocumentsReady', 'Напишите «да» или «готов предоставить»', setError);
+    requireAffirmation(values.noLegalRestrictionsDeclaration, 'noLegalRestrictionsDeclaration', 'Напишите «да» или «подтверждаю»', setError);
+  }
+
+  if (isParkDriverRole(role)) {
+    validateExperienceYear(values, setError);
+    requireAffirmation(values.taxiParkDriverAgreement, 'taxiParkDriverAgreement', 'Напишите «да» или «подтверждаю»', setError);
+  }
+
+  return errors;
+}
+
+export function hasMissingConsent(consents: ConsentValues) {
+  return consentItems.some((item) => !consents[item.id]);
+}
+
+// Плоский список для финального шага — собирается из по-полевых ошибок,
+// чтобы формулировки совпадали с подсветкой на шагах.
 export function validateRegistration(
   role: AccountRole,
   values: FormValues,
   consents: ConsentValues,
 ) {
-  const errors: string[] = [];
+  const fieldErrors = validateRegistrationFields(role, values);
   const fields = getFieldsForRole(role);
+  const errors = fields
+    .filter((field) => fieldErrors[field.id])
+    .map((field) =>
+      fieldErrors[field.id] === 'Заполните это поле'
+        ? `Заполните поле "${field.label}".`
+        : `${field.label}: ${fieldErrors[field.id].toLowerCase()}.`,
+    );
 
-  fields.forEach((field) => {
-    if (field.required && !values[field.id]?.trim()) {
-      errors.push(`Заполните поле "${field.label}".`);
-    }
-  });
-
-  if (values.email && !emailPattern.test(values.email.trim())) {
-    errors.push('Проверьте формат почты.');
-  }
-
-  if (values.phone && !phonePattern.test(values.phone.trim())) {
-    errors.push('Проверьте формат телефона.');
-  }
-
-  if (values.appPassword && values.appPassword.length < 8) {
-    errors.push('Пароль для приложения должен быть не короче 8 символов.');
-  }
-
-  if (isSelfEmployedDriverRole(role)) {
-    validateDriverLegalFields(values, errors);
-  }
-
-  if (isParkDriverRole(role)) {
-    validateParkDriverFields(values, errors);
-  }
-
-  const missingConsent = consentItems.find((item) => !consents[item.id]);
-
-  if (missingConsent) {
+  if (hasMissingConsent(consents)) {
     errors.push('Подтвердите обязательные согласия.');
   }
 
   return errors;
 }
 
-function validateParkDriverFields(values: FormValues, errors: string[]) {
-  const experienceYear = Number(values.drivingExperienceSince);
+function validateExperienceYear(values: FormValues, setError: (id: string, message: string) => void) {
+  const raw = values.drivingExperienceSince?.trim();
+
+  if (!raw) {
+    return;
+  }
+
+  const experienceYear = Number(raw);
   const currentYear = new Date().getFullYear();
 
-  if (values.drivingExperienceSince?.trim()) {
-    if (
-      !digitsOnlyPattern.test(values.drivingExperienceSince.trim()) ||
-      experienceYear < 1950 ||
-      experienceYear > currentYear
-    ) {
-      errors.push('Укажите корректный год начала водительского стажа.');
-    } else if (currentYear - experienceYear < 3) {
-      errors.push('Для работы в легковом такси нужен водительский стаж не менее 3 лет.');
-    }
+  if (!digitsOnlyPattern.test(raw) || experienceYear < 1950 || experienceYear > currentYear) {
+    setError('drivingExperienceSince', `Год числом: 1950–${currentYear}`);
+  } else if (currentYear - experienceYear < 3) {
+    setError('drivingExperienceSince', 'Для такси нужен стаж от 3 лет');
   }
-
-  requireAffirmation(
-    values.taxiParkDriverAgreement,
-    'Подтвердите работу через таксопарк.',
-    errors,
-  );
 }
 
-function validateDriverLegalFields(values: FormValues, errors: string[]) {
-  const driverInn = onlyDigits(values.driverInn);
-
-  if (driverInn && driverInn.length !== 12) {
-    errors.push('ИНН водителя должен состоять из 12 цифр.');
-  }
-
-  const experienceYear = Number(values.drivingExperienceSince);
-  const currentYear = new Date().getFullYear();
-
-  if (values.drivingExperienceSince?.trim()) {
-    if (
-      !digitsOnlyPattern.test(values.drivingExperienceSince.trim()) ||
-      experienceYear < 1950 ||
-      experienceYear > currentYear
-    ) {
-      errors.push('Укажите корректный год начала водительского стажа.');
-    } else if (currentYear - experienceYear < 3) {
-      errors.push('Для работы в легковом такси нужен водительский стаж не менее 3 лет.');
-    }
-  }
-
-  requireAffirmation(
-    values.vehicleDocumentsReady,
-    'Подтвердите готовность предоставить документы автомобиля.',
-    errors,
-  );
-  requireAffirmation(
-    values.noLegalRestrictionsDeclaration,
-    'Подтвердите отсутствие ограничений для работы в такси.',
-    errors,
-  );
-}
-
-function requireAffirmation(value: string | undefined, message: string, errors: string[]) {
+function requireAffirmation(
+  value: string | undefined,
+  fieldId: string,
+  message: string,
+  setError: (id: string, message: string) => void,
+) {
   if (!value?.trim()) {
     return;
   }
 
   if (!/(да|есть|подтверждаю|оформля|готов)/i.test(value)) {
-    errors.push(message);
+    setError(fieldId, message);
   }
 }
 

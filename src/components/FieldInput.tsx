@@ -7,9 +7,11 @@ type FieldInputProps = {
   field: RegistrationField;
   value: string;
   onChangeText: (value: string) => void;
+  // Ошибка шаговой валидации — подсвечивает поле и объясняет, что поправить.
+  error?: string;
 };
 
-export function FieldInput({ field, value, onChangeText }: FieldInputProps) {
+export function FieldInput({ error, field, value, onChangeText }: FieldInputProps) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>
@@ -24,16 +26,26 @@ export function FieldInput({ field, value, onChangeText }: FieldInputProps) {
         placeholder={field.placeholder}
         placeholderTextColor={kx.text.muted}
         secureTextEntry={field.secureTextEntry}
-        style={styles.input}
+        style={[styles.input, error ? styles.inputError : null]}
         textContentType={field.textContentType}
         value={value}
       />
-      {field.helper ? <Text style={styles.helper}>{field.helper}</Text> : null}
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : field.helper ? (
+        <Text style={styles.helper}>{field.helper}</Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  errorText: {
+    color: '#B23B32',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
   field: {
     gap: 7,
   },
@@ -54,6 +66,11 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 15,
     paddingVertical: 12,
+  },
+  inputError: {
+    backgroundColor: '#FDF6F5',
+    borderColor: '#C9564C',
+    borderWidth: 1.5,
   },
   label: {
     color: kx.text.primary,
