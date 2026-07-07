@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
+  Ban,
   Car,
   Check,
   CircleDot,
@@ -89,6 +90,9 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const [shareResult, setShareResult] = useState('');
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [safetyResult, setSafetyResult] = useState('');
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelNotice, setCancelNotice] = useState('');
   const [tripChatOpen, setTripChatOpen] = useState(false);
   const [tripChatDraft, setTripChatDraft] = useState('');
   const [tripChatMessages, setTripChatMessages] = useState<
@@ -130,6 +134,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
       : config.participantMeta;
   const existingReview = currentOrder?.review;
   const liveStatus = currentOrder?.status ?? (order as { status?: string }).status;
+  const isCancelled = ['cancelled', 'canceled'].includes(liveStatus ?? '');
+  const canCancelTrip = role === 'client' && !isCompleted && !isCancelled;
   const paymentStatus = displayedOrder.paymentStatus ?? 'pending';
   const isPaid = paymentStatus === 'paid';
   const paymentEvent = displayedOrder.paymentEvents?.[0];
@@ -286,6 +292,24 @@ export function OrderStatusScreen({ navigation, route }: Props) {
       updateOrderStatus(order.id, calculatedNextStatus);
       return calculatedNextIndex;
     });
+  };
+
+  const cancelTrip = async () => {
+    // Первое нажатие раскрывает подтверждение — отмена необратима.
+    if (!cancelConfirm) {
+      setCancelConfirm(true);
+      return;
+    }
+
+    setCancelBusy(true);
+
+    try {
+      await updateOrderStatus(order.id, 'cancelled');
+      setCancelNotice('Поездка отменена. Водитель получит уведомление.');
+    } finally {
+      setCancelBusy(false);
+      setCancelConfirm(false);
+    }
   };
 
   const confirmPayment = async () => {
@@ -502,8 +526,10 @@ export function OrderStatusScreen({ navigation, route }: Props) {
           <View style={styles.mainColumn}>
             <View style={styles.statusPanel}>
               <View style={styles.statusHeader}>
-                <View style={styles.statusIcon}>
-                  {isCompleted ? (
+                <View style={[styles.statusIcon, isCancelled && styles.statusIconCancelled]}>
+                  {isCancelled ? (
+                    <Ban color="#B23B32" size={24} strokeWidth={2.6} />
+                  ) : isCompleted ? (
                     <Check color="#12382C" size={24} strokeWidth={3} />
                   ) : (
                     <CircleDot color="#12382C" size={24} strokeWidth={2.6} />
@@ -511,33 +537,49 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                 </View>
                 <View style={styles.statusCopy}>
                   <Text style={styles.statusTitle}>
-                    {isCompleted ? config.completedTitle : activeStep.title}
+                    {isCancelled
+                      ? 'Поездка отменена'
+                      : isCompleted
+                        ? config.completedTitle
+                        : activeStep.title}
                   </Text>
                   <Text numberOfLines={3} style={styles.statusText}>
-                    {isCompleted ? config.completedText : activeStep.description}
+                    {isCancelled
+                      ? role === 'client'
+                        ? 'Вы отменили поездку. Водитель получил уведомление.'
+                        : 'Клиент отменил поездку.'
+                      : isCompleted
+                        ? config.completedText
+                        : activeStep.description}
                   </Text>
                 </View>
               </View>
 
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${progress}%` }]} />
-              </View>
-              <Text style={styles.progressText}>{isCompleted ? config.completedTitle : activeStep.title}</Text>
+              {isCancelled ? null : (
+                <>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                  </View>
+                  <Text style={styles.progressText}>
+                    {isCompleted ? config.completedTitle : activeStep.title}
+                  </Text>
+                </>
+              )}
 
               <View style={styles.actionRow}>
                 {isDriverRole ? (
                   <Pressable
                     accessibilityRole="button"
-                    disabled={isCompleted}
+                    disabled={isCompleted || isCancelled}
                     onPress={advance}
                     style={({ pressed }) => [
                       styles.primaryButton,
-                      isCompleted && styles.primaryButtonMuted,
+                      (isCompleted || isCancelled) && styles.primaryButtonMuted,
                       pressed && styles.pressed,
                     ]}
                   >
                     <Text style={styles.primaryButtonText}>
-                      {isCompleted ? 'Статус завершен' : primaryActionLabel}
+                      {isCancelled ? 'Заказ отменён' : isCompleted ? 'Статус завершен' : primaryActionLabel}
                     </Text>
                   </Pressable>
                 ) : null}
@@ -563,6 +605,48 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                   <Text style={styles.secondaryButtonText}>Поделиться</Text>
                 </Pressable>
               </View>
+
+              {canCancelTrip ? (
+                cancelConfirm ? (
+                  <View style={styles.cancelConfirmRow}>
+                    <Text style={styles.cancelConfirmText}>Точно отменить поездку?</Text>
+                    <View style={styles.cancelConfirmActions}>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={cancelBusy}
+                        onPress={cancelTrip}
+                        style={({ pressed }) => [
+                          styles.cancelDangerButton,
+                          cancelBusy && styles.pressed,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={styles.cancelDangerButtonText}>
+                          {cancelBusy ? 'Отменяем…' : 'Да, отменить'}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={cancelBusy}
+                        onPress={() => setCancelConfirm(false)}
+                        style={({ pressed }) => [styles.cancelKeepButton, pressed && styles.pressed]}
+                      >
+                        <Text style={styles.cancelKeepButtonText}>Нет</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={cancelTrip}
+                    style={({ pressed }) => [styles.cancelTripButton, pressed && styles.pressed]}
+                  >
+                    <Ban color="#B23B32" size={17} strokeWidth={2.4} />
+                    <Text style={styles.cancelTripButtonText}>Отменить поездку</Text>
+                  </Pressable>
+                )
+              ) : null}
+              {cancelNotice ? <Text style={styles.inlineNotice}>{cancelNotice}</Text> : null}
               {shareResult ? <Text style={styles.inlineNotice}>{shareResult}</Text> : null}
             </View>
 
@@ -1477,6 +1561,69 @@ const styles = StyleSheet.create({
   contactTitle: {
     color: '#008D49',
     fontSize: 15,
+    fontWeight: '900',
+  },
+  cancelConfirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cancelConfirmRow: {
+    backgroundColor: '#FDF3F2',
+    borderColor: 'rgba(178, 59, 50, 0.22)',
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+  },
+  cancelConfirmText: {
+    color: '#7A2A24',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  cancelDangerButton: {
+    alignItems: 'center',
+    backgroundColor: '#B23B32',
+    borderRadius: 12,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 14,
+  },
+  cancelDangerButtonText: {
+    color: '#FDF3F2',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  cancelKeepButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(178, 59, 50, 0.26)',
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 20,
+  },
+  cancelKeepButtonText: {
+    color: '#7A2A24',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  cancelTripButton: {
+    alignItems: 'center',
+    backgroundColor: '#FDF3F2',
+    borderColor: 'rgba(178, 59, 50, 0.24)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 50,
+    paddingHorizontal: 16,
+  },
+  cancelTripButtonText: {
+    color: '#B23B32',
+    fontSize: 14,
     fontWeight: '900',
   },
   inlineNotice: {
@@ -2470,6 +2617,9 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: 'center',
     width: 48,
+  },
+  statusIconCancelled: {
+    backgroundColor: '#F7D7D3',
   },
   statusPanel: {
     backgroundColor: '#FFFFFF',

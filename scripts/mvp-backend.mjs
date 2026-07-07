@@ -1460,6 +1460,8 @@ function getOrderStatusLabel(status) {
   const labels = {
     accepted: 'водитель назначен',
     arrived: 'водитель на месте',
+    cancelled: 'поездка отменена',
+    canceled: 'поездка отменена',
     closed: 'заказ закрыт',
     completed: 'поездка завершена',
     created: 'заказ создан',
@@ -9069,12 +9071,18 @@ async function handleRequest(request, response) {
         settleDriverReferralForOrder(db, order);
         settleMarketingForOrder(db, order);
 
+        // Отмену клиентом показываем водителю отдельным понятным сообщением,
+        // а не обезличенным «Статус заказа обновлён».
+        const cancelledByClient =
+          ['cancelled', 'canceled'].includes(order.status) && getSessionRole(sessionContext) === 'client';
         const notification = notifyOrderChange(
           db,
           order,
-          'Статус заказа обновлен',
-          `${order.id}: ${getOrderStatusLabel(order.status)}.`,
-          'order_status',
+          cancelledByClient ? 'Клиент отменил поездку' : 'Статус заказа обновлен',
+          cancelledByClient
+            ? `Заказ ${order.id}: клиент отменил поездку.`
+            : `${order.id}: ${getOrderStatusLabel(order.status)}.`,
+          cancelledByClient ? 'order_cancelled' : 'order_status',
         );
         await sendPushToUser(db, order.userId, notification, {
           orderId: order.id,

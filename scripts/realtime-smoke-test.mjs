@@ -131,6 +131,60 @@ try {
   );
   assert(availabilityEvent.payload.driver.isOnline === false, 'Driver availability event should carry offline state');
 
+  // Отмена клиентом: второй заказ назначаем водителю, затем клиент его отменяет.
+  // Проверяем, что realtime разносит отмену и водителю уходит понятное уведомление.
+  await api(`/drivers/${encodeURIComponent(driver.id)}/availability`, {
+    body: { isOnline: true },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+  const cancelOrder = await createOrder({
+    clientName: 'Realtime Client',
+    clientPhone: '+79009998877',
+    destination: 'Cancel destination',
+    paymentMethod: 'Карта',
+    pickup: 'Cancel pickup',
+    role: 'client',
+    tariff: 'economy',
+    total: 410,
+  }, client.session.token);
+  await stream.waitFor(
+    (event) => event.event === 'order_created' && event.payload.order?.id === cancelOrder.id,
+    'order_created event (cancel order)',
+  );
+  await api(`/orders/${encodeURIComponent(cancelOrder.id)}/assign`, {
+    body: { driverId: driver.id },
+    method: 'PATCH',
+    token: admin.session.token,
+  });
+  await stream.waitFor(
+    (event) => event.event === 'order_assigned' && event.payload.order?.id === cancelOrder.id,
+    'order_assigned event (cancel order)',
+  );
+
+  const cancelResponse = await api(`/orders/${encodeURIComponent(cancelOrder.id)}/status`, {
+    body: { status: 'cancelled' },
+    method: 'PATCH',
+    token: client.session.token,
+  });
+  assert(cancelResponse.order.status === 'cancelled', 'Client should be able to cancel own order');
+
+  const cancelledEvent = await stream.waitFor(
+    (event) =>
+      event.event === 'order_status' &&
+      event.payload.order?.id === cancelOrder.id &&
+      event.payload.order?.status === 'cancelled',
+    'order cancelled event',
+  );
+  assert(
+    cancelledEvent.payload.notification?.title === 'Клиент отменил поездку',
+    'Cancel by client should notify driver with a clear title',
+  );
+  assert(
+    cancelledEvent.payload.notification?.driverId === driver.id,
+    'Cancel notification should target the assigned driver',
+  );
+
   const snapshot = await api('/realtime/snapshot', { token: admin.session.token });
   const snapshotOrder = snapshot.orders.find((item) => item.id === order.id);
 
