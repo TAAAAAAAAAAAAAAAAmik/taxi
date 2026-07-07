@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { ArrowLeft, type LucideProps } from 'lucide-react-native';
+import { ArrowLeft, type LucideProps, Menu as MenuIcon } from 'lucide-react-native';
 
 import { kinetixColors } from '../theme/kinetixTokens';
 import { PressableScale } from './KinetixUI';
@@ -9,6 +9,8 @@ type ScreenHeroProps = {
   title: string;
   subtitle?: string;
   onBack: () => void;
+  // ☰ справа — переход на главный экран, где открывается боковое меню.
+  onMenu?: () => void;
   Icon?: ComponentType<LucideProps>;
   right?: ReactNode;
   // Отрицательные поля, чтобы hero уходил в край поверх padding страницы.
@@ -17,7 +19,7 @@ type ScreenHeroProps = {
 
 // Единый тёмный премиальный заголовок для вложенных экранов (История,
 // Рефералы, Адрес, Подписка и т.д.) — тот же язык, что hero на главной.
-export function ScreenHero({ title, subtitle, onBack, Icon, right, bleed = 16 }: ScreenHeroProps) {
+export function ScreenHero({ title, subtitle, onBack, onMenu, Icon, right, bleed = 16 }: ScreenHeroProps) {
   return (
     <View style={[styles.hero, { marginHorizontal: -bleed, marginTop: -bleed }]}>
       <View style={styles.glow} />
@@ -30,7 +32,17 @@ export function ScreenHero({ title, subtitle, onBack, Icon, right, bleed = 16 }:
         >
           <ArrowLeft color={kinetixColors.lime} size={21} strokeWidth={2.3} />
         </PressableScale>
-        {right ?? null}
+        {right ??
+          (onMenu ? (
+            <PressableScale
+              accessibilityLabel="Меню"
+              accessibilityRole="button"
+              onPress={onMenu}
+              style={styles.back}
+            >
+              <MenuIcon color={kinetixColors.lime} size={21} strokeWidth={2.3} />
+            </PressableScale>
+          ) : null)}
       </View>
       <View style={styles.main}>
         {Icon ? (

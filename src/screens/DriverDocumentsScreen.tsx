@@ -67,7 +67,8 @@ function estimateDocumentBytes(asset: { base64?: string | null; fileSize?: numbe
   return Math.floor((asset.base64?.length ?? 0) * 0.75);
 }
 
-export function DriverDocumentsScreen({ navigation }: Props) {
+export function DriverDocumentsScreen({ navigation, route }: Props) {
+  const { firstName, role } = route.params;
   const { currentUser, drivers, submitDriverDocuments } = useAppState();
   const [selectedDocuments, setSelectedDocuments] = useState<
     Partial<Record<DriverDocumentKind, DriverDocumentUploadInput>>
@@ -196,6 +197,7 @@ export function DriverDocumentsScreen({ navigation }: Props) {
           Icon={ShieldCheck}
           bleed={14}
           onBack={() => navigation.goBack()}
+          onMenu={() => navigation.navigate('Dashboard', { firstName, role })}
           subtitle="Фото документов для допуска к заказам."
           title="Документы водителя"
         />

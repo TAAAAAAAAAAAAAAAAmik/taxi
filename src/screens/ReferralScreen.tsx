@@ -35,7 +35,7 @@ const referralStatusLabels = {
 };
 
 export function ReferralScreen({ navigation, route }: Props) {
-  const { role } = route.params;
+  const { firstName, role } = route.params;
   const {
     currentUser,
     referralDashboard,
@@ -109,6 +109,7 @@ export function ReferralScreen({ navigation, route }: Props) {
         <ScreenHero
           Icon={Share2}
           onBack={() => navigation.goBack()}
+          onMenu={() => navigation.navigate('Dashboard', { firstName, role })}
           subtitle="Одна ссылка для клиентов и водителей. Бонус — после завершённых поездок."
           title="Пригласить друзей"
         />

@@ -94,6 +94,7 @@ export function OrderHistoryScreen({ navigation, route }: Props) {
         <ScreenHero
           Icon={ReceiptText}
           onBack={() => navigation.goBack()}
+          onMenu={() => navigation.navigate('Dashboard', { firstName, role })}
           right={
             <PressableScale
               accessibilityLabel={isDriverRole ? 'К ленте заказов' : 'Повторить маршрут'}

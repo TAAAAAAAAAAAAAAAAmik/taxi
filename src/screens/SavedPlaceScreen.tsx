@@ -80,6 +80,7 @@ export function SavedPlaceScreen({ navigation, route }: Props) {
         <ScreenHero
           Icon={Home}
           onBack={() => navigation.goBack()}
+          onMenu={() => navigation.navigate('Dashboard', { firstName, role })}
           subtitle="Сохраните дом один раз — быстрый заказ подставит его сам."
           title="Домашний адрес"
         />

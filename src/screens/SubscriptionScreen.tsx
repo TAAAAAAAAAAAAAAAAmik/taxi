@@ -113,6 +113,7 @@ export function SubscriptionScreen({ navigation, route }: Props) {
         <ScreenHero
           Icon={WalletCards}
           onBack={() => navigation.goBack()}
+          onMenu={() => navigation.navigate('Dashboard', { firstName, role })}
           subtitle="120 ₽ за день или Партнёр PRO на месяц"
           title="Доступ к заказам"
         />
