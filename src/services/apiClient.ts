@@ -199,7 +199,11 @@ export type DriverBillingDashboard = {
 
 export type DriverPaymentSettings = {
   amount: number;
+  dailyAmount?: number;
+  monthlyAmount?: number;
   cardMask?: string;
+  cardNumber?: string;
+  cardHolder?: string;
   instructions: string;
   planName: string;
 };

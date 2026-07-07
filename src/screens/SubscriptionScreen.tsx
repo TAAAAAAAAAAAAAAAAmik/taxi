@@ -4,14 +4,13 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
+  Copy,
   CreditCard,
-  ExternalLink,
   ReceiptText,
-  RefreshCw,
   RotateCcw,
   WalletCards,
 } from 'lucide-react-native';
-import { Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   DriverBillingMode,
@@ -32,7 +31,6 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     driverSubscription,
     payDriverSubscription,
     refundDriverSubscriptionPayment,
-    syncDriverSubscriptionPayment,
   } = useAppState();
   const [selectedMode, setSelectedMode] = useState<DriverBillingMode>('monthly');
   const [busy, setBusy] = useState(false);
@@ -40,19 +38,39 @@ export function SubscriptionScreen({ navigation, route }: Props) {
   const [paymentNotice, setPaymentNotice] = useState('');
   const [showPayments, setShowPayments] = useState(false);
   const [refundBusyId, setRefundBusyId] = useState<string | undefined>();
-  const [syncBusyId, setSyncBusyId] = useState<string | undefined>();
+  const [cardCopied, setCardCopied] = useState(false);
   const selectedPlan = driverAccessPlans[selectedMode];
   const isActive = driverSubscription.status === 'active';
   const paidPayments = useMemo(
     () => driverPayments.filter((payment) => payment.status === 'paid'),
     [driverPayments],
   );
-  const pendingProviderPayment = driverPayments.find(
-    (payment) => payment.status === 'pending' && payment.confirmationUrl,
-  );
   const lastRefundablePayment = paidPayments.find((payment) => payment.amount > 0);
-  const hasPaymentActivity =
-    driverPayments.length > 0 || Boolean(pendingProviderPayment || lastRefundablePayment);
+  const hasPaymentActivity = driverPayments.length > 0 || Boolean(lastRefundablePayment);
+  const selectedAmount =
+    selectedMode === 'daily'
+      ? paymentSettings?.dailyAmount ?? driverAccessPlans.daily.monthlyPrice
+      : paymentSettings?.monthlyAmount ?? driverAccessPlans.monthly.monthlyPrice;
+  const ownerCardNumber = paymentSettings?.cardNumber?.trim() || '';
+  const ownerCardHolder = paymentSettings?.cardHolder?.trim() || '';
+
+  const copyOwnerCard = async () => {
+    if (!ownerCardNumber) {
+      return;
+    }
+
+    const digits = ownerCardNumber.replace(/\s/g, '');
+
+    try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(digits);
+      }
+      setCardCopied(true);
+      setTimeout(() => setCardCopied(false), 2000);
+    } catch {
+      setCardCopied(false);
+    }
+  };
   const hasActiveDriverAccess = isActive && ['monthly', 'daily'].includes(driverSubscription.billingMode);
   const isSelectedCurrentMode = hasActiveDriverAccess && selectedMode === driverSubscription.billingMode;
   const isTrialChoice = context === 'trial-ended' || driverSubscription.status === 'expired';
@@ -82,13 +100,14 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     await payDriverSubscription(selectedMode);
     setBusy(false);
     if (selectedMode === 'daily') {
+      setPaymentNotice('Смена открыта на 24 часа. Не забудьте перевести оплату на карту владельца.');
       navigation.navigate('Dashboard', { firstName, role });
       return;
     }
 
     if (selectedMode === 'monthly') {
       setPaymentNotice(
-        'Заявка на подключение тарифа отправлена. Администратор свяжется с вами для оплаты и активации.',
+        'Заявка отправлена. Переведите сумму на карту владельца — администратор проверит перевод и откроет Партнёр PRO.',
       );
     }
   };
@@ -98,13 +117,6 @@ export function SubscriptionScreen({ navigation, route }: Props) {
     await refundDriverSubscriptionPayment(paymentId, 'Отмена платежа доступа');
     setRefundBusyId(undefined);
     setPaymentNotice('Платеж отменен.');
-  };
-
-  const checkPayment = async (paymentId: string) => {
-    setSyncBusyId(paymentId);
-    await syncDriverSubscriptionPayment(paymentId);
-    setSyncBusyId(undefined);
-    setPaymentNotice('Статус оплаты обновлен.');
   };
 
   return (
@@ -159,15 +171,48 @@ export function SubscriptionScreen({ navigation, route }: Props) {
           </View>
 
           <View style={styles.summaryBox}>
-            <Text style={styles.summaryTitle}>Выбрано: {selectedPlan.shortName}</Text>
+            <View style={styles.payHead}>
+              <Text style={styles.summaryTitle}>Оплата доступа — на карту</Text>
+              <Text style={styles.payAmount}>{formatMoney(selectedAmount)}</Text>
+            </View>
             <Text style={styles.summaryText}>
               {selectedMode === 'monthly'
-                ? '3 290 ₽ за 30 дней. Доступ включается после проверки оплаты.'
-                : '120 ₽ за 24 часа. Доступ включается после проверки оплаты.'}
+                ? 'Партнёр PRO на 30 дней. Переведите сумму на карту владельца — доступ откроет администратор после проверки перевода.'
+                : 'Смена на 24 часа. Переведите сумму на карту владельца за смену; доступ открывается сразу.'}
             </Text>
-            {selectedMode === 'monthly' && paymentSettings?.cardMask ? (
-              <Text style={styles.summaryText}>Карта: {paymentSettings.cardMask}</Text>
-            ) : null}
+
+            {ownerCardNumber ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Скопировать номер карты"
+                onPress={copyOwnerCard}
+                style={({ pressed }) => [styles.cardBox, pressed && styles.pressed]}
+              >
+                <View style={styles.cardInfo}>
+                  <Text style={styles.cardLabel}>Карта для перевода</Text>
+                  <Text style={styles.cardNumber}>{ownerCardNumber}</Text>
+                  {ownerCardHolder ? <Text style={styles.cardHolder}>{ownerCardHolder}</Text> : null}
+                </View>
+                <View style={styles.cardCopy}>
+                  <Copy color="#008D49" size={18} strokeWidth={2.4} />
+                  <Text style={styles.cardCopyText}>{cardCopied ? 'Скопировано' : 'Копировать'}</Text>
+                </View>
+              </Pressable>
+            ) : (
+              <Text style={styles.summaryText}>
+                Реквизиты карты для перевода покажет владелец сервиса.
+              </Text>
+            )}
+
+            <View style={styles.paySteps}>
+              <Text style={styles.payStep}>1. Перевести {formatMoney(selectedAmount)} на карту.</Text>
+              <Text style={styles.payStep}>2. Нажать кнопку ниже — «{selectedPlan.primaryAction}».</Text>
+              <Text style={styles.payStep}>
+                3. {selectedMode === 'monthly' ? 'Дождаться подтверждения администратора.' : 'Доступ на смену откроется сразу.'}
+              </Text>
+            </View>
+
+            <Text style={styles.summaryText}>С поездок процента нет — клиент платит вам напрямую.</Text>
             {paymentNotice ? <Text style={styles.noticeText}>{paymentNotice}</Text> : null}
           </View>
 
@@ -213,36 +258,6 @@ export function SubscriptionScreen({ navigation, route }: Props) {
 
               {showPayments ? (
                 <View style={styles.paymentDetails}>
-                  {pendingProviderPayment ? (
-                    <View style={styles.providerActions}>
-                      <Pressable
-                        accessibilityRole="link"
-                        onPress={() => {
-                          void Linking.openURL(pendingProviderPayment.confirmationUrl || '');
-                        }}
-                        style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-                      >
-                        <ExternalLink color="#008D49" size={17} strokeWidth={2.4} />
-                        <Text style={styles.providerButtonText}>Открыть оплату</Text>
-                      </Pressable>
-                      <Pressable
-                        accessibilityRole="button"
-                        disabled={syncBusyId === pendingProviderPayment.id}
-                        onPress={() => checkPayment(pendingProviderPayment.id)}
-                        style={({ pressed }) => [
-                          styles.secondaryButton,
-                          syncBusyId === pendingProviderPayment.id && styles.disabledButton,
-                          pressed && styles.pressed,
-                        ]}
-                      >
-                        <RefreshCw color="#008D49" size={17} strokeWidth={2.4} />
-                        <Text style={styles.providerButtonText}>
-                          {syncBusyId === pendingProviderPayment.id ? 'Проверяем оплату' : 'Проверить оплату'}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  ) : null}
-
                   {lastRefundablePayment ? (
                     <Pressable
                       accessibilityRole="button"
@@ -525,11 +540,36 @@ const styles = StyleSheet.create({
     borderColor: LINE,
     borderRadius: 14,
     borderWidth: 1,
-    gap: 5,
+    gap: 10,
     padding: 14,
   },
   summaryText: { color: '#71877D', fontSize: 13, lineHeight: 19 },
   summaryTitle: { color: '#12382C', fontSize: 15, fontWeight: '800' },
+  payHead: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  payAmount: { color: '#008D49', fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
+  cardBox: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0, 141, 73, 0.20)',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+  },
+  cardInfo: { flex: 1, gap: 3, minWidth: 0 },
+  cardLabel: { color: '#71877D', fontSize: 12, fontWeight: '700' },
+  cardNumber: { color: '#12382C', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  cardHolder: { color: '#71877D', fontSize: 12, fontWeight: '600' },
+  cardCopy: { alignItems: 'center', gap: 3 },
+  cardCopyText: { color: '#008D49', fontSize: 11, fontWeight: '800' },
+  paySteps: { gap: 3 },
+  payStep: { color: '#4C6B5E', fontSize: 13, fontWeight: '600', lineHeight: 19 },
   trialChoiceCard: {
     backgroundColor: '#FFFCF3',
     borderColor: 'rgba(231, 180, 22, 0.35)',

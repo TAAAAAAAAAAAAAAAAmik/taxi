@@ -82,6 +82,7 @@ const paymentProviderMode = ['demo', 'live', 'manual'].includes(process.env.MVP_
   : 'demo';
 const paymentProviderName = String(process.env.MVP_PAYMENT_PROVIDER || 'demo-acquiring').trim() || 'demo-acquiring';
 const paymentCardNumber = String(process.env.PAYMENT_CARD_NUMBER || '').trim();
+const paymentCardHolder = String(process.env.PAYMENT_CARD_HOLDER || '').trim();
 const yookassaConfig = {
   apiBaseUrl: String(process.env.MVP_YOOKASSA_API_URL || 'https://api.yookassa.ru/v3')
     .trim()
@@ -3051,6 +3052,18 @@ function maskPaymentCardNumber(value) {
   }
 
   return `**** **** **** ${digits.slice(-4)}`;
+}
+
+// Полный номер карты владельца для ручного перевода за доступ: группируем
+// по 4 цифры. Пусто, если карта не настроена (env PAYMENT_CARD_NUMBER).
+function formatPaymentCardNumber(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+
+  if (digits.length < 12) {
+    return '';
+  }
+
+  return digits.replace(/(.{4})/g, '$1 ').trim();
 }
 
 function isDriverPartnerProActive(driver, at = Date.now()) {
@@ -8192,11 +8205,18 @@ async function handleRequest(request, response) {
         return;
       }
 
+      const dailyAmount = driverAccessPlans.daily.monthlyPrice;
+      const monthlyAmount = driverAccessPlans.monthly.monthlyPrice;
       sendJson(response, 200, {
-        amount: driverAccessPlans.monthly.monthlyPrice,
+        // amount оставлен для обратной совместимости (месячный тариф).
+        amount: monthlyAmount,
+        dailyAmount,
+        monthlyAmount,
         cardMask: maskPaymentCardNumber(paymentCardNumber),
+        cardNumber: formatPaymentCardNumber(paymentCardNumber),
+        cardHolder: paymentCardHolder,
         instructions:
-          'Для подключения Партнёр PRO переведите 3 290 ₽ на карту владельца проекта и отправьте чек администратору.',
+          'Оплата доступа — переводом на карту владельца. Переведите сумму тарифа и нажмите «Я оплатил»: администратор проверит перевод и откроет доступ.',
         planName: driverAccessPlans.monthly.name,
       });
       return;

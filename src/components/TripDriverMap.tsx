@@ -31,11 +31,21 @@ function almostEqual(a: GeoPoint, b: GeoPoint): boolean {
   return Math.abs(a.latitude - b.latitude) < 0.0006 && Math.abs(a.longitude - b.longitude) < 0.0006;
 }
 
+function escapeHtml(value: string) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function buildHtml(
   pickup: GeoPoint,
   destination: GeoPoint | null,
   driver: GeoPoint | null,
   carMode: CarMode,
+  pickupLabel: string,
+  destinationLabel: string,
 ) {
   const P = [pickup.latitude, pickup.longitude];
   const D = destination ? [destination.latitude, destination.longitude] : null;
@@ -46,9 +56,15 @@ function buildHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  html,body,#map{height:100%;margin:0;background:#DDECE3}
+  html,body,#map{height:100%;margin:0;background:#EAF3EC}
   #fb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
-      padding:0 24px;color:#557669;font:600 13px/1.4 system-ui;z-index:0}
+      padding:16px;z-index:0;font-family:system-ui,-apple-system,'Inter',sans-serif}
+  .fbcard{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:320px}
+  .fbscheme{width:100%;max-width:240px;height:auto;display:block}
+  .fbtitle{color:#12382C;font-size:15px;font-weight:800;letter-spacing:-.2px}
+  .fbroute{color:#49665A;font-size:12px;font-weight:600;line-height:1.4;
+           display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .fbcap{color:#8AA396;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
   .pin{border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
   .pin-a{width:18px;height:18px;background:#008D49}
   .pin-b{width:18px;height:18px;background:#12382C}
@@ -56,7 +72,24 @@ function buildHtml(
        box-shadow:0 4px 10px rgba(0,111,58,.4);display:flex;align-items:center;justify-content:center}
   .car svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.4}
 </style></head><body>
-<div id="map"><div id="fb">Карта недоступна — проверьте интернет</div></div>
+<div id="map"><div id="fb"><div class="fbcard">
+  <svg class="fbscheme" viewBox="0 0 240 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1" width="238" height="128" rx="16" fill="#F4FAF6" stroke="rgba(11,47,37,.10)"/>
+    <path d="M0 44H240M0 88H240M70 0V130M160 0V130" stroke="rgba(0,141,73,.08)" stroke-width="2"/>
+    <path d="M46 96 C90 96 96 52 140 52 S196 40 196 40" stroke="#008D49" stroke-width="4"
+          stroke-linecap="round" stroke-dasharray="1 11" opacity=".55"/>
+    <path d="M46 96 C90 96 96 52 140 52" stroke="#008D49" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    <circle cx="46" cy="96" r="8" fill="#fff" stroke="#008D49" stroke-width="4"/>
+    <rect x="188" y="32" width="16" height="16" rx="4" fill="#12382C"/>
+    <g transform="translate(120 40)">
+      <rect x="-17" y="-13" width="34" height="26" rx="9" fill="#008D49" stroke="#fff" stroke-width="3"/>
+      <circle cx="-8" cy="10" r="3.4" fill="#12382C"/><circle cx="8" cy="10" r="3.4" fill="#12382C"/>
+    </g>
+  </svg>
+  <div class="fbtitle">Маршрут поездки</div>
+  <div class="fbroute">${escapeHtml(pickupLabel)} → ${escapeHtml(destinationLabel)}</div>
+  <div class="fbcap">Салаватский район · с. Малояз</div>
+</div></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function(){
@@ -136,7 +169,7 @@ export function TripDriverMap({
   const pickupCoord = pickupPoint ?? resolveCoord(pickup) ?? SALAVAT_CENTER;
   const destinationCoord = destinationPoint ?? resolveCoord(destination) ?? null;
   const driverCoord = driverPoint ?? null;
-  const html = buildHtml(pickupCoord, destinationCoord, driverCoord, carMode);
+  const html = buildHtml(pickupCoord, destinationCoord, driverCoord, carMode, pickup, destination);
 
   const createElement = (require('react-native-web') as { unstable_createElement: Function })
     .unstable_createElement;
