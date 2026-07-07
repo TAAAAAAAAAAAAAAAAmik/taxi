@@ -9,9 +9,11 @@ import {
   Info,
   LoaderCircle,
   LocateFixed,
+  MapPin,
   MapPinned,
   Navigation,
   Package,
+  RefreshCw,
   Route,
   ShieldCheck,
   SlidersHorizontal,
@@ -34,7 +36,6 @@ import {
 import {
   KinetixBottomSheet,
   KinetixButton,
-  KinetixEmptyState,
   KinetixSkeleton,
   PopIn,
   TickerText,
@@ -69,6 +70,7 @@ import {
 import { requestUserLocation, reverseGeocodePoint } from '../services/locationService';
 import { type AppOrder, type DriverProfile, useAppState } from '../state/AppState';
 import { NearbyCarsMap } from '../components/NearbyCarsMap';
+import { ScreenHero } from '../components/ScreenHero';
 import { styles } from './OrderFlowScreen.styles';
 import { buildRouteEstimate, formatDistance, getGeoDistanceKm, type OrderServiceType, type RouteEstimate } from './orderFlow.routeEstimate';
 
@@ -1788,39 +1790,19 @@ export function OrderFlowScreen({ navigation, route }: Props) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.driverFeedPage} keyboardShouldPersistTaps="handled">
-          <View style={styles.topBar}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.goBack()}
-              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            >
-              <ArrowLeft color="#008D49" size={20} strokeWidth={2.4} />
-              <Text style={styles.backButtonText}>Назад</Text>
-            </Pressable>
-
-            <View style={styles.rolePill}>
-              <UserRound color="#008D49" size={17} strokeWidth={2.4} />
-              <Text style={styles.rolePillText}>Водитель</Text>
-            </View>
-          </View>
-
-          <View style={styles.driverFeedHeaderPanel}>
-            <View style={styles.driverFeedHeaderIcon}>
-              <Route color="#008D49" size={24} strokeWidth={2.4} />
-            </View>
-            <View style={styles.driverFeedHeaderCopy}>
-              <Text style={styles.driverFeedScreenTitle}>Лента заказов</Text>
-              <Text numberOfLines={2} style={styles.driverFeedScreenText}>
-                Расстояние, адрес и цена. Детали открываются через i.
-              </Text>
-            </View>
-          </View>
+          <ScreenHero
+            Icon={Route}
+            bleed={14}
+            onBack={() => navigation.goBack()}
+            subtitle="Заказы рядом — расстояние, адрес и цена"
+            title="Лента заказов"
+          />
 
           <View style={styles.driverFeedListPanel}>
             <View style={styles.driverFeedListTop}>
               <View style={styles.driverFeedListCopy}>
                 <Text style={styles.regionTitle}>{driverFeedStatusText}</Text>
-                <Text numberOfLines={1} style={styles.regionText}>{realtimeMessage}</Text>
+                <Text numberOfLines={1} style={styles.regionText}>Обновляется автоматически</Text>
               </View>
               <Pressable
                 accessibilityLabel="Обновить ленту заказов"
@@ -1828,7 +1810,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                 onPress={refreshServerData}
                 style={({ pressed }) => [styles.feedRefreshButton, pressed && styles.pressed]}
               >
-                <Route color="#008D49" size={17} strokeWidth={2.4} />
+                <RefreshCw color="#008D49" size={17} strokeWidth={2.4} />
               </Pressable>
             </View>
 
@@ -1864,6 +1846,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                   disabled={isSubmitting}
                   distanceLabel={getDriverOrderDistanceLabel(order, currentDriver)}
                   fromLabel={getDriverFeedAddressLabel(order)}
+                  isDelivery={order.serviceType === 'delivery'}
                   key={order.id}
                   onAccept={() => acceptDriverFeedOrder(order)}
                   onInfoPress={() => {
@@ -1879,16 +1862,16 @@ export function OrderFlowScreen({ navigation, route }: Props) {
             ) : realtimeStatus === 'connecting' && !driverCannotReceiveOrders ? (
               <KinetixSkeleton rows={3} />
             ) : (
-              <KinetixEmptyState
+              <FeedRadarEmpty
                 description={
                   driverCannotReceiveOrders
                     ? driverNeedsApproval
                       ? 'После одобрения лента откроется сама.'
                       : 'Нужны документы, договор и проверка авто.'
-                    : 'Лента обновляется сама. Можно обновить вручную.'
+                    : 'Оставайтесь на линии — как только клиент создаст поездку, карточка появится здесь.'
                 }
-                icon={<Route color="#008D49" size={21} strokeWidth={2.4} />}
-                title={driverCannotReceiveOrders ? 'Доступ закрыт' : 'Заказов рядом нет'}
+                locked={Boolean(driverCannotReceiveOrders)}
+                title={driverCannotReceiveOrders ? 'Доступ закрыт' : 'Ищем заказы рядом'}
               />
             )}
 
@@ -2115,6 +2098,7 @@ export function OrderFlowScreen({ navigation, route }: Props) {
                         disabled={isSubmitting}
                         distanceLabel={getDriverOrderDistanceLabel(order, currentDriver)}
                         fromLabel={getDriverFeedAddressLabel(order)}
+                        isDelivery={order.serviceType === 'delivery'}
                         key={order.id}
                         onAccept={() => acceptDriverFeedOrder(order)}
                         onInfoPress={() => {
@@ -2741,6 +2725,7 @@ type CompactOrderCardProps = {
   disabled: boolean;
   distanceLabel: string;
   fromLabel: string;
+  isDelivery: boolean;
   onAccept: () => void;
   onInfoPress: () => void;
   paymentLabel: string;
@@ -2749,11 +2734,78 @@ type CompactOrderCardProps = {
   toLabel: string;
 };
 
+function FeedRadarEmpty({
+  description,
+  locked,
+  title,
+}: {
+  description: string;
+  locked: boolean;
+  title: string;
+}) {
+  const reducedMotion = useReducedMotionPreference();
+  const rings = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    if (reducedMotion || locked) {
+      return;
+    }
+    const loops = rings.map((value, index) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(index * 900),
+          Animated.timing(value, {
+            toValue: 1,
+            duration: 2700,
+            easing: kinetixEasing.easeOut,
+            useNativeDriver: false,
+          }),
+          Animated.timing(value, { toValue: 0, duration: 0, useNativeDriver: false }),
+        ]),
+      ),
+    );
+    loops.forEach((loop) => loop.start());
+    return () => loops.forEach((loop) => loop.stop());
+  }, [locked, reducedMotion, rings]);
+
+  return (
+    <View style={styles.feedRadarEmpty}>
+      <View style={styles.feedRadar}>
+        {!reducedMotion && !locked
+          ? rings.map((value, index) => {
+              const scale = value.interpolate({ inputRange: [0, 1], outputRange: [0.5, 2.6] });
+              const opacity = value.interpolate({
+                inputRange: [0, 0.15, 1],
+                outputRange: [0, 0.3, 0],
+              });
+              return (
+                <Animated.View
+                  key={index}
+                  style={[styles.feedRadarRing, { opacity, transform: [{ scale }] }]}
+                />
+              );
+            })
+          : null}
+        <View style={styles.feedRadarCore}>
+          {locked ? (
+            <ShieldCheck color="#008D49" size={24} strokeWidth={2.3} />
+          ) : (
+            <Route color="#008D49" size={24} strokeWidth={2.3} />
+          )}
+        </View>
+      </View>
+      <Text style={styles.feedRadarTitle}>{title}</Text>
+      <Text style={styles.feedRadarText}>{description}</Text>
+    </View>
+  );
+}
+
 function CompactOrderCard({
   active,
   disabled,
   distanceLabel,
   fromLabel,
+  isDelivery,
   onAccept,
   onInfoPress,
   paymentLabel,
@@ -2761,6 +2813,7 @@ function CompactOrderCard({
   serviceLabel,
   toLabel,
 }: CompactOrderCardProps) {
+  const ServiceIcon = isDelivery ? Package : Car;
   return (
     <View
       accessibilityState={{ selected: active }}
@@ -2769,12 +2822,12 @@ function CompactOrderCard({
         active && styles.compactOrderCardActive,
       ]}
     >
+      <View style={styles.compactOrderAccent} />
+
       <View style={styles.compactOrderTop}>
-        <View style={styles.compactOrderTags}>
+        <View style={styles.compactOrderBadge}>
+          <ServiceIcon color="#008D49" size={14} strokeWidth={2.5} />
           <Text numberOfLines={1} style={styles.compactOrderService}>{serviceLabel}</Text>
-          {paymentLabel ? (
-            <Text numberOfLines={1} style={styles.compactOrderPayment}>{paymentLabel}</Text>
-          ) : null}
         </View>
         <Text numberOfLines={1} style={styles.compactOrderPrice}>{priceLabel}</Text>
       </View>
@@ -2791,8 +2844,21 @@ function CompactOrderCard({
         </View>
       </View>
 
-      {distanceLabel ? (
-        <Text numberOfLines={1} style={styles.compactOrderMeta}>{distanceLabel}</Text>
+      {distanceLabel || paymentLabel ? (
+        <View style={styles.compactOrderChips}>
+          {distanceLabel ? (
+            <View style={styles.compactOrderChip}>
+              <MapPin color="#49665A" size={12} strokeWidth={2.4} />
+              <Text numberOfLines={1} style={styles.compactOrderChipText}>{distanceLabel}</Text>
+            </View>
+          ) : null}
+          {paymentLabel ? (
+            <View style={styles.compactOrderChip}>
+              <Wallet color="#49665A" size={12} strokeWidth={2.4} />
+              <Text numberOfLines={1} style={styles.compactOrderChipText}>{paymentLabel}</Text>
+            </View>
+          ) : null}
+        </View>
       ) : null}
 
       <View style={styles.compactOrderActions}>
@@ -2802,7 +2868,7 @@ function CompactOrderCard({
           onPress={onInfoPress}
           style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}
         >
-          <Info color="#008D49" size={20} strokeWidth={2.4} />
+          <Info color="#008D49" size={18} strokeWidth={2.4} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
