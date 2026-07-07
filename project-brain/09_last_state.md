@@ -8,6 +8,12 @@
 
 клиент создает заказ → водитель видит заказ → водитель принимает заказ → статус меняется → заказ завершается.
 
+## 2026-07-07 (Claude) — нативные пуши: конфиг-хук FCM (код уже готов)
+
+- Ревизия нативных пушей: инфраструктура **code-complete** и не была задокументирована как готовая. Клиент — `src/services/pushNotifications.ts` (запрос разрешения, нативный токен FCM/APNs, категория `driver_order_offer` с кнопками «Принять/Пропустить`»), вызывается на логине (`AppState` ~566). Бэк — `POST /push-tokens` + хранение, `sendPushToDriver/User/Admins`, реальная отправка `sendFcmPush` (через `firebase-admin`) и `sendApnsPush` (через `apn`); диспетчеризация на событиях заказа (создание/назначение/статус/отмена). Зависимости `firebase-admin`, `apn`, `expo-notifications`, `expo-device` — в `package.json`; плагин `expo-notifications` — в `app.config.js`.
+- Добавлен недостающий конфиг-хук: `android.googleServicesFile = process.env.GOOGLE_SERVICES_JSON || undefined` — включает FCM в APK, не ломая web/dev без файла.
+- **Что нужно от владельца, чтобы пуши «полетели» (не код):** Firebase-проект → service account JSON на бэк (`MVP_FIREBASE_SERVICE_ACCOUNT_JSON` или `_PATH` / `GOOGLE_APPLICATION_CREDENTIALS`); `google-services.json` в сборку (EAS-секрет `GOOGLE_SERVICES_JSON`); для iOS — APNs-ключ (`MVP_APNS_KEY_PATH/KEY_ID/TEAM_ID`). Плюс реальная APK/dev-сборка (в вебе и Expo Go пуши не приходят). Без конфигурации бэк логирует «FCM skipped» и работает по realtime-каналу.
+
 ## 2026-07-07 (Claude) — реквизиты водителя клиенту + чистый статус на экране заказа
 
 - **Реквизиты водителя для оплаты клиентом** (клиент платит за поездку напрямую водителю). Поле «Карта или счёт для оплаты от клиента» (`payoutAccount`) собиралось при регистрации, но не доходило до клиента — цепочка достроена: бэк сохраняет `payoutAccount` на профиле водителя (`makeDriverFromUser` при регистрации + `POST /drivers` у админа), прокидывает в клиентский `order.driver` (участник заказа при принятии/назначении). Клиент видит реквизиты в блоке «Оплата» → «Оплатить»: строка «Реквизиты» теперь показывает реальные реквизиты водителя (было — захардкоженная фейковая карта `2200 24•• •••• 4011`); если не заданы — «Уточните у водителя». Тип `OrderParticipant.payoutAccount` добавлен.

@@ -35,6 +35,10 @@ module.exports = {
     },
     android: {
       package: 'ru.taxipartner.app',
+      // FCM для нативных пушей. Путь к google-services.json из Firebase
+      // задаётся при сборке (EAS-секрет GOOGLE_SERVICES_JSON). Без него —
+      // undefined, чтобы web-экспорт и dev-сборка не падали.
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON || undefined,
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#0C0C0C',
