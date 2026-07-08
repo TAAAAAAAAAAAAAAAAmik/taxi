@@ -1,4 +1,47 @@
-# Деплой бэкенда бесплатно (Render + Neon)
+# Деплой бэкенда
+
+Два варианта: **A** — RU VPS за ~300 ₽/мес (рекомендуется: не засыпает,
+в России) и **B** — бесплатный Render + Neon (для показов; засыпает).
+
+---
+
+## Вариант A (рекомендуется): RU VPS за ~300 ₽ — FirstVDS / FirstByte / Timeweb
+
+Бэкенд лёгкий — хватит минимального тарифа: **1 CPU / 1 ГБ RAM,
+Ubuntu 24.04**. Свой домен не нужен (HTTPS выдаётся на домен-по-IP).
+
+1. Купи VPS, при заказе выбери ОС **Ubuntu 24.04**, получи IP и root-пароль.
+2. Зайди на сервер (с телефона — приложение Termius; с ПК — `ssh root@IP`).
+3. Выполни одну команду (подставь свои значения):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TAAAAAAAAAAAAAAAAmik/taxi/claude/github-taxi-project-ho7q97/scripts/setup-vps.sh -o setup.sh \
+&& REPO_URL=https://github.com/TAAAAAAAAAAAAAAAAmik/taxi.git \
+   ADMIN_PASSWORD='твой_пароль_админки' \
+   CARD_NUMBER='2200XXXXXXXXXXXX' \
+   CARD_HOLDER='Иванов Иван' \
+   bash setup.sh
+```
+
+Скрипт сам ставит Node 22 и Caddy, поднимает systemd-сервис с
+автоперезапуском и HTTPS, и в конце печатает адрес вида
+`https://85-198-1-2.sslip.io`.
+
+> Репозиторий приватный? В `REPO_URL` подставь GitHub-токен:
+> `https://<токен>@github.com/TAAAAAAAAAAAAAAAAmik/taxi.git`
+> (токен: github.com → Settings → Developer settings → Fine-grained token,
+> доступ read к репо taxi).
+
+4. Проверь `https://…sslip.io/health` в браузере — JSON = работает.
+5. **Пришли URL Claude** — он пересоберёт приложение под сервер.
+
+Обслуживание: логи `journalctl -u kinetix -f`; обновление кода —
+`cd /opt/kinetix && git pull && systemctl restart kinetix`. Данные
+лежат в `/var/lib/kinetix/db.json` (бэкап = скопировать файл).
+
+---
+
+## Вариант B: бесплатно (Render + Neon)
 
 Цель: заказы, чаты, оплата смен и админка работают **между реальными
 телефонами**. Всё бесплатно; данные хранятся в Postgres и переживают
