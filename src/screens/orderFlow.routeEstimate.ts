@@ -74,18 +74,6 @@ export function buildRouteEstimate({
     (preset?.estimatedTime ? parseRouteTime(preset.estimatedTime) : estimateDurationMin(baseDistanceKm)) +
     stopsCount * 6;
 
-  if (!isDriverLikeRole(role) && tariff.id === 'economy') {
-    const economyBase = serviceType === 'delivery' ? 160 : 120;
-    return {
-      confidence: preset ? 'preset' : 'estimated',
-      distanceKm,
-      distancePrice: economyBase + stopsCount * 40,
-      durationMin,
-      note: stopsCount ? `${serviceType === 'delivery' ? 'Доставка' : 'Фиксированная цена'} · ${stopsCount} ост.` : serviceType === 'delivery' ? 'Доставка по району' : 'Фиксированная цена',
-      total: economyBase + stopsCount * 40 + optionsTotal,
-    };
-  }
-
   const rate = getFareRate(tariff.id, role);
   const distancePrice = roundToTen(distanceKm * rate.perKm + durationMin * rate.perMin);
   const calculatedTotal = rate.base + distancePrice + optionsTotal;
@@ -169,20 +157,10 @@ function estimateDurationMin(distanceKm: number) {
   return Math.max(8, Math.round(distanceKm * 1.35 + 6));
 }
 
-function getFareRate(tariffId: string, role: AccountRole) {
-  if (isDriverLikeRole(role)) {
-    return { base: 0, perKm: 22, perMin: 4 };
-  }
-
-  if (['business', 'airport'].includes(tariffId)) {
-    return { base: 260, perKm: 42, perMin: 8 };
-  }
-
-  if (['comfort', 'current'].includes(tariffId)) {
-    return { base: 160, perKm: 30, perMin: 5 };
-  }
-
-  return { base: 120, perKm: 24, perMin: 4 };
+// Правило владельца: 1 км = 30 ₽. Чистая дистанционная формула без посадки
+// и поминутных — водитель получает всю сумму, поэтому его оценка та же.
+function getFareRate(_tariffId: string, _role: AccountRole) {
+  return { base: 0, perKm: 30, perMin: 0 };
 }
 
 function roundToTen(value: number) {

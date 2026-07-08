@@ -2072,25 +2072,6 @@ function estimateRouteFare(payload) {
   const distanceKm = baseDistanceKm + stopsCount * 1.8;
   const durationMin =
     (preset?.durationMin ?? Math.max(8, Math.round(baseDistanceKm * 1.35 + 6))) + stopsCount * 6;
-  if (!isDriverLikeRole(role) && tariffId === 'economy') {
-    const economyBase = serviceType === 'delivery' ? 160 : 120;
-    const economyPrice = economyBase + stopsCount * 40;
-    return {
-      calculatedAt: new Date().toISOString(),
-      confidence: preset ? 'preset' : pickupPoint && destinationPoint ? 'estimated' : 'draft',
-      currency: 'RUB',
-      distanceKm: roundDistance(distanceKm),
-      distancePrice: economyPrice,
-      durationMin,
-      eta: `${durationMin} мин`,
-      note: stopsCount ? `фикс по Малоязу · ${stopsCount} ост.` : 'фикс по Малоязу',
-      provider: makeGeoProviderMeta('local'),
-      surgeCoefficient: 1,
-      tariffId,
-      total: economyPrice + optionsTotal,
-    };
-  }
-
   const rate = getFareRate(tariffId, role);
   const distancePrice = roundToTen(distanceKm * rate.perKm + durationMin * rate.perMin);
   const total = roundToTen(Math.max(minimumPrice, rate.base + distancePrice + optionsTotal));
@@ -2132,20 +2113,10 @@ function findRoutePoint(value) {
   return match?.coordinates;
 }
 
+// Правило владельца: 1 км = 30 ₽. Чистая дистанционная формула без посадки
+// и поминутных — водитель получает всю сумму, поэтому его ставка та же.
 function getFareRate(tariffId, role) {
-  if (isDriverLikeRole(role)) {
-    return { base: 0, perKm: 22, perMin: 4 };
-  }
-
-  if (['business', 'airport'].includes(tariffId)) {
-    return { base: 260, perKm: 42, perMin: 8 };
-  }
-
-  if (['comfort', 'current'].includes(tariffId)) {
-    return { base: 160, perKm: 30, perMin: 5 };
-  }
-
-  return { base: 120, perKm: 24, perMin: 4 };
+  return { base: 0, perKm: 30, perMin: 0 };
 }
 
 function getTariffMinimum(tariffId) {

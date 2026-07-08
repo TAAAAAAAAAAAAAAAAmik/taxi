@@ -244,9 +244,11 @@ try {
     total: 999,
   }, clientToken);
 
+  // Правило владельца: 1 км = 30 ₽. Неизвестные адреса → база 9 км,
+  // каждая остановка +1.8 км: (9 + 2×1.8) × 30 = 378 → округление до 10 = 380.
   assert(
-    guardedOrder.total === 200,
-    `Client total must be recomputed server-side (economy 120 + 2 stops x 40), got ${guardedOrder.total}`,
+    guardedOrder.total === 380,
+    `Client total must be recomputed server-side ((9 + 2*1.8) km * 30 ₽, round to 10), got ${guardedOrder.total}`,
   );
   assert(
     Array.isArray(guardedOrder.stops) && guardedOrder.stops.length === 2,
