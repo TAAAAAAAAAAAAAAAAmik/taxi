@@ -608,6 +608,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Лёгкое событие чата водителей тоже приходит без snapshot — не даём
+        // ему уронить live-статус в «polling» через applyRealtimeSnapshot.
+        if (payload.type === 'driver_chat') {
+          return;
+        }
+
         applyRealtimeSnapshot(payload.snapshot);
         setRealtimeStatus((current) => (current === 'connecting' ? 'live' : current));
         if (payload.notification) {

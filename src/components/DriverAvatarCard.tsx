@@ -65,8 +65,10 @@ export function DriverAvatarCard() {
       await updateDriverAvatar(currentDriver.id, dataUri);
       setLocalAvatar(dataUri);
       setNotice('Фото профиля обновлено — клиенты увидят его в заказе.');
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Не удалось сохранить фото.');
+    } catch {
+      // Без backend (демо) фото остаётся локально — без сырых текстов ошибок.
+      setLocalAvatar(dataUri);
+      setNotice('Фото сохранится на сервере при подключенном backend.');
     } finally {
       setBusy(false);
     }

@@ -57,8 +57,32 @@ try {
   });
   assert(route.estimate.distanceKm > 0, 'Route estimate should include distance');
   assert(route.estimate.durationMin > 0, 'Route estimate should include ETA');
-  assert(route.estimate.total === 240, 'Economy route should keep fixed 120 RUB fare plus options');
-  assert(route.estimate.surgeCoefficient === 1, 'Economy route should not apply surge');
+  // Правило владельца: межсельская поездка = 30 ₽/км (+ опции), distancePrice уже
+  // округлён до 10, total = distancePrice + options (минималка 420 перекрыта).
+  assert(
+    route.estimate.total === route.estimate.distancePrice + 120,
+    `Intercity total must be per-km price plus options, got ${route.estimate.total}`,
+  );
+  assert(
+    route.estimate.surgeCoefficient === undefined || route.estimate.surgeCoefficient === 1,
+    'Route should not apply surge',
+  );
+
+  // По селу — фикс 120 ₽ + опции.
+  const villageRoute = await api('/geo/routes', {
+    body: {
+      destination: 'Малояз, администрация',
+      optionsTotal: 80,
+      pickup: 'Малояз, центр',
+      role: 'client',
+      tariffId: 'economy',
+    },
+    method: 'POST',
+  });
+  assert(
+    villageRoute.estimate.total === 200,
+    `Same-village trip must be flat 120 RUB plus options, got ${villageRoute.estimate.total}`,
+  );
 
   const support = await api('/support/messages', {
     body: {
