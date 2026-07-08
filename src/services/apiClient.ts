@@ -1266,6 +1266,92 @@ export async function fetchAdminDriverPayments() {
   return response.payments;
 }
 
+export type AdminPricing = { dailyPrice: number; monthlyPrice: number };
+
+export type AdminBlacklistEntry = {
+  id: string;
+  type: 'client' | 'driver';
+  name: string;
+  reason: string;
+  addedAt: string;
+};
+
+export type AdminStats = {
+  generatedAt: string;
+  users: {
+    total: number;
+    clients: number;
+    drivers: number;
+    newBy: { hour: number; day: number; week: number; month: number; year: number };
+    monthly: Array<{ label: string; total: number; clients: number; drivers: number }>;
+  };
+  money: {
+    clientSpendTotal: number;
+    driverEarningsTotal: number;
+    myRevenueTotal: number;
+    myRevenueBy: { day: number; week: number; month: number };
+    clientSpendBy: { day: number; week: number; month: number };
+    revenueMonthly: Array<{ label: string; access: number; trips: number }>;
+    avgCheck: number;
+  };
+  orders: {
+    total: number;
+    completed: number;
+    cancelled: number;
+    active: number;
+    byDay: Array<{ label: string; count: number }>;
+    byVillage: Array<{ name: string; count: number }>;
+  };
+  drivers: {
+    total: number;
+    online: number;
+    canReceiveOrders: number;
+    blacklisted: number;
+    byBilling: { daily: number; monthly: number };
+    byStatus: { approved: number; pending: number };
+    topVehicles: Array<{ name: string; count: number }>;
+    ratingAvg: number;
+  };
+};
+
+export async function fetchAdminStats() {
+  return request<AdminStats>('/admin/stats');
+}
+
+export async function fetchAdminPricing() {
+  const payload = await request<{ pricing: AdminPricing }>('/admin/settings');
+  return payload.pricing;
+}
+
+export async function updateAdminPricing(pricing: Partial<AdminPricing>) {
+  const payload = await request<{ pricing: AdminPricing }>('/admin/pricing', {
+    body: JSON.stringify(pricing),
+    method: 'PATCH',
+  });
+  return payload.pricing;
+}
+
+export async function fetchAdminBlacklist() {
+  const payload = await request<{ items: AdminBlacklistEntry[] }>('/admin/blacklist');
+  return payload.items;
+}
+
+export async function addToAdminBlacklist(entry: { id: string; type: 'client' | 'driver'; reason?: string }) {
+  const payload = await request<{ items: AdminBlacklistEntry[] }>('/admin/blacklist', {
+    body: JSON.stringify(entry),
+    method: 'POST',
+  });
+  return payload.items;
+}
+
+export async function removeFromAdminBlacklist(entryId: string) {
+  const payload = await request<{ items: AdminBlacklistEntry[] }>(
+    `/admin/blacklist/${encodeURIComponent(entryId)}`,
+    { method: 'DELETE' },
+  );
+  return payload.items;
+}
+
 export async function fetchDrivers() {
   const payload = await request<{ drivers: DriverProfile[] }>('/drivers');
   return payload.drivers;
@@ -1385,6 +1471,8 @@ export async function sendSupportMessageToServer(payload: {
   threadId?: string;
   title?: string;
   userId?: string;
+  // Ответ администратора от лица поддержки в существующий тред.
+  asSupport?: boolean;
 }) {
   const response = await request<{ thread: SupportThread }>('/support/messages', {
     body: JSON.stringify(payload),

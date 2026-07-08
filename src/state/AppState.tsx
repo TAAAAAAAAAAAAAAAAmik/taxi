@@ -325,9 +325,10 @@ export type SupportThread = {
   role: AccountRole;
   category: string;
   title: string;
-  status: 'open' | 'waiting' | 'closed';
+  status: 'answered' | 'open' | 'waiting' | 'closed';
   updatedAt: string;
   messages: SupportMessage[];
+  userId?: string;
 };
 
 type AppStateValue = {

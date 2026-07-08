@@ -713,7 +713,7 @@ function normalizeDb(parsed) {
   const source = parsed && typeof parsed === 'object' ? parsed : {};
   const defaultDb = createDefaultDb();
 
-  return {
+  const db = {
     ...defaultDb,
     ...source,
     drivers:
@@ -769,7 +769,207 @@ function normalizeDb(parsed) {
     users: Array.isArray(source.users) ? source.users : [],
     verificationCodes: Array.isArray(source.verificationCodes) ? source.verificationCodes : [],
     walletLedger: Array.isArray(source.walletLedger) ? source.walletLedger : [],
+    // Чёрный список (водители и клиенты по id) и настройки владельца (цены доступа).
+    blacklist: Array.isArray(source.blacklist) ? source.blacklist.map(normalizeBlacklistEntry) : [],
+    settings: normalizeAdminSettings(source.settings),
   };
+
+  applyPricingSettings(db);
+  return db;
+}
+
+function normalizeBlacklistEntry(entry) {
+  return {
+    id: String(entry.id || ''),
+    type: entry.type === 'client' ? 'client' : 'driver',
+    name: String(entry.name || ''),
+    reason: String(entry.reason || ''),
+    addedAt: String(entry.addedAt || new Date().toISOString()),
+  };
+}
+
+function normalizeAdminSettings(settings) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  const daily = Number(source.dailyPrice);
+  const monthly = Number(source.monthlyPrice);
+
+  return {
+    dailyPrice: Number.isFinite(daily) && daily > 0 ? Math.round(daily) : driverAccessPlans.daily.monthlyPrice,
+    monthlyPrice:
+      Number.isFinite(monthly) && monthly > 0 ? Math.round(monthly) : driverAccessPlans.monthly.monthlyPrice,
+  };
+}
+
+// Подробная статистика владельца: люди, деньги, заказы, водители — считается
+// на лету из db, фронт только рисует.
+function buildAdminStats(db) {
+  const now = Date.now();
+  const HOUR = 3600000;
+  const DAY = 24 * HOUR;
+  const users = db.users || [];
+  const orders = db.orders || [];
+  const drivers = db.drivers || [];
+  const payments = (db.driverPayments || []).filter(
+    (payment) => payment.status === 'paid' && Number(payment.amount) > 0,
+  );
+  const isDriverUser = (user) =>
+    ['self_employed_driver', 'driver', 'park_driver'].includes(String(user.role || ''));
+  const within = (item, key, ms) => {
+    const at = Date.parse(item?.[key] || '');
+    return Number.isFinite(at) && now - at <= ms;
+  };
+  const countWithin = (list, key, ms) => list.filter((item) => within(item, key, ms)).length;
+  const sumWithin = (list, key, ms, amountKey) =>
+    list.filter((item) => within(item, key, ms)).reduce((sum, item) => sum + Number(item[amountKey] || 0), 0);
+
+  // Помесячные серии за 12 месяцев.
+  const months = [];
+  const base = new Date();
+  for (let index = 11; index >= 0; index -= 1) {
+    const date = new Date(base.getFullYear(), base.getMonth() - index, 1);
+    months.push({
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+      label: date.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', ''),
+    });
+  }
+  const monthKeyOf = (value) => {
+    const at = new Date(Date.parse(value || ''));
+    return Number.isNaN(at.getTime())
+      ? ''
+      : `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const usersMonthly = months.map((month) => {
+    const inMonth = users.filter((user) => monthKeyOf(user.createdAt) === month.key);
+    return {
+      label: month.label,
+      total: inMonth.length,
+      clients: inMonth.filter((user) => user.role === 'client').length,
+      drivers: inMonth.filter(isDriverUser).length,
+    };
+  });
+
+  const completed = orders.filter((order) => ['completed', 'closed'].includes(order.status));
+  const cancelled = orders.filter((order) => ['cancelled', 'canceled'].includes(order.status));
+  const revenueMonthly = months.map((month) => ({
+    label: month.label,
+    access: payments
+      .filter((payment) => monthKeyOf(payment.paidAt || payment.createdAt) === month.key)
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    trips: completed
+      .filter((order) => monthKeyOf(order.completedAt || order.updatedAt) === month.key)
+      .reduce((sum, order) => sum + Number(order.total || 0), 0),
+  }));
+
+  // Заказы по дням (14 дней).
+  const ordersByDay = [];
+  for (let index = 13; index >= 0; index -= 1) {
+    const dayStart = new Date(now - index * DAY);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = dayStart.getTime() + DAY;
+    ordersByDay.push({
+      label: dayStart.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
+      count: orders.filter((order) => {
+        const at = Date.parse(order.createdAt || '');
+        return Number.isFinite(at) && at >= dayStart.getTime() && at < dayEnd;
+      }).length,
+    });
+  }
+
+  // География: из адресов подачи («Малояз, Советская 12» → «Малояз»).
+  const villageCounts = new Map();
+  orders.forEach((order) => {
+    const village = String(order.pickup || '').split(',')[0].trim() || 'Не указано';
+    villageCounts.set(village, (villageCounts.get(village) || 0) + 1);
+  });
+  const byVillage = [...villageCounts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 8);
+
+  // Водители: тарифы, статусы, машины.
+  const vehicleCounts = new Map();
+  drivers.forEach((driver) => {
+    const brand = String(driver.vehicle || 'Не указано').split(' ')[0].trim() || 'Не указано';
+    vehicleCounts.set(brand, (vehicleCounts.get(brand) || 0) + 1);
+  });
+  const ratings = drivers.map((driver) => Number(driver.rating || 0)).filter((value) => value > 0);
+  const clientSpendTotal = completed.reduce((sum, order) => sum + Number(order.total || 0), 0);
+  const myRevenueTotal = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+  return {
+    generatedAt: new Date(now).toISOString(),
+    users: {
+      total: users.length,
+      clients: users.filter((user) => user.role === 'client').length,
+      drivers: users.filter(isDriverUser).length,
+      newBy: {
+        hour: countWithin(users, 'createdAt', HOUR),
+        day: countWithin(users, 'createdAt', DAY),
+        week: countWithin(users, 'createdAt', 7 * DAY),
+        month: countWithin(users, 'createdAt', 30 * DAY),
+        year: countWithin(users, 'createdAt', 365 * DAY),
+      },
+      monthly: usersMonthly,
+    },
+    money: {
+      // Клиенты платят водителям напрямую; платформа зарабатывает на доступе.
+      clientSpendTotal,
+      driverEarningsTotal: clientSpendTotal,
+      myRevenueTotal,
+      myRevenueBy: {
+        day: sumWithin(payments, 'paidAt', DAY, 'amount'),
+        week: sumWithin(payments, 'paidAt', 7 * DAY, 'amount'),
+        month: sumWithin(payments, 'paidAt', 30 * DAY, 'amount'),
+      },
+      clientSpendBy: {
+        day: sumWithin(completed, 'completedAt', DAY, 'total'),
+        week: sumWithin(completed, 'completedAt', 7 * DAY, 'total'),
+        month: sumWithin(completed, 'completedAt', 30 * DAY, 'total'),
+      },
+      revenueMonthly,
+      avgCheck: completed.length ? Math.round(clientSpendTotal / completed.length) : 0,
+    },
+    orders: {
+      total: orders.length,
+      completed: completed.length,
+      cancelled: cancelled.length,
+      active: orders.length - completed.length - cancelled.length,
+      byDay: ordersByDay,
+      byVillage,
+    },
+    drivers: {
+      total: drivers.length,
+      online: drivers.filter((driver) => driver.isOnline).length,
+      canReceiveOrders: drivers.filter((driver) => driver.canReceiveOrders).length,
+      blacklisted: drivers.filter((driver) => driver.blacklisted).length,
+      byBilling: {
+        daily: drivers.filter((driver) => normalizeBillingMode(driver.billingMode) !== 'monthly').length,
+        monthly: drivers.filter((driver) => normalizeBillingMode(driver.billingMode) === 'monthly').length,
+      },
+      byStatus: {
+        approved: drivers.filter((driver) => driver.status === 'approved').length,
+        pending: drivers.filter((driver) => driver.status !== 'approved').length,
+      },
+      topVehicles: [...vehicleCounts.entries()]
+        .map(([name, count]) => ({ name, count }))
+        .sort((left, right) => right.count - left.count)
+        .slice(0, 6),
+      ratingAvg: ratings.length
+        ? Math.round((ratings.reduce((sum, value) => sum + value, 0) / ratings.length) * 100) / 100
+        : 0,
+    },
+  };
+}
+
+// Цены владельца из db применяются к runtime-тарифам: все существующие места
+// (списание доступа, /driver-payments/settings, тексты планов) подхватывают
+// их автоматически. MVP — один процесс, поэтому мутация констант безопасна.
+function applyPricingSettings(db) {
+  const settings = normalizeAdminSettings(db?.settings);
+  driverAccessPlans.daily.monthlyPrice = settings.dailyPrice;
+  driverAccessPlans.daily.headline = `${settings.dailyPrice} ₽ / день`;
+  driverAccessPlans.monthly.monthlyPrice = settings.monthlyPrice;
+  driverAccessPlans.monthly.headline = `${settings.monthlyPrice.toLocaleString('ru-RU')} ₽ / месяц`;
 }
 
 function normalizePark(park) {
@@ -2326,7 +2526,7 @@ function normalizeSupportThread(thread) {
     id: String(thread.id || `support-${Date.now().toString().slice(-7)}`),
     messages,
     role: normalizeRole(thread.role),
-    status: ['closed', 'open', 'waiting'].includes(thread.status) ? thread.status : 'waiting',
+    status: ['answered', 'closed', 'open', 'waiting'].includes(thread.status) ? thread.status : 'waiting',
     title: String(thread.title || thread.category || 'Обращение в поддержку'),
     updatedAt: String(thread.updatedAt || messages.at(-1)?.createdAt || now),
     userId: thread.userId ? String(thread.userId) : undefined,
@@ -2365,6 +2565,39 @@ function listSupportThreads(db, filters = {}) {
 
 function appendSupportMessage(db, payload, sessionContext) {
   const now = new Date().toISOString();
+
+  // Админ отвечает в существующий тред ОТ ЛИЦА ПОДДЕРЖКИ: одно сообщение
+  // author 'support', без автоответа, тред помечается отвеченным.
+  if (isAdminSession(sessionContext) && payload.asSupport && payload.threadId) {
+    const threads = Array.isArray(db.supportThreads) ? db.supportThreads.map(normalizeSupportThread) : [];
+    const existing = threads.find((item) => item.id === String(payload.threadId));
+
+    if (existing) {
+      const supportReply = normalizeSupportMessage({
+        author: 'support',
+        createdAt: now,
+        deliveryStatus: 'delivered',
+        id: `MSG-${Date.now()}-${randomUUID().slice(0, 6)}-support`,
+        text: requireString(payload.text, 'text'),
+      });
+      const thread = normalizeSupportThread({
+        ...existing,
+        messages: [...(existing.messages || []), supportReply],
+        status: 'answered',
+        updatedAt: now,
+      });
+
+      db.supportThreads = [thread, ...threads.filter((item) => item.id !== thread.id)].slice(0, 300);
+      addRealtimeNotification(db, {
+        audience: 'all',
+        body: `${thread.category}: ${supportReply.text.slice(0, 120)}`,
+        kind: 'support-message',
+        title: 'Ответ поддержки',
+        userId: thread.userId || undefined,
+      });
+      return thread;
+    }
+  }
   const role = isAdminSession(sessionContext) && payload.role
     ? normalizeRole(payload.role)
     : getSessionRole(sessionContext);
@@ -6842,6 +7075,11 @@ function normalizeDriverSubscriptionStatus(driver) {
 function getDriverAccessBlockers(driver) {
   const blockers = [];
 
+  // Чёрный список владельца — полный стоп независимо от остальных статусов.
+  if (driver.blacklisted) {
+    blockers.push('blacklisted');
+  }
+
   if (driver.status !== 'approved') {
     blockers.push('driver_review');
   }
@@ -8132,6 +8370,177 @@ async function handleRequest(request, response) {
       return;
     }
 
+    if (request.method === 'GET' && url.pathname === '/admin/settings') {
+      const sessionContext = getSessionContext(db, request);
+
+      if (!isAdminSession(sessionContext)) {
+        sendJson(response, 403, { error: 'Admin access required' });
+        return;
+      }
+
+      sendJson(response, 200, { pricing: normalizeAdminSettings(db.settings) });
+      return;
+    }
+
+    if (request.method === 'PATCH' && url.pathname === '/admin/pricing') {
+      const payload = await readBody(request);
+      const outcome = await mutateDb(async (db2) => {
+        const sessionContext = getSessionContext(db2, request);
+
+        if (!isAdminSession(sessionContext)) {
+          return { status: 403, body: { error: 'Admin access required' } };
+        }
+
+        const current = normalizeAdminSettings(db2.settings);
+        const daily = Number(payload.dailyPrice ?? current.dailyPrice);
+        const monthly = Number(payload.monthlyPrice ?? current.monthlyPrice);
+
+        if (!Number.isFinite(daily) || daily < 1 || daily > 100000 || !Number.isFinite(monthly) || monthly < 1 || monthly > 1000000) {
+          return { status: 400, body: { error: 'Цена должна быть числом в разумных пределах.' } };
+        }
+
+        db2.settings = { dailyPrice: Math.round(daily), monthlyPrice: Math.round(monthly) };
+        applyPricingSettings(db2);
+        addRealtimeNotification(db2, {
+          audience: 'all',
+          body: `Смена: ${db2.settings.dailyPrice} ₽ / день · Партнёр PRO: ${db2.settings.monthlyPrice} ₽ / месяц.`,
+          kind: 'pricing',
+          title: 'Тарифы доступа обновлены',
+        });
+        return { status: 200, body: { pricing: db2.settings } };
+      });
+
+      sendJson(response, outcome.status, outcome.body);
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/admin/blacklist') {
+      const sessionContext = getSessionContext(db, request);
+
+      if (!isAdminSession(sessionContext)) {
+        sendJson(response, 403, { error: 'Admin access required' });
+        return;
+      }
+
+      sendJson(response, 200, { items: db.blacklist || [] });
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/admin/blacklist') {
+      const payload = await readBody(request);
+      const outcome = await mutateDb(async (db2) => {
+        const sessionContext = getSessionContext(db2, request);
+
+        if (!isAdminSession(sessionContext)) {
+          return { status: 403, body: { error: 'Admin access required' } };
+        }
+
+        const targetId = String(payload.id || '').trim();
+        const type = payload.type === 'client' ? 'client' : 'driver';
+
+        if (!targetId) {
+          return { status: 400, body: { error: 'Укажите ID.' } };
+        }
+
+        let name = '';
+
+        if (type === 'driver') {
+          // Принимаем и driver-id, и user-id водителя.
+          const driver = db2.drivers.find(
+            (item) => item.id === targetId || String(item.userId || '') === targetId,
+          );
+
+          if (!driver) {
+            return { status: 404, body: { error: `Водитель ${targetId} не найден.` } };
+          }
+
+          driver.blacklisted = true;
+          applyDriverAccessState(driver);
+          driver.isOnline = false;
+          driver.updatedAt = new Date().toISOString();
+          name = driver.name;
+        } else {
+          const user = db2.users.find(
+            (item) =>
+              item.id === targetId ||
+              String(item.phone || '') === targetId ||
+              String(item.email || '').toLowerCase() === targetId.toLowerCase(),
+          );
+
+          if (!user) {
+            return { status: 404, body: { error: `Клиент ${targetId} не найден.` } };
+          }
+
+          name = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.phone;
+        }
+
+        const entry = normalizeBlacklistEntry({
+          addedAt: new Date().toISOString(),
+          id:
+            type === 'client'
+              ? db2.users.find(
+                  (item) =>
+                    item.id === targetId ||
+                    String(item.phone || '') === targetId ||
+                    String(item.email || '').toLowerCase() === targetId.toLowerCase(),
+                )?.id || targetId
+              : db2.drivers.find(
+                  (item) => item.id === targetId || String(item.userId || '') === targetId,
+                )?.id || targetId,
+          name,
+          reason: String(payload.reason || ''),
+          type,
+        });
+
+        db2.blacklist = [entry, ...(db2.blacklist || []).filter((item) => item.id !== entry.id)];
+        return { status: 200, body: { items: db2.blacklist } };
+      });
+
+      sendJson(response, outcome.status, outcome.body);
+      return;
+    }
+
+    if (request.method === 'DELETE' && pathParts[0] === 'admin' && pathParts[1] === 'blacklist' && pathParts[2]) {
+      const outcome = await mutateDb(async (db2) => {
+        const sessionContext = getSessionContext(db2, request);
+
+        if (!isAdminSession(sessionContext)) {
+          return { status: 403, body: { error: 'Admin access required' } };
+        }
+
+        const targetId = decodeURIComponent(pathParts[2]);
+        const entry = (db2.blacklist || []).find((item) => item.id === targetId);
+
+        if (entry?.type === 'driver') {
+          const driver = db2.drivers.find((item) => item.id === targetId);
+
+          if (driver) {
+            driver.blacklisted = false;
+            applyDriverAccessState(driver);
+            driver.updatedAt = new Date().toISOString();
+          }
+        }
+
+        db2.blacklist = (db2.blacklist || []).filter((item) => item.id !== targetId);
+        return { status: 200, body: { items: db2.blacklist } };
+      });
+
+      sendJson(response, outcome.status, outcome.body);
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/admin/stats') {
+      const sessionContext = getSessionContext(db, request);
+
+      if (!isAdminSession(sessionContext)) {
+        sendJson(response, 403, { error: 'Admin access required' });
+        return;
+      }
+
+      sendJson(response, 200, buildAdminStats(db));
+      return;
+    }
+
     if (request.method === 'PATCH' && pathParts[0] === 'admin' && pathParts[1] === 'referrals' && pathParts[3] === 'status') {
       const sessionContext = getSessionContext(db, request);
       const payload = await readBody(request);
@@ -8942,6 +9351,18 @@ async function handleRequest(request, response) {
           return {
             status: 200,
             body: { order: makeOrderResponse(db, existingOrder, sessionContext) },
+          };
+        }
+
+        // Клиент из чёрного списка владельца не может создавать заказы.
+        if (
+          (db.blacklist || []).some(
+            (entry) => entry.type === 'client' && entry.id === String(sessionContext.user.id),
+          )
+        ) {
+          return {
+            status: 403,
+            body: { error: 'Доступ к заказам ограничен. Обратитесь в поддержку.' },
           };
         }
 

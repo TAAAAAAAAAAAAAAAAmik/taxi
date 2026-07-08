@@ -57,6 +57,12 @@ import {
   useAppState,
 } from '../state/AppState';
 import { useReducedMotionPreference } from '../hooks/useReducedMotionPreference';
+import {
+  AdminBlacklistCard,
+  AdminPricingCard,
+  AdminStatsBoard,
+  AdminSupportChat,
+} from '../components/admin/AdminOwnerTools';
 import { styles } from './AdminPanelScreen.styles';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminPanel'>;
@@ -74,7 +80,8 @@ type AdminSectionId =
   | 'users'
   | 'fleets'
   | 'system'
-  | 'support';
+  | 'support'
+  | 'blacklist';
 
 type AdminNavItem = {
   id: AdminSectionId;
@@ -102,7 +109,8 @@ const adminPrimarySections: AdminNavItem[] = [
 ];
 
 const adminDrawerSections: AdminNavItem[] = [
-  { id: 'settlements', title: 'Расчеты', subtitle: 'Сверки и оплаты', icon: Wallet },
+  { id: 'settlements', title: 'Расчеты', subtitle: 'Цены доступа и сверки', icon: Wallet },
+  { id: 'blacklist', title: 'Чёрный список', subtitle: 'Блокировка по ID', icon: LockKeyhole },
   { id: 'pro', title: 'PRO-заявки', subtitle: 'Партнер PRO и оплаты', icon: Wallet },
   { id: 'referrals', title: 'Рефералы', subtitle: 'Бонусы на подтверждение', icon: Gift },
   { id: 'settings', title: 'Настройки', subtitle: 'Адресный слой и данные', icon: MapPinned },
@@ -730,6 +738,19 @@ export function AdminPanelScreen({ navigation }: Props) {
                   <Text numberOfLines={2} style={styles.statHelper}>{item.helper}</Text>
                 </View>
               ))}
+            </View>
+
+            {/* Подробная аналитика владельца: люди, деньги, заказы, водители */}
+            <View style={activeSection !== 'stats' ? styles.hiddenSection : null}>
+              <AdminStatsBoard />
+            </View>
+
+            <View style={activeSection !== 'settlements' ? styles.hiddenSection : null}>
+              <AdminPricingCard />
+            </View>
+
+            <View style={activeSection !== 'blacklist' ? styles.hiddenSection : null}>
+              <AdminBlacklistCard />
             </View>
 
             <View style={[styles.sectionCard, activeSection !== 'settlements' && styles.hiddenSection]}>
@@ -1403,29 +1424,9 @@ export function AdminPanelScreen({ navigation }: Props) {
               </Text>
             </View>
 
-            <View style={[styles.sectionCard, activeSection !== 'support' && styles.hiddenSection]}>
-              <View style={styles.sectionHeader}>
-                <Headphones color="#008D49" size={20} strokeWidth={2.4} />
-                <Text style={styles.sectionTitle}>Поддержка</Text>
-              </View>
-              <Text style={styles.sectionText}>
-                Обращения пользователей не удалены из админки, но вынесены из основных вкладок.
-              </Text>
-              {supportThreads.length ? (
-                supportThreadsPreview.map((thread) => (
-                  <View key={thread.id} style={styles.orderRow}>
-                    <Text numberOfLines={1} style={styles.orderTitle}>{thread.title}</Text>
-                    <Text numberOfLines={1} style={styles.orderText}>
-                      {thread.role} · {thread.category} · {thread.status} · {formatDate(thread.updatedAt)}
-                    </Text>
-                    <Text numberOfLines={2} style={styles.orderText}>
-                      {thread.messages[thread.messages.length - 1]?.text || 'Сообщений пока нет.'}
-                    </Text>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.sectionTextMuted}>Открытых обращений пока нет.</Text>
-              )}
+            {/* Чат поддержки: ответы клиентам и водителям от лица поддержки */}
+            <View style={activeSection !== 'support' ? styles.hiddenSection : null}>
+              <AdminSupportChat />
             </View>
 
             <View style={[styles.sectionCard, activeSection !== 'orders' && styles.hiddenSection]}>
