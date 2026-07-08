@@ -1344,6 +1344,36 @@ export async function addToAdminBlacklist(entry: { id: string; type: 'client' | 
   return payload.items;
 }
 
+export async function updateDriverAvatar(driverId: string, image: string) {
+  const response = await request<{ driver: DriverProfile }>(
+    `/drivers/${encodeURIComponent(driverId)}/avatar`,
+    { body: JSON.stringify({ image }), method: 'PATCH' },
+  );
+  return response.driver;
+}
+
+export type DriverChatMessage = {
+  id: string;
+  driverId: string;
+  driverName: string;
+  avatar?: string;
+  text: string;
+  createdAt: string;
+};
+
+export async function fetchDriverChatMessages() {
+  const payload = await request<{ messages: DriverChatMessage[] }>('/driver-chat');
+  return payload.messages;
+}
+
+export async function sendDriverChatMessage(text: string) {
+  const payload = await request<{ message: DriverChatMessage }>('/driver-chat', {
+    body: JSON.stringify({ text }),
+    method: 'POST',
+  });
+  return payload.message;
+}
+
 export async function removeFromAdminBlacklist(entryId: string) {
   const payload = await request<{ items: AdminBlacklistEntry[] }>(
     `/admin/blacklist/${encodeURIComponent(entryId)}`,

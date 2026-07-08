@@ -170,6 +170,7 @@ export type OrderParticipant = {
   subscriptionPlan?: string;
   subscriptionStatus?: DriverSubscription['status'];
   payoutAccount?: string;
+  avatar?: string;
 };
 
 export type DriverProfile = OrderParticipant & {

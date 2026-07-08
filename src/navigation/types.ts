@@ -109,4 +109,8 @@ export type RootStackParamList = {
     destination: string;
     phase?: 'pickup' | 'trip';
   };
+  DriverChat: {
+    role: AccountRole;
+    firstName?: string;
+  };
 };

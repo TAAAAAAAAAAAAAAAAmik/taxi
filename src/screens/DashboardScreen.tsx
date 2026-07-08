@@ -322,6 +322,9 @@ export function DashboardScreen({ navigation, route }: Props) {
             ? () => navigation.navigate('OrderStatus', { firstName, order: activeClientOrder, role })
             : undefined
         }
+        onOpenDriverChat={
+          isDriverRole ? () => navigation.navigate('DriverChat', { firstName, role }) : undefined
+        }
         onOpenOrderHistory={() => navigation.navigate('OrderHistory', { firstName, role })}
         onOpenReferral={() => navigation.navigate('Referral', { firstName, role })}
         onOpenSavedPlace={() => navigation.navigate('SavedPlace', { firstName, role })}

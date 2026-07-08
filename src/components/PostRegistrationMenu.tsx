@@ -27,6 +27,7 @@ import {
   LucideProps,
   MapPinned,
   Menu as MenuIcon,
+  MessagesSquare,
   Package,
   Phone,
   Plus,
@@ -49,6 +50,7 @@ import {
   roleCopy,
 } from '../data/registration';
 import { KinetixEmptyState, KinetixStatus, PressableScale, StaggerView } from './KinetixUI';
+import { DriverAvatarCard } from './DriverAvatarCard';
 import { NearbyCarsMap } from './NearbyCarsMap';
 import { useAppState } from '../state/AppState';
 import {
@@ -102,6 +104,7 @@ type PostRegistrationMenuProps = {
   onOpenSavedPlace: () => void;
   onOpenSubscription: () => void;
   onOpenSupportChat: (category?: string) => void;
+  onOpenDriverChat?: () => void;
   onAcceptDriverOrder?: (orderId: string) => void | Promise<void>;
 };
 
@@ -202,6 +205,7 @@ export function PostRegistrationMenu({
   onOpenSavedPlace,
   onOpenSubscription,
   onOpenSupportChat,
+  onOpenDriverChat,
   onAcceptDriverOrder,
   role,
 }: PostRegistrationMenuProps) {
@@ -446,12 +450,15 @@ export function PostRegistrationMenu({
                 driverStats={driverStats}
                 isSelfEmployedDriver={isSelfEmployedDriver}
                 menuButton={driverMobileTopless}
+                onOpenDriverChat={onOpenDriverChat}
                 onOpenMenu={() => setDrawerOpen(true)}
                 onOpenOrderFlow={onOpenOrderFlow}
                 onOpenSubscription={onOpenSubscription}
                 onToggleDriverLine={onToggleDriverLine}
               />
             ) : (
+              <>
+              {isDriverRole && activeItem.id === 'profile' ? <DriverAvatarCard /> : null}
               <SectionPageView
                 activeItemId={activeItem.id}
                 appTitle={config.title}
@@ -473,6 +480,7 @@ export function PostRegistrationMenu({
                 onOpenMenu={() => setDrawerOpen(true)}
                 page={activePage}
               />
+              </>
             )}
           </Animated.View>
         </View>
@@ -1617,11 +1625,17 @@ function DriverHomePage({
   driverStats,
   isSelfEmployedDriver,
   menuButton,
+  onOpenDriverChat,
   onOpenMenu,
   onOpenOrderFlow,
   onOpenSubscription,
   onToggleDriverLine,
-}: DriverCommandCenterProps & { appTitle: string; menuButton?: boolean; onOpenMenu?: () => void }) {
+}: DriverCommandCenterProps & {
+  appTitle: string;
+  menuButton?: boolean;
+  onOpenDriverChat?: () => void;
+  onOpenMenu?: () => void;
+}) {
   return (
     <View style={styles.driverHome}>
       <DriverCommandCenter
@@ -1634,6 +1648,26 @@ function DriverHomePage({
         onOpenSubscription={onOpenSubscription}
         onToggleDriverLine={onToggleDriverLine}
       />
+
+      {onOpenDriverChat ? (
+        <PressableScale
+          accessibilityLabel="Открыть чат водителей"
+          accessibilityRole="button"
+          onPress={onOpenDriverChat}
+          style={styles.driverChatEntry}
+        >
+          <View style={styles.driverChatEntryIcon}>
+            <MessagesSquare color="#008D49" size={21} strokeWidth={2.3} />
+          </View>
+          <View style={styles.driverChatEntryCopy}>
+            <Text style={styles.driverChatEntryTitle}>Чат водителей</Text>
+            <Text numberOfLines={1} style={styles.driverChatEntryText}>
+              Смены, дороги и взаимовыручка района
+            </Text>
+          </View>
+          <ChevronRight color="#71877D" size={20} strokeWidth={2.4} />
+        </PressableScale>
+      ) : null}
     </View>
   );
 }

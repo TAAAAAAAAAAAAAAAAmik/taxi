@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AdminPanelScreen } from '../screens/AdminPanelScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
+import { DriverChatScreen } from '../screens/DriverChatScreen';
 import { DriverDocumentsScreen } from '../screens/DriverDocumentsScreen';
 import { NavigatorScreen } from '../screens/NavigatorScreen';
 import { OrderFlowScreen } from '../screens/OrderFlowScreen';
@@ -204,6 +205,7 @@ export function AppNavigator() {
         <Stack.Screen component={SupportChatScreen} name="SupportChat" />
         <Stack.Screen component={ReferralScreen} name="Referral" />
         <Stack.Screen component={NavigatorScreen} name="Navigator" />
+        <Stack.Screen component={DriverChatScreen} name="DriverChat" />
       </Stack.Navigator>
     </NavigationContainer>
   );

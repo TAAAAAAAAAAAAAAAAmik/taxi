@@ -8,6 +8,13 @@
 
 клиент создает заказ → водитель видит заказ → водитель принимает заказ → статус меняется → заказ завершается.
 
+## 2026-07-08 (Claude) — аватар водителя + «кто приедет» у клиента + общий чат водителей
+
+- **Аватар водителя**: карточка «Фото профиля» на вкладке «Аккаунт» водителя (`DriverAvatarCard`, галерея/камера через expo-image-picker, квадратная обрезка, dataUri ≤ ~0.9 МБ). Бэк: `PATCH /drivers/:id/avatar` (canAccessDriver, валидация `data:image/(jpeg|png|webp)`, мусор → 400), `driver.avatar` хранится на профиле; при принятии заказа уходит клиенту в `order.driver.avatar`. Клиент видит **кто приедет** на экране заказа: фото (кругом) + имя, машина, рейтинг, госномер (имя/машина/номер уже были). Без бэка карточка честно предупреждает, фото держится локально.
+- **Общий чат водителей**: `DriverChatScreen` (тёмный ScreenHero «Чат водителей · Смены, дороги и взаимовыручка — без клиентов», пузыри с аватарами/именами, свои справа зелёным, poll 6с + мгновенная отправка). Вход — карточка «Чат водителей» на главной водителя (`DriverHomePage` → `onOpenDriverChat` → route `DriverChat`). Бэк: `db.driverChat` (cap 500), `GET /driver-chat` (водители+админ, последние 200), `POST /driver-chat` (text ≤ 600, identity из профиля водителя; админ пишет как «Диспетчер»), лёгкий realtime-event `driver_chat` без snapshot.
+- Затронуты: `scripts/mvp-backend.mjs`, `src/services/apiClient.ts`, `src/state/AppState.tsx` (тип avatar), `src/components/DriverAvatarCard.tsx` (новый), `src/screens/DriverChatScreen.tsx` (новый), `src/components/PostRegistrationMenu(.styles)`, `src/screens/OrderStatusScreen.tsx`, `src/screens/DashboardScreen.tsx`, `src/navigation/*`.
+- Проверено: typecheck и `test:realtime` зелёные; бэк живьём (curl): avatar сохраняется, не-image → 400, чат POST/GET (админ = «Диспетчер»); UI живьём (Playwright): кнопка чата на главной, экран чата с композером, карточка «Фото профиля» в Аккаунте. Деплой в gh-pages.
+
 ## 2026-07-08 (Claude) — тариф владельца: по селу 120 ₽, межсельские 30 ₽/км
 
 - Уточнение правила: **внутри одного села — фикс 120 ₽** (любой тариф, note «по селу — фикс»), **между сёлами — 1 км = 30 ₽**. Село определяется по первой части адреса до запятой (`extractSettlement`: «Малояз, Советская 12» → «малояз»), сравнение регистронезависимое. Константа `VILLAGE_FLAT_PRICE = 120` (клиент `orderFlow.routeEstimate.ts` + бэк `estimateRouteFare` — симметрично). Опции (кресло/багаж) добавляются поверх фикса. Водительская оценка — та же (вся сумма его).

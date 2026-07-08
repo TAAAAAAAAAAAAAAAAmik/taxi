@@ -772,6 +772,8 @@ function normalizeDb(parsed) {
     // Чёрный список (водители и клиенты по id) и настройки владельца (цены доступа).
     blacklist: Array.isArray(source.blacklist) ? source.blacklist.map(normalizeBlacklistEntry) : [],
     settings: normalizeAdminSettings(source.settings),
+    // Общий чат водителей (последние сообщения, cap в обработчике).
+    driverChat: Array.isArray(source.driverChat) ? source.driverChat : [],
   };
 
   applyPricingSettings(db);
@@ -9277,6 +9279,112 @@ async function handleRequest(request, response) {
       return;
     }
 
+    // Аватар водителя: небольшое фото (data-uri) на профиле, клиент видит
+    // его в карточке «кто приедет» после назначения заказа.
+    if (request.method === 'PATCH' && pathParts[0] === 'drivers' && pathParts[2] === 'avatar') {
+      const sessionContext = getSessionContext(db, request);
+      const payload = await readBody(request);
+      const driver = db.drivers.find((item) => item.id === pathParts[1]);
+
+      if (!sessionContext) {
+        sendJson(response, 401, { error: 'Authentication required' });
+        return;
+      }
+
+      if (!driver) {
+        sendJson(response, 404, { error: 'Driver not found' });
+        return;
+      }
+
+      if (!canAccessDriver(sessionContext, driver)) {
+        sendJson(response, 403, { error: 'Driver avatar access denied' });
+        return;
+      }
+
+      const image = String(payload.image || '').trim();
+
+      if (image && !/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(image)) {
+        sendJson(response, 400, { error: 'Аватар должен быть изображением (jpeg/png/webp).' });
+        return;
+      }
+
+      if (image.length > 900000) {
+        sendJson(response, 400, { error: 'Фото слишком большое — выберите меньше или сожмите.' });
+        return;
+      }
+
+      driver.avatar = image;
+      driver.updatedAt = new Date().toISOString();
+      await writeDb(db);
+      sendJson(response, 200, { driver: makeDriverResponse(db, driver, sessionContext) });
+      return;
+    }
+
+    // Общий чат водителей: видят водители и админ.
+    if (request.method === 'GET' && url.pathname === '/driver-chat') {
+      const sessionContext = getSessionContext(db, request);
+      const role = getSessionRole(sessionContext);
+
+      if (!sessionContext || (!isDriverLikeRole(role) && !isAdminSession(sessionContext))) {
+        sendJson(response, 403, { error: 'Чат доступен водителям.' });
+        return;
+      }
+
+      sendJson(response, 200, { messages: (db.driverChat || []).slice(-200) });
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/driver-chat') {
+      const payload = await readBody(request);
+      const outcome = await mutateDb(async (db2) => {
+        const sessionContext = getSessionContext(db2, request);
+        const role = getSessionRole(sessionContext);
+        const isAdmin = isAdminSession(sessionContext);
+
+        if (!sessionContext || (!isDriverLikeRole(role) && !isAdmin)) {
+          return { status: 403, body: { error: 'Чат доступен водителям.' } };
+        }
+
+        const text = String(payload.text || '').trim().slice(0, 600);
+
+        if (!text) {
+          return { status: 400, body: { error: 'Пустое сообщение.' } };
+        }
+
+        const driver = isAdmin
+          ? undefined
+          : db2.drivers.find((item) => String(item.userId || '') === String(sessionContext.user.id));
+        const message = {
+          id: `DCM-${Date.now().toString(36)}-${randomUUID().slice(0, 5)}`,
+          driverId: driver?.id || (isAdmin ? 'admin' : sessionContext.user.id),
+          driverName: isAdmin
+            ? 'Диспетчер'
+            : driver?.name ||
+              [sessionContext.user.firstName, sessionContext.user.lastName].filter(Boolean).join(' ') ||
+              'Водитель',
+          avatar: driver?.avatar || '',
+          text,
+          createdAt: new Date().toISOString(),
+        };
+
+        db2.driverChat = [...(db2.driverChat || []), message].slice(-500);
+        return { status: 201, body: { message } };
+      });
+
+      // Лёгкий realtime без snapshot — сообщение прилетает водителям сразу.
+      if (outcome.status === 201) {
+        for (const client of realtimeClients.values()) {
+          sendRealtimeEvent(client, 'driver_chat', { message: outcome.body.message, type: 'driver_chat' });
+        }
+        for (const socket of realtimeSocketClients) {
+          sendRealtimeSocketEvent(socket, 'driver_chat', { message: outcome.body.message, type: 'driver_chat' });
+        }
+      }
+
+      sendJson(response, outcome.status, outcome.body);
+      return;
+    }
+
     if (request.method === 'GET' && url.pathname === '/orders') {
       const sessionContext = getSessionContext(db, request);
 
@@ -10035,6 +10143,7 @@ async function handleRequest(request, response) {
           vehicle: driver.vehicle,
           plate: driver.plate,
           payoutAccount: driver.payoutAccount || '',
+          avatar: driver.avatar || '',
         };
         order.fulfilledByRole = normalizeFulfilledByRole(payload.fulfilledByRole, driver.employmentType === 'park_driver' ? 'park_driver' : 'self_employed_driver');
         order.parkId = payload.parkId ? String(payload.parkId) : driver.parkId || order.parkId;

@@ -22,6 +22,7 @@ import {
   UserRound,
 } from 'lucide-react-native';
 import {
+  Image,
   Pressable,
   SafeAreaView,
   Share,
@@ -902,7 +903,14 @@ export function OrderStatusScreen({ navigation, route }: Props) {
               <SectionHeader title={config.participantTitle} />
               <View style={styles.participant}>
                 <View style={styles.participantIcon}>
-                  <UserRound color="#008D49" size={22} strokeWidth={2.4} />
+                  {role === 'client' && (driver as OrderParticipant).avatar ? (
+                    <Image
+                      source={{ uri: (driver as OrderParticipant).avatar }}
+                      style={styles.participantAvatar}
+                    />
+                  ) : (
+                    <UserRound color="#008D49" size={22} strokeWidth={2.4} />
+                  )}
                 </View>
                 <View style={styles.participantCopy}>
                   <Text style={styles.participantName}>{participantName}</Text>
@@ -2299,12 +2307,18 @@ const styles = StyleSheet.create({
     gap: 4,
     minWidth: 0,
   },
+  participantAvatar: {
+    borderRadius: 999,
+    height: 42,
+    width: 42,
+  },
   participantIcon: {
     alignItems: 'center',
     backgroundColor: '#E8F3EF',
-    borderRadius: 8,
+    borderRadius: 999,
     height: 42,
     justifyContent: 'center',
+    overflow: 'hidden',
     width: 42,
   },
   participantMeta: {
