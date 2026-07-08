@@ -74,6 +74,21 @@ export function buildRouteEstimate({
     (preset?.estimatedTime ? parseRouteTime(preset.estimatedTime) : estimateDurationMin(baseDistanceKm)) +
     stopsCount * 6;
 
+  // Правило владельца: поездка в пределах одного села — фикс 120 ₽.
+  const pickupVillage = extractSettlement(pickup);
+  const destinationVillage = extractSettlement(destination);
+
+  if (pickupVillage && pickupVillage === destinationVillage) {
+    return {
+      confidence: preset ? 'preset' : 'estimated',
+      distanceKm,
+      distancePrice: VILLAGE_FLAT_PRICE,
+      durationMin,
+      note: 'по селу — фикс',
+      total: VILLAGE_FLAT_PRICE + optionsTotal,
+    };
+  }
+
   const rate = getFareRate(tariff.id, role);
   const distancePrice = roundToTen(distanceKm * rate.perKm + durationMin * rate.perMin);
   const calculatedTotal = rate.base + distancePrice + optionsTotal;
@@ -157,10 +172,17 @@ function estimateDurationMin(distanceKm: number) {
   return Math.max(8, Math.round(distanceKm * 1.35 + 6));
 }
 
-// Правило владельца: 1 км = 30 ₽. Чистая дистанционная формула без посадки
-// и поминутных — водитель получает всю сумму, поэтому его оценка та же.
+// Правило владельца: по селу — фикс 120 ₽, межсельские — 1 км = 30 ₽.
+// Водитель получает всю сумму, поэтому его оценка та же.
+const VILLAGE_FLAT_PRICE = 120;
+
 function getFareRate(_tariffId: string, _role: AccountRole) {
   return { base: 0, perKm: 30, perMin: 0 };
+}
+
+// Село из адреса: «Малояз, Советская 12» → «малояз».
+function extractSettlement(address: string) {
+  return String(address || '').split(',')[0].trim().toLowerCase();
 }
 
 function roundToTen(value: number) {
