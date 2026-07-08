@@ -1,0 +1,28 @@
+# Бесплатный хостинг бэкенда на Render.com (Blueprint).
+# Данные храним в Postgres (Neon.tech, бесплатный) — переживают перезапуски.
+# Шаги подключения — в DEPLOY.md.
+services:
+  - type: web
+    name: kinetix-backend
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: node scripts/mvp-backend.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: MVP_STORAGE_DRIVER
+        value: postgres
+      - key: DATABASE_URL
+        sync: false # строка подключения Neon — вставить вручную
+      - key: MVP_ADMIN_PASSWORD
+        sync: false # твой пароль админки
+      - key: MVP_PAYMENT_PROVIDER_MODE
+        value: manual
+      - key: MVP_PAYMENT_PROVIDER
+        value: manual-card
+      - key: PAYMENT_CARD_NUMBER
+        sync: false # карта владельца для оплаты смен
+      - key: PAYMENT_CARD_HOLDER
+        sync: false # имя держателя карты
+      - key: EXPO_PUBLIC_APP_ENV
+        value: production
