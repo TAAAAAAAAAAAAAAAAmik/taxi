@@ -45,3 +45,8 @@
 Где появилась: scripts/mvp-backend.mjs (рассылка driver_chat); src/screens/OrderStatusScreen.tsx (дефолт-driver из config).
 Как решили: (1) фильтр рассылки по роли сессии (isDriverLikeRole || admin) для SSE и WebSocket. (2) флаг hasAssignedDriver: у клиента без водителя — честный плейсхолдер «Ищем водителя рядом» без контактов; мета карты — «Подбираем ближайшую машину · ~N мин». Проверено Playwright: фейковых данных на экране 0, оба плейсхолдера на месте; typecheck, test:realtime зелёные.
 Какие файлы изменены: scripts/mvp-backend.mjs, src/screens/OrderStatusScreen.tsx.
+
+Дата: 2026-07-12 (Claude) — ИСПРАВЛЕНО (edge из аудита №1)
+Ошибка: (1) адрес без запятой («Малояз школа») не совпадал по селу с «Малояз, …» → поездка по селу тарифицировалась как межсельская; (2) /admin/stats «мой доход за день/неделю/месяц» терял платежи без paidAt.
+Как решили: (1) isSameSettlement (равенство или «село + пробел» как префикс, срез префиксов «с./село/д.»; «Малоязовка» с «Малояз» не путается) симметрично на клиенте и бэке + кейс в geo-тесте; (2) paidAtEffective = paidAt || createdAt.
+Какие файлы изменены: scripts/mvp-backend.mjs, src/screens/orderFlow.routeEstimate.ts, scripts/geo-messaging-smoke-test.mjs.
