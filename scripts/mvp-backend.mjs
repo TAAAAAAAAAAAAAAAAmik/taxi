@@ -9372,12 +9372,20 @@ async function handleRequest(request, response) {
       });
 
       // Лёгкий realtime без snapshot — сообщение прилетает водителям сразу.
+      // Приватность: чат водителей не транслируем сессиям клиентов.
       if (outcome.status === 201) {
+        const canSeeDriverChat = (sessionContext) =>
+          isAdminSession(sessionContext) || isDriverLikeRole(getSessionRole(sessionContext));
+
         for (const client of realtimeClients.values()) {
-          sendRealtimeEvent(client, 'driver_chat', { message: outcome.body.message, type: 'driver_chat' });
+          if (canSeeDriverChat(client.sessionContext)) {
+            sendRealtimeEvent(client, 'driver_chat', { message: outcome.body.message, type: 'driver_chat' });
+          }
         }
         for (const socket of realtimeSocketClients) {
-          sendRealtimeSocketEvent(socket, 'driver_chat', { message: outcome.body.message, type: 'driver_chat' });
+          if (canSeeDriverChat(socket.sessionContext)) {
+            sendRealtimeSocketEvent(socket, 'driver_chat', { message: outcome.body.message, type: 'driver_chat' });
+          }
         }
       }
 

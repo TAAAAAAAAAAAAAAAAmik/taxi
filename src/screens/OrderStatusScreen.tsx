@@ -113,6 +113,9 @@ export function OrderStatusScreen({ navigation, route }: Props) {
   const displayedOrder = (currentOrder ?? order) as AppOrder;
   const serviceCopy = getStatusServiceCopy(displayedOrder);
   const routeDriver = (order as typeof order & { driver?: OrderParticipant }).driver;
+  // У клиента до назначения реального водителя нет — не показываем
+  // демо-заглушку с чужим именем и контактами.
+  const hasAssignedDriver = Boolean(currentOrder?.driver ?? routeDriver);
   const driver = currentOrder?.driver ?? routeDriver ?? {
     id: 'driver-alexey-solaris',
     name: config.participantName,
@@ -901,6 +904,20 @@ export function OrderStatusScreen({ navigation, route }: Props) {
 
             <View style={styles.panel}>
               <SectionHeader title={config.participantTitle} />
+              {role === 'client' && !hasAssignedDriver ? (
+                <View style={styles.participant}>
+                  <View style={styles.participantIcon}>
+                    <CircleDot color="#008D49" size={22} strokeWidth={2.4} />
+                  </View>
+                  <View style={styles.participantCopy}>
+                    <Text style={styles.participantName}>Ищем водителя рядом</Text>
+                    <Text style={styles.participantMeta}>
+                      Карточка водителя появится, как только он примет заказ.
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+              <>
               <View style={styles.participant}>
                 <View style={styles.participantIcon}>
                   {role === 'client' && (driver as OrderParticipant).avatar ? (
@@ -1034,6 +1051,8 @@ export function OrderStatusScreen({ navigation, route }: Props) {
                   </View>
                 </Animated.View>
               ) : null}
+              </>
+              )}
             </View>
 
             <View style={styles.panel}>
@@ -1256,9 +1275,11 @@ function TripPulseMap({
           <Text style={styles.tripMapTitle}>{isCompleted ? serviceCompletedTitle : mapTitle}</Text>
           <Text numberOfLines={1} style={styles.tripMapMeta}>
             {viewerRole === 'client'
-              ? [driver.vehicle, driver.plate ? `номер ${driver.plate}` : null, `${etaMinutes} мин`]
-                  .filter(Boolean)
-                  .join(' · ')
+              ? showDriver
+                ? [driver.vehicle, driver.plate ? `номер ${driver.plate}` : null, `${etaMinutes} мин`]
+                    .filter(Boolean)
+                    .join(' · ')
+                : `Подбираем ближайшую машину · ~${etaMinutes} мин`
               : isDelivery
                 ? 'Получатель на карте'
                 : 'Пассажир на карте'}
