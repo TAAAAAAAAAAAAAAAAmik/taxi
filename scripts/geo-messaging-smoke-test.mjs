@@ -84,6 +84,21 @@ try {
     `Same-village trip must be flat 120 RUB plus options, got ${villageRoute.estimate.total}`,
   );
 
+  // Адрес без запятой («Малояз школа») — всё ещё то же село.
+  const villageNoComma = await api('/geo/routes', {
+    body: {
+      destination: 'Малояз школа',
+      pickup: 'Малояз, центр',
+      role: 'client',
+      tariffId: 'economy',
+    },
+    method: 'POST',
+  });
+  assert(
+    villageNoComma.estimate.total === 120,
+    `Comma-less same-village address must still be flat 120 RUB, got ${villageNoComma.estimate.total}`,
+  );
+
   const support = await api('/support/messages', {
     body: {
       category: 'Поездка',

@@ -78,7 +78,7 @@ export function buildRouteEstimate({
   const pickupVillage = extractSettlement(pickup);
   const destinationVillage = extractSettlement(destination);
 
-  if (pickupVillage && pickupVillage === destinationVillage) {
+  if (isSameSettlement(pickupVillage, destinationVillage)) {
     return {
       confidence: preset ? 'preset' : 'estimated',
       distanceKm,
@@ -180,9 +180,26 @@ function getFareRate(_tariffId: string, _role: AccountRole) {
   return { base: 0, perKm: 30, perMin: 0 };
 }
 
-// Село из адреса: «Малояз, Советская 12» → «малояз».
+// Село из адреса: «Малояз, Советская 12» → «малояз». Убираем типовые
+// префиксы («с. Малояз», «село Малояз», «д. …»).
 function extractSettlement(address: string) {
-  return String(address || '').split(',')[0].trim().toLowerCase();
+  return String(address || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase()
+    .replace(/^(с|д|п|пос|село|деревня|посёлок|поселок)[.\s]+/u, '')
+    .trim();
+}
+
+// Одно ли это село: точное совпадение или «село + пробел» как префикс —
+// покрывает адреса без запятой («Малояз школа» ~ «Малояз, центр»),
+// не путая «Малояз» с «Малоязовка».
+function isSameSettlement(a: string, b: string) {
+  if (!a || !b) {
+    return false;
+  }
+
+  return a === b || a.startsWith(`${b} `) || b.startsWith(`${a} `);
 }
 
 function roundToTen(value: number) {

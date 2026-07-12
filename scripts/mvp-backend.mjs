@@ -811,9 +811,11 @@ function buildAdminStats(db) {
   const users = db.users || [];
   const orders = db.orders || [];
   const drivers = db.drivers || [];
-  const payments = (db.driverPayments || []).filter(
-    (payment) => payment.status === 'paid' && Number(payment.amount) > 0,
-  );
+  // paidAtEffective: у части легаси-платежей нет paidAt — считаем по createdAt,
+  // чтобы «доход за день/неделю/месяц» их не терял.
+  const payments = (db.driverPayments || [])
+    .filter((payment) => payment.status === 'paid' && Number(payment.amount) > 0)
+    .map((payment) => ({ ...payment, paidAtEffective: payment.paidAt || payment.createdAt }));
   const isDriverUser = (user) =>
     ['self_employed_driver', 'driver', 'park_driver'].includes(String(user.role || ''));
   const within = (item, key, ms) => {
@@ -919,9 +921,9 @@ function buildAdminStats(db) {
       driverEarningsTotal: clientSpendTotal,
       myRevenueTotal,
       myRevenueBy: {
-        day: sumWithin(payments, 'paidAt', DAY, 'amount'),
-        week: sumWithin(payments, 'paidAt', 7 * DAY, 'amount'),
-        month: sumWithin(payments, 'paidAt', 30 * DAY, 'amount'),
+        day: sumWithin(payments, 'paidAtEffective', DAY, 'amount'),
+        week: sumWithin(payments, 'paidAtEffective', 7 * DAY, 'amount'),
+        month: sumWithin(payments, 'paidAtEffective', 30 * DAY, 'amount'),
       },
       clientSpendBy: {
         day: sumWithin(completed, 'completedAt', DAY, 'total'),
@@ -2078,7 +2080,7 @@ function estimateRouteFare(payload) {
   const pickupVillage = extractSettlement(pickup);
   const destinationVillage = extractSettlement(destination);
 
-  if (pickupVillage && pickupVillage === destinationVillage) {
+  if (isSameSettlement(pickupVillage, destinationVillage)) {
     return {
       calculatedAt: new Date().toISOString(),
       confidence: preset ? 'preset' : pickupPoint && destinationPoint ? 'estimated' : 'draft',
@@ -2144,9 +2146,26 @@ function getFareRate(tariffId, role) {
   return { base: 0, perKm: 30, perMin: 0 };
 }
 
-// Село из адреса: «Малояз, Советская 12» → «малояз».
+// Село из адреса: «Малояз, Советская 12» → «малояз». Убираем типовые
+// префиксы («с. Малояз», «село Малояз», «д. …»).
 function extractSettlement(address) {
-  return String(address || '').split(',')[0].trim().toLowerCase();
+  return String(address || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase()
+    .replace(/^(с|д|п|пос|село|деревня|посёлок|поселок)[.\s]+/u, '')
+    .trim();
+}
+
+// Одно ли это село: точное совпадение или «село + пробел» как префикс —
+// покрывает адреса без запятой («Малояз школа» ~ «Малояз, центр»),
+// не путая «Малояз» с «Малоязовка».
+function isSameSettlement(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+
+  return a === b || a.startsWith(`${b} `) || b.startsWith(`${a} `);
 }
 
 function getTariffMinimum(tariffId) {
