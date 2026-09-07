@@ -37,7 +37,18 @@ const inviteBaseUrl = String(process.env.MVP_INVITE_BASE_URL || defaultInviteBas
 const verificationCodeTtlMinutes = readNumberEnv('MVP_VERIFICATION_CODE_TTL_MINUTES', 10);
 const passwordResetCodeTtlMinutes = readNumberEnv('MVP_PASSWORD_RESET_CODE_TTL_MINUTES', 15);
 const verificationMaxAttempts = readNumberEnv('MVP_VERIFICATION_MAX_ATTEMPTS', 5);
-const sessionTtlDays = readNumberEnv('MVP_SESSION_TTL_DAYS', 30);
+// Каждый отправленный код стоит денег (SMS/звонок), поэтому запрос кода
+// ограничен и по номеру, и по IP — иначе скрипт в цикле сливает весь
+// бюджет и заодно заваливает сообщениями живого человека.
+const HOUR_IN_MS = 3600000;
+const DAY_IN_MS = 24 * HOUR_IN_MS;
+const codeRequestCooldownSeconds = readNumberEnv('MVP_CODE_REQUEST_COOLDOWN_SECONDS', 60);
+const codeRequestsPerHour = readNumberEnv('MVP_CODE_REQUESTS_PER_HOUR', 5);
+const codeRequestsPerDay = readNumberEnv('MVP_CODE_REQUESTS_PER_DAY', 15);
+const codeRequestsPerIpPerHour = readNumberEnv('MVP_CODE_REQUESTS_PER_IP_PER_HOUR', 20);
+// Полгода вместо месяца: каждый повторный вход — это ещё одна платная
+// SMS, а такси-приложения не разлогинивают человека без причины.
+const sessionTtlDays = readNumberEnv('MVP_SESSION_TTL_DAYS', 180);
 const skipPhoneVerification = readBooleanEnv('MVP_SKIP_PHONE_VERIFICATION', false);
 const deliveryAuditLimit = readNumberEnv('MVP_DELIVERY_AUDIT_LIMIT', 500);
 const verificationDeliveryMode = normalizeProviderMode(
@@ -571,6 +582,7 @@ function createDefaultDb() {
     notifications: [],
     passwordResetTokens: [],
     pushTokens: [],
+    authCodeRequests: [],
     verificationCodes: [],
     walletLedger: [],
   };
@@ -767,6 +779,7 @@ function normalizeDb(parsed) {
       ? source.supportThreads.map(normalizeSupportThread)
       : [],
     users: Array.isArray(source.users) ? source.users : [],
+    authCodeRequests: Array.isArray(source.authCodeRequests) ? source.authCodeRequests : [],
     verificationCodes: Array.isArray(source.verificationCodes) ? source.verificationCodes : [],
     walletLedger: Array.isArray(source.walletLedger) ? source.walletLedger : [],
     // Чёрный список (водители и клиенты по id) и настройки владельца (цены доступа).
@@ -4923,6 +4936,79 @@ function createVerificationRecord(user, channel, deliveryChannel) {
   };
 }
 
+function getClientIp(request) {
+  const forwarded = String(request.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim();
+
+  return forwarded || request.socket?.remoteAddress || 'unknown';
+}
+
+// Три рубежа: пауза между кодами на один номер, потолок за час и за сутки
+// на номер, и потолок за час на IP — последний ловит перебор чужих номеров
+// с одной машины. Счётчик пишется на каждую попытку, а не только на удачную
+// отправку, иначе перебор номеров остаётся бесплатным.
+function checkAuthCodeRateLimit(db, target, ip) {
+  const now = Date.now();
+  const ageOf = (item) => now - new Date(item.at).getTime();
+
+  db.authCodeRequests = (Array.isArray(db.authCodeRequests) ? db.authCodeRequests : []).filter(
+    (item) => ageOf(item) < DAY_IN_MS,
+  );
+
+  const forTarget = db.authCodeRequests.filter((item) => item.target === target);
+  const lastAt = forTarget.reduce((max, item) => Math.max(max, new Date(item.at).getTime()), 0);
+  const secondsSinceLast = Math.round((now - lastAt) / 1000);
+
+  if (lastAt && secondsSinceLast < codeRequestCooldownSeconds) {
+    return { ok: false, retryAfterSeconds: codeRequestCooldownSeconds - secondsSinceLast };
+  }
+
+  if (forTarget.filter((item) => ageOf(item) < HOUR_IN_MS).length >= codeRequestsPerHour) {
+    return { ok: false, retryAfterSeconds: 3600 };
+  }
+
+  if (forTarget.length >= codeRequestsPerDay) {
+    return { ok: false, retryAfterSeconds: 86400 };
+  }
+
+  const fromIp = db.authCodeRequests.filter((item) => item.ip === ip && ageOf(item) < HOUR_IN_MS);
+
+  if (ip !== 'unknown' && fromIp.length >= codeRequestsPerIpPerHour) {
+    return { ok: false, retryAfterSeconds: 3600 };
+  }
+
+  return { ok: true };
+}
+
+function recordAuthCodeRequest(db, target, ip) {
+  db.authCodeRequests = [
+    { at: new Date().toISOString(), ip, target },
+    ...(Array.isArray(db.authCodeRequests) ? db.authCodeRequests : []),
+  ].slice(0, 2000);
+}
+
+// Общая проверка для всех эндпоинтов, которые шлют код. Возвращает true,
+// если запрос уже отклонён и ответ отправлен.
+async function rejectFrequentCodeRequest(db, request, response, target) {
+  const ip = getClientIp(request);
+  const rateLimit = checkAuthCodeRateLimit(db, target, ip);
+
+  if (!rateLimit.ok) {
+    sendJson(response, 429, {
+      error: 'Код уже отправлен. Попробуйте немного позже.',
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+    });
+    return true;
+  }
+
+  // Пишем сразу: иначе перебор чужих номеров, где код так и не уходит,
+  // не оставляет следа и обходит лимит.
+  recordAuthCodeRequest(db, target, ip);
+  await writeDb(db);
+  return false;
+}
+
 function createSmsLoginRecord(user, deliveryChannel) {
   const code = makeVerificationCode('phone');
   const expiresAt = new Date();
@@ -6763,7 +6849,11 @@ function makeDriverResponse(db, driver, sessionContext) {
   const normalizedDriver = normalizeDriver(driver);
 
   if (!canAccessDriver(sessionContext, normalizedDriver)) {
-    const { documentAudit, documentReview, documentUploads, phone, userId, ...publicDriver } = normalizedDriver;
+    // Публичный профиль: без документов, телефона и платёжных реквизитов.
+    // Карточку водителя с контактами клиент получает только в своём
+    // заказе, через order.driver.
+    const { documentAudit, documentReview, documentUploads, payoutAccount, phone, userId, ...publicDriver } =
+      normalizedDriver;
     return publicDriver;
   }
 
@@ -7755,6 +7845,10 @@ async function handleRequest(request, response) {
         return;
       }
 
+      if (await rejectFrequentCodeRequest(db, request, response, target)) {
+        return;
+      }
+
       const deliveryChannel = normalizeVerificationDeliveryChannel(channel, payload.deliveryChannel);
       const { code, record } = createVerificationRecord(user, channel, deliveryChannel);
       let delivery;
@@ -7878,6 +7972,10 @@ async function handleRequest(request, response) {
 
       if (!phone || phone.length < 10 || phone.length > 15) {
         sendJson(response, 400, { error: 'Valid phone is required' });
+        return;
+      }
+
+      if (await rejectFrequentCodeRequest(db, request, response, phone)) {
         return;
       }
 
@@ -8124,6 +8222,14 @@ async function handleRequest(request, response) {
 
     if (request.method === 'POST' && url.pathname === '/auth/password-reset/request') {
       const payload = await readBody(request);
+      const identifier = String(payload.identifier || '')
+        .trim()
+        .toLowerCase();
+
+      if (identifier && (await rejectFrequentCodeRequest(db, request, response, identifier))) {
+        return;
+      }
+
       const user = findUserByIdentifier(db.users, payload.identifier);
 
       if (!user) {
@@ -9254,88 +9360,93 @@ async function handleRequest(request, response) {
     }
 
     if (request.method === 'PATCH' && pathParts[0] === 'drivers' && pathParts[2] === 'location') {
-      const sessionContext = getSessionContext(db, request);
       const payload = await readBody(request);
-      const driver = db.drivers.find((item) => item.id === pathParts[1]);
+      // Пинг частый (каждые ~25 с на каждого водителя) и пишет базу целиком.
+      // Через mutateDb, иначе устаревший снимок затирает параллельное
+      // принятие заказа.
+      const outcome = await mutateDb(async (freshDb) => {
+        const sessionContext = getSessionContext(freshDb, request);
+        const driver = freshDb.drivers.find((item) => item.id === pathParts[1]);
 
-      if (!sessionContext) {
-        sendJson(response, 401, { error: 'Authentication required' });
-        return;
+        if (!sessionContext) {
+          return { status: 401, body: { error: 'Authentication required' } };
+        }
+
+        if (!driver) {
+          return { status: 404, body: { error: 'Driver not found' } };
+        }
+
+        if (!canAccessDriver(sessionContext, driver)) {
+          return { status: 403, body: { error: 'Driver location access denied' } };
+        }
+
+        const locationPoint = readGeoPoint(payload.location || payload);
+
+        if (!locationPoint) {
+          return { status: 400, body: { error: 'location with latitude and longitude is required' } };
+        }
+
+        driver.lastLocation = {
+          accuracy: readOptionalNumber(payload.accuracy ?? payload.location?.accuracy),
+          latitude: locationPoint.latitude,
+          longitude: locationPoint.longitude,
+          updatedAt: new Date().toISOString(),
+        };
+        driver.locationUpdatedAt = driver.lastLocation.updatedAt;
+        driver.updatedAt = driver.lastLocation.updatedAt;
+
+        return {
+          status: 200,
+          body: { driver: makeDriverResponse(freshDb, driver, sessionContext) },
+          broadcastDriver: driver.isOnline ? { ...driver } : undefined,
+        };
+      });
+
+      if (outcome.broadcastDriver) {
+        broadcastDriverLocation(outcome.broadcastDriver);
       }
 
-      if (!driver) {
-        sendJson(response, 404, { error: 'Driver not found' });
-        return;
-      }
-
-      if (!canAccessDriver(sessionContext, driver)) {
-        sendJson(response, 403, { error: 'Driver location access denied' });
-        return;
-      }
-
-      const locationPoint = readGeoPoint(payload.location || payload);
-
-      if (!locationPoint) {
-        sendJson(response, 400, { error: 'location with latitude and longitude is required' });
-        return;
-      }
-
-      driver.lastLocation = {
-        accuracy: readOptionalNumber(payload.accuracy ?? payload.location?.accuracy),
-        latitude: locationPoint.latitude,
-        longitude: locationPoint.longitude,
-        updatedAt: new Date().toISOString(),
-      };
-      driver.locationUpdatedAt = driver.lastLocation.updatedAt;
-      driver.updatedAt = driver.lastLocation.updatedAt;
-      await writeDb(db);
-
-      if (driver.isOnline) {
-        broadcastDriverLocation(driver);
-      }
-
-      sendJson(response, 200, { driver: makeDriverResponse(db, driver, sessionContext) });
+      sendJson(response, outcome.status, outcome.body);
       return;
     }
 
     // Аватар водителя: небольшое фото (data-uri) на профиле, клиент видит
     // его в карточке «кто приедет» после назначения заказа.
     if (request.method === 'PATCH' && pathParts[0] === 'drivers' && pathParts[2] === 'avatar') {
-      const sessionContext = getSessionContext(db, request);
       const payload = await readBody(request);
-      const driver = db.drivers.find((item) => item.id === pathParts[1]);
+      const outcome = await mutateDb(async (freshDb) => {
+        const sessionContext = getSessionContext(freshDb, request);
+        const driver = freshDb.drivers.find((item) => item.id === pathParts[1]);
 
-      if (!sessionContext) {
-        sendJson(response, 401, { error: 'Authentication required' });
-        return;
-      }
+        if (!sessionContext) {
+          return { status: 401, body: { error: 'Authentication required' } };
+        }
 
-      if (!driver) {
-        sendJson(response, 404, { error: 'Driver not found' });
-        return;
-      }
+        if (!driver) {
+          return { status: 404, body: { error: 'Driver not found' } };
+        }
 
-      if (!canAccessDriver(sessionContext, driver)) {
-        sendJson(response, 403, { error: 'Driver avatar access denied' });
-        return;
-      }
+        if (!canAccessDriver(sessionContext, driver)) {
+          return { status: 403, body: { error: 'Driver avatar access denied' } };
+        }
 
-      const image = String(payload.image || '').trim();
+        const image = String(payload.image || '').trim();
 
-      if (image && !/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(image)) {
-        sendJson(response, 400, { error: 'Аватар должен быть изображением (jpeg/png/webp).' });
-        return;
-      }
+        if (image && !/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(image)) {
+          return { status: 400, body: { error: 'Аватар должен быть изображением (jpeg/png/webp).' } };
+        }
 
-      if (image.length > 900000) {
-        sendJson(response, 400, { error: 'Фото слишком большое — выберите меньше или сожмите.' });
-        return;
-      }
+        if (image.length > 900000) {
+          return { status: 400, body: { error: 'Фото слишком большое — выберите меньше или сожмите.' } };
+        }
 
-      driver.avatar = image;
-      driver.updatedAt = new Date().toISOString();
-      await writeDb(db);
-      sendJson(response, 200, { driver: makeDriverResponse(db, driver, sessionContext) });
+        driver.avatar = image;
+        driver.updatedAt = new Date().toISOString();
+
+        return { status: 200, body: { driver: makeDriverResponse(freshDb, driver, sessionContext) } };
+      });
+
+      sendJson(response, outcome.status, outcome.body);
       return;
     }
 

@@ -40,6 +40,12 @@ try {
       MVP_TELEGRAM_BOT_TOKEN: telegramBotToken,
       MVP_TELEGRAM_CHAT_ID: '444001',
       MVP_TELEGRAM_PROVIDER: 'botapi',
+      // Тест шлёт коды пачкой подряд — антифлуд здесь не проверяется,
+      // для него есть отдельный code-rate-limit-smoke-test.
+      MVP_CODE_REQUESTS_PER_DAY: '999',
+      MVP_CODE_REQUESTS_PER_HOUR: '999',
+      MVP_CODE_REQUESTS_PER_IP_PER_HOUR: '999',
+      MVP_CODE_REQUEST_COOLDOWN_SECONDS: '0',
       MVP_VERIFICATION_CODE_TTL_MINUTES: '10',
       PORT: String(backendPort),
     },

@@ -19,6 +19,7 @@
     "test:driver-billing:tbank": "node scripts/driver-billing-tbank-smoke-test.mjs",
     "test:documents": "node scripts/driver-documents-smoke-test.mjs",
     "test:auth-delivery": "node scripts/auth-delivery-smoke-test.mjs",
+    "test:code-rate-limit": "node scripts/code-rate-limit-smoke-test.mjs",
     "test:geo-messaging": "node scripts/geo-messaging-smoke-test.mjs",
     "test:realtime": "node scripts/realtime-smoke-test.mjs",
     "test:registration-no-sms": "node scripts/registration-no-sms-smoke-test.mjs",
