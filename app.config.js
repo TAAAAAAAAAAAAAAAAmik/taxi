@@ -32,6 +32,11 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: 'ru.taxipartner.app',
       associatedDomains: linksDomain ? [`applinks:${linksDomain}`] : [],
+      infoPlist: {
+        // Своей криптографии нет, только HTTPS. Без этого флага App Store
+        // Connect спрашивает про экспортные ограничения на каждой загрузке.
+        ITSAppUsesNonExemptEncryption: false,
+      },
     },
     android: {
       package: 'ru.taxipartner.app',

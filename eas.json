@@ -4,6 +4,16 @@
     "version": ">= 12.0.0"
   },
   "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
     "pilot-apk": {
       "android": {
         "buildType": "apk"
@@ -15,6 +25,33 @@
         "EXPO_PUBLIC_ENABLE_DEMO": "false",
         "EXPO_PUBLIC_SKIP_PHONE_VERIFICATION": "true"
       }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "preview",
+        "EXPO_PUBLIC_ENABLE_DEMO": "false"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {},
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_ENABLE_DEMO": "false"
+      }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
