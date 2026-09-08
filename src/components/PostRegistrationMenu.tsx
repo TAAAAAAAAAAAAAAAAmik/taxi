@@ -85,6 +85,7 @@ type PostRegistrationMenuProps = {
     accessBlockers?: string[];
     canToggle: boolean;
     isOnline: boolean;
+    locationNotice?: string;
     requiresPayment?: boolean;
     status: string;
   };
@@ -1762,6 +1763,12 @@ function DriverCommandCenter({
             {online ? 'Завершить смену' : requiresPayment ? 'Оплатить и выйти на линию' : 'Выйти на линию'}
           </Text>
         </PressableScale>
+        {driverLine.locationNotice ? (
+          <View style={styles.driverLocationNotice}>
+            <MapPinned color={kinetixColors.lime} size={15} strokeWidth={2.4} />
+            <Text style={styles.driverLocationNoticeText}>{driverLine.locationNotice}</Text>
+          </View>
+        ) : null}
       </StaggerView>
 
       <StaggerView index={1} style={styles.driverStatsRow}>

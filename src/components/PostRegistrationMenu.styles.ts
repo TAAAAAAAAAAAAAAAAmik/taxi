@@ -712,6 +712,21 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  driverLocationNotice: {
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(183, 244, 106, 0.12)',
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+  },
+  driverLocationNoticeText: {
+    color: '#DCEFE2',
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   driverHeroCtaTextStop: {
     color: '#F2FBF6',
   },

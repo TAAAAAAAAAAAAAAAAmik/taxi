@@ -45,6 +45,7 @@
     "expo-location": "~19.0.8",
     "expo-notifications": "^0.32.17",
     "expo-status-bar": "~3.0.9",
+    "expo-task-manager": "^57.0.16",
     "firebase-admin": "^13.10.0",
     "lucide-react-native": "^1.14.0",
     "pg": "^8.21.0",

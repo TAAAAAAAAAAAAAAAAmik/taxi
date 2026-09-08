@@ -36,6 +36,10 @@ module.exports = {
         // Своей криптографии нет, только HTTPS. Без этого флага App Store
         // Connect спрашивает про экспортные ограничения на каждой загрузке.
         ITSAppUsesNonExemptEncryption: false,
+        // Обычный таймер в приложении засыпает вместе с экраном, и машина
+        // на карте у клиента замирает. Фоновый режим нужен только водителю
+        // и только пока идёт смена.
+        UIBackgroundModes: ['location'],
       },
     },
     android: {
@@ -92,6 +96,12 @@ module.exports = {
       [
         'expo-location',
         {
+          isAndroidBackgroundLocationEnabled: true,
+          isAndroidForegroundServiceEnabled: true,
+          locationAlwaysAndWhenInUsePermission:
+            'Пока идёт смена, клиент видит вашу машину на карте — даже когда экран погашен. Вне смены геопозиция не передаётся.',
+          locationAlwaysPermission:
+            'Пока идёт смена, клиент видит вашу машину на карте — даже когда экран погашен. Вне смены геопозиция не передаётся.',
           locationWhenInUsePermission:
             'Нужно определить местоположение водителя, чтобы предложить ближайший заказ.',
         },

@@ -65,7 +65,7 @@ import {
 } from '../services/apiClient';
 import type { DriverServiceShareSummary } from '../services/apiClient';
 import { configurePushNotifications } from '../services/pushNotifications';
-import { isDemoModeEnabled } from '../utils/runtimeFlags';
+import { getPublicEnv, isDemoModeEnabled } from '../utils/runtimeFlags';
 
 export type SavedPlace = {
   id: 'home';
@@ -1739,12 +1739,22 @@ function createDemoAuthUser(identifier: string, password: string, role: AccountR
   return null;
 }
 
-// Личный пароль владельца для входа в админку на бессерверном демо
-// (github.io): бэкенда там нет, поэтому проверка локальная.
-const localAdminPassword = '791021Tamik1221';
+// Пароль демо-админки задаётся при сборке и по умолчанию отсутствует —
+// тогда админка на бессерверном демо просто недоступна.
+//
+// ВАЖНО: любая проверка пароля на клиенте не является защитой. Всё, что
+// попало в приложение, попадает и в публичный бандл, и читается любым
+// пользователем. Настоящая проверка админа живёт на сервере
+// (/auth/admin-login). Здесь допустим только одноразовый пароль для
+// показа демо, но никогда не личный и не используемый где-то ещё.
+function getDemoAdminPassword() {
+  return String(getPublicEnv('EXPO_PUBLIC_DEMO_ADMIN_PASSWORD') || '').trim();
+}
 
 function createDemoAdminUser(password: string): AuthUser | null {
-  if (!isDemoModeEnabled() || password.trim() !== localAdminPassword) {
+  const demoAdminPassword = getDemoAdminPassword();
+
+  if (!isDemoModeEnabled() || !demoAdminPassword || password.trim() !== demoAdminPassword) {
     return null;
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Alert, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   ClientOrderSummary,
@@ -12,6 +12,7 @@ import {
 import { AccountRole, isDriverLikeRole, isSelfEmployedDriverRole } from '../data/registration';
 import { driverAccessPlans } from '../data/subscription';
 import { RootStackParamList } from '../navigation/types';
+import { startDriverLocationTracking, stopDriverLocationTracking } from '../services/driverLocationTracking';
 import { requestUserLocation } from '../services/locationService';
 import { AppOrder, DriverProfile, DriverSubscription, useAppState } from '../state/AppState';
 
@@ -72,34 +73,67 @@ export function DashboardScreen({ navigation, route }: Props) {
     [currentUser, drivers, isDriverRole],
   );
 
-  // Пока водитель на линии — периодически шлём его координаты (живой GPS для клиента).
+  // Пока водитель на линии — шлём его координаты, чтобы клиент видел машину.
+  // На вебе таймер, на телефоне — фоновый трекинг: обычный setInterval
+  // засыпает вместе с приложением, и машина на карте у клиента замирает,
+  // как только водитель погасил экран.
   const onlineDriverId = currentDriver?.isOnline ? currentDriver.id : undefined;
+  const [locationNotice, setLocationNotice] = useState<string | null>(null);
+
   useEffect(() => {
     if (!onlineDriverId) {
+      setLocationNotice(null);
       return;
     }
 
     let cancelled = false;
-    const report = async () => {
-      const result = await requestUserLocation();
 
-      if (cancelled || result.status !== 'granted') {
+    if (Platform.OS === 'web') {
+      const report = async () => {
+        const result = await requestUserLocation();
+
+        if (cancelled || result.status !== 'granted') {
+          return;
+        }
+
+        // Лёгкий канал: только точка, без полного snapshot всем клиентам.
+        updateDriverLocation(onlineDriverId, {
+          accuracy: result.accuracy,
+          latitude: result.point.latitude,
+          longitude: result.point.longitude,
+        });
+      };
+
+      const timer = setInterval(report, 25000);
+
+      return () => {
+        cancelled = true;
+        clearInterval(timer);
+      };
+    }
+
+    startDriverLocationTracking(onlineDriverId).then((result) => {
+      if (cancelled) {
         return;
       }
 
-      // Лёгкий канал: только точка, без полного snapshot всем клиентам.
-      updateDriverLocation(onlineDriverId, {
-        accuracy: result.accuracy,
-        latitude: result.point.latitude,
-        longitude: result.point.longitude,
-      });
-    };
+      if (result.status === 'denied') {
+        setLocationNotice(result.message);
+        return;
+      }
 
-    const timer = setInterval(report, 25000);
+      // Разрешение «только при использовании» — не ошибка, но клиент
+      // перестанет видеть машину, когда водитель погасит экран.
+      setLocationNotice(
+        result.status === 'started' && !result.background
+          ? 'Геопозиция передаётся, пока приложение открыто. Разрешите доступ «всегда», чтобы клиент видел вас и с погашенным экраном.'
+          : null,
+      );
+    });
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      stopDriverLocationTracking();
     };
   }, [onlineDriverId, updateDriverLocation]);
 
@@ -257,6 +291,7 @@ export function DashboardScreen({ navigation, route }: Props) {
                 canToggle: canToggleLine,
                 accessBlockers: driverAccessBlockers,
                 isOnline: Boolean(currentDriver?.isOnline),
+                locationNotice: locationNotice ?? undefined,
                 requiresPayment: driverNeedsPayment,
                 status: currentDriver?.canReceiveOrders
                   ? 'Допущен к заказам'
