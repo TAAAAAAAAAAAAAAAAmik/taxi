@@ -361,13 +361,13 @@ type AppStateValue = {
   loginAccount: (identifier: string, password: string, role: AccountRole) => Promise<AuthUser | null>;
   requestSmsLoginCode: (
     phone: string,
-    role: AccountRole,
+    role?: AccountRole,
     deliveryChannel?: Extract<AuthDeliveryChannel, 'max' | 'sms' | 'telegram'>,
   ) => Promise<SmsLoginCodeResult | null>;
   confirmSmsLoginCode: (
     phone: string,
     code: string,
-    role: AccountRole,
+    role?: AccountRole,
   ) => Promise<AuthUser | null>;
   loginAdmin: (password: string) => Promise<boolean>;
   registerAccount: (payload: RegisterAccountPayload) => Promise<AuthUser | null>;

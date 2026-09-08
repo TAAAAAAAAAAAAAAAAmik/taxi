@@ -17,6 +17,7 @@ import { SubscriptionScreen } from '../screens/SubscriptionScreen';
 import { SupportChatScreen } from '../screens/SupportChatScreen';
 import { VerifyEmailScreen } from '../screens/VerifyEmailScreen';
 import { VerifyPhoneScreen } from '../screens/VerifyPhoneScreen';
+import { SignInScreen } from '../screens/SignInScreen';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { getPublicEnv, normalizePublicOrigin } from '../utils/runtimeFlags';
 import { normalizeAccountRole } from '../data/registration';
@@ -191,6 +192,7 @@ export function AppNavigator() {
       >
         <Stack.Screen component={WelcomeScreen} name="Welcome" />
         <Stack.Screen component={PasswordResetScreen} name="PasswordReset" />
+        <Stack.Screen component={SignInScreen} name="SignIn" />
         <Stack.Screen component={AdminPanelScreen} name="AdminPanel" />
         <Stack.Screen component={RegistrationScreen} name="Registration" />
         <Stack.Screen component={VerifyPhoneScreen} name="VerifyPhone" />

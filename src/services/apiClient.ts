@@ -969,7 +969,7 @@ export async function loginAccount(identifier: string, password: string, role: A
 
 export async function requestSmsLoginCode(
   phone: string,
-  role: AccountRole,
+  role?: AccountRole,
   deliveryChannel?: Extract<AuthDeliveryChannel, 'max' | 'sms' | 'telegram'>,
 ) {
   return request<SmsLoginCodeResult>('/auth/sms-login/request', {
@@ -978,7 +978,9 @@ export async function requestSmsLoginCode(
   });
 }
 
-export async function confirmSmsLoginCode(phone: string, code: string, role: AccountRole) {
+// Роль не передаём, если её не знают: сервер определит пользователя по
+// номеру. Иначе вход упирался бы в вопрос «вы клиент или водитель?».
+export async function confirmSmsLoginCode(phone: string, code: string, role?: AccountRole) {
   return request<AuthResult>('/auth/sms-login/confirm', {
     body: JSON.stringify({ code, phone, role }),
     method: 'POST',
