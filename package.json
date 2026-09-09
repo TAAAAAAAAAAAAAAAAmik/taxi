@@ -18,6 +18,7 @@
     "test:driver-billing:yookassa": "node scripts/driver-billing-yookassa-smoke-test.mjs",
     "test:driver-billing:tbank": "node scripts/driver-billing-tbank-smoke-test.mjs",
     "test:documents": "node scripts/driver-documents-smoke-test.mjs",
+    "test:driver-linking": "node scripts/driver-linking-smoke-test.mjs",
     "test:auth-delivery": "node scripts/auth-delivery-smoke-test.mjs",
     "test:code-rate-limit": "node scripts/code-rate-limit-smoke-test.mjs",
     "test:geo-messaging": "node scripts/geo-messaging-smoke-test.mjs",

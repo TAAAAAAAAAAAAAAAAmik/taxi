@@ -183,6 +183,9 @@ export type CreateOrderPayload = OrderStatusSummary & {
 export type CreateDriverPayload = {
   name: string;
   phone?: string;
+  // Необязательно: парк обычно заводит водителя до того, как тот поставит
+  // приложение, и карточку заберёт регистрация по совпадающему телефону.
+  userId?: string;
   vehicle?: string;
   plate?: string;
   status?: DriverProfile['status'];

@@ -6588,6 +6588,36 @@ function makeDriverFromUser(user, payload, options = {}) {
   };
 }
 
+// Парк заводит своих водителей через админку заранее — у такой карточки
+// есть телефон, но нет аккаунта. Когда человек регистрируется с тем же
+// номером, карточку надо забрать, иначе у него появится второй, пустой
+// профиль, а подготовленный админом останется висеть без владельца.
+function claimDriverCardByPhone(db, user, payload) {
+  const phone = normalizePhone(user.phone);
+
+  if (!phone) {
+    return null;
+  }
+
+  const orphan = db.drivers.find(
+    (driver) => !driver.userId && normalizePhone(driver.phone) === phone,
+  );
+
+  if (!orphan) {
+    return null;
+  }
+
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+
+  orphan.userId = user.id;
+  orphan.name = orphan.name || fullName || 'Водитель';
+  orphan.vehicle = orphan.vehicle || [payload.carBrand, payload.carModel].filter(Boolean).join(' ');
+  orphan.plate = orphan.plate || String(payload.carPlate || '');
+  orphan.updatedAt = new Date().toISOString();
+
+  return orphan;
+}
+
 function makeParkFromUser(user, payload) {
   const now = new Date().toISOString();
   return normalizePark({
@@ -7777,7 +7807,9 @@ async function handleRequest(request, response) {
           isSelfEmployedDriverRole(role) &&
           !freshDb.drivers.some((driver) => driver.userId === user.id)
         ) {
-          freshDb.drivers.unshift(makeDriverFromUser(user, payload, { employmentType: 'self_employed' }));
+          if (!claimDriverCardByPhone(freshDb, user, payload)) {
+            freshDb.drivers.unshift(makeDriverFromUser(user, payload, { employmentType: 'self_employed' }));
+          }
         }
 
         if (isParkAdminRole(role)) {
@@ -8999,6 +9031,21 @@ async function handleRequest(request, response) {
         return;
       }
 
+      // Привязка к аккаунту необязательна: парк обычно заводит водителя
+      // до того, как тот поставит приложение. Тогда карточку заберёт
+      // регистрация по совпадающему телефону.
+      const linkedUserId = String(payload.userId || '').trim();
+
+      if (linkedUserId && !db.users.some((item) => item.id === linkedUserId)) {
+        sendJson(response, 400, { error: 'User not found' });
+        return;
+      }
+
+      if (linkedUserId && db.drivers.some((item) => item.userId === linkedUserId)) {
+        sendJson(response, 409, { error: 'Driver card for this user already exists' });
+        return;
+      }
+
       const driver = {
         id: `driver-${Date.now().toString(36)}`,
         name: requireString(payload.name, 'name'),
@@ -9011,6 +9058,7 @@ async function handleRequest(request, response) {
         documentUploads: {},
         payoutAccount: String(payload.payoutAccount || '').trim(),
         subscriptionStatus: payload.subscriptionStatus === 'active' ? 'active' : 'inactive',
+        userId: linkedUserId || undefined,
         updatedAt: now,
       };
       db.drivers.unshift(applyDriverAccessState(driver));
