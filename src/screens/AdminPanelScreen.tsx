@@ -684,6 +684,24 @@ export function AdminPanelScreen({ navigation }: Props) {
               </Text>
             </View>
 
+            {/* Приём звонков — ежедневная работа, а не раздел со статистикой,
+                поэтому вынесен отдельной кнопкой наверх. */}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('Dispatcher')}
+              style={({ pressed }) => [styles.dispatcherEntry, pressed && styles.dispatcherEntryPressed]}
+            >
+              <View style={styles.dispatcherEntryIcon}>
+                <Headphones color="#FFFFFF" size={22} strokeWidth={2.4} />
+              </View>
+              <View style={styles.dispatcherEntryCopy}>
+                <Text style={styles.dispatcherEntryTitle}>Заказ по телефону</Text>
+                <Text numberOfLines={2} style={styles.dispatcherEntryText}>
+                  Клиент позвонил — впишите адрес, заказ уйдёт водителям
+                </Text>
+              </View>
+            </Pressable>
+
             <View style={styles.adminPathRow}>
               <Text style={styles.adminPathMuted}>Админ</Text>
               <Text style={styles.adminPathDivider}>/</Text>

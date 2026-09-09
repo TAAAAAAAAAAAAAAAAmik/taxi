@@ -8,6 +8,7 @@ import {
 } from '../data/subscription';
 import { OrderStatusSummary } from '../navigation/types';
 import {
+  ApiGeoPoint,
   AccountDeletionResult,
   AdminReferralDashboard,
   ApiHttpError,
@@ -247,6 +248,9 @@ export type AppOrder = OrderStatusSummary & {
   status: string;
   acceptedAt?: string;
   clientRequestId?: string;
+  // Заказ принят по телефону диспетчером, а не создан в приложении.
+  orderSource?: 'app' | 'dispatcher';
+  dispatchedByUserId?: string;
   arrivedAt?: string;
   completedAt?: string;
   createdAt: string;
@@ -352,7 +356,14 @@ type AppStateValue = {
   realtimeUpdatedAt?: string;
   simpleMode: boolean;
   addOrder: (
-    order: OrderStatusSummary & { useBonus?: boolean },
+    order: OrderStatusSummary & {
+      clientPhone?: string;
+      clientRequestId?: string;
+      orderSource?: 'app' | 'dispatcher';
+      pickupPoint?: ApiGeoPoint;
+      tariffId?: string;
+      useBonus?: boolean;
+    },
     role: AccountRole,
     clientName?: string,
   ) => Promise<{ message: string; order: AppOrder; outcome: 'server' | 'local' | 'rejected' }>;
@@ -851,12 +862,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const localOrder = createLocalOrder(order, role, clientName, currentUser);
 
         try {
+          // У заказа по телефону клиент — позвонивший, а не диспетчер:
+          // иначе водитель наберёт диспетчера, а заказ ляжет в его историю.
+          const dispatched = order.orderSource === 'dispatcher';
           const serverOrder = await createOrderApi({
             ...order,
             clientName,
-            clientPhone: currentUser?.phone,
+            clientPhone: dispatched ? order.clientPhone : currentUser?.phone,
             role,
-            userId: currentUser?.id,
+            userId: dispatched ? undefined : currentUser?.id,
           });
 
           setOrders((current) => [serverOrder, ...current.filter((item) => item.id !== serverOrder.id)]);

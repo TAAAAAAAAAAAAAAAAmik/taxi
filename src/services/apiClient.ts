@@ -171,6 +171,9 @@ export type CreateOrderPayload = OrderStatusSummary & {
   clientName?: string;
   clientPhone?: string;
   clientRequestId?: string;
+  // 'dispatcher' — заказ принят по телефону: клиент и номер берутся из
+  // формы диспетчера, а не из сессии.
+  orderSource?: 'app' | 'dispatcher';
   optionsTotal?: number;
   pickupPoint?: ApiGeoPoint;
   routeEstimate?: ApiRouteEstimate;

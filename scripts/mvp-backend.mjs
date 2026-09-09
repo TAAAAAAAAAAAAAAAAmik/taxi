@@ -2825,6 +2825,9 @@ function makeOrder(payload) {
     clientName: String(payload.clientName || ''),
     clientPhone: String(payload.clientPhone || ''),
     userId: String(payload.userId || ''),
+    // Откуда пришёл заказ: из приложения или от диспетчера по телефону.
+    orderSource: payload.orderSource === 'dispatcher' ? 'dispatcher' : 'app',
+    dispatchedByUserId: payload.dispatchedByUserId ? String(payload.dispatchedByUserId) : undefined,
     batchId: payload.batchId ? String(payload.batchId) : undefined,
     fulfilledByRole: normalizeFulfilledByRole(payload.fulfilledByRole, role),
     parkId: payload.parkId ? String(payload.parkId) : undefined,
@@ -3007,6 +3010,8 @@ function normalizeOrder(order) {
       normalizedOrder.paidAt || normalizedOrder.completedAt || normalizedOrder.updatedAt || new Date().toISOString();
   }
 
+  normalizedOrder.orderSource = order.orderSource === 'dispatcher' ? 'dispatcher' : 'app';
+  normalizedOrder.dispatchedByUserId = order.dispatchedByUserId ? String(order.dispatchedByUserId) : undefined;
   normalizedOrder.batchId = order.batchId || order.batch_id || undefined;
   normalizedOrder.fulfilledByRole = normalizeFulfilledByRole(order.fulfilledByRole, normalizedOrder.role);
   normalizedOrder.parkId = order.parkId ? String(order.parkId) : undefined;
@@ -9619,24 +9624,50 @@ async function handleRequest(request, response) {
       }
 
       const payload = await readBody(request);
-      const actorRole = isAdminSession(sessionContext) && payload.role
-        ? normalizeRole(payload.role)
-        : getSessionRole(sessionContext);
+      const sessionRole = getSessionRole(sessionContext);
+      // Заказ по телефону: человек позвонил диспетчеру, приложения у него
+      // нет. Клиент и его номер берутся из формы, а не из сессии — иначе
+      // водитель позвонит диспетчеру, а заказ ляжет в его историю.
+      const canDispatch = isAdminSession(sessionContext) || isParkAdminRole(sessionRole);
+      const dispatched = canDispatch && String(payload.orderSource || '') === 'dispatcher';
+      const callerPhone = dispatched ? normalizePhone(payload.clientPhone) : '';
+
+      if (dispatched && (callerPhone.length < 10 || callerPhone.length > 15)) {
+        sendJson(response, 400, { error: 'Для заказа по телефону нужен номер клиента' });
+        return;
+      }
+
+      // Заказ по телефону — обычный клиентский заказ: только так он попадёт
+      // в ленту водителей, которая отбирает заказы с ролью client.
+      const actorRole = dispatched
+        ? 'client'
+        : isAdminSession(sessionContext) && payload.role
+          ? normalizeRole(payload.role)
+          : sessionRole;
       const clientRequestId = String(payload.clientRequestId || payload.id || '').trim();
       const orderPayload = {
         ...payload,
-        clientName: payload.clientName || [sessionContext.user.firstName, sessionContext.user.lastName].filter(Boolean).join(' '),
-        clientPhone: sessionContext.user.phone || payload.clientPhone,
+        clientName: dispatched
+          ? String(payload.clientName || '').trim() || 'Заказ по телефону'
+          : payload.clientName || [sessionContext.user.firstName, sessionContext.user.lastName].filter(Boolean).join(' '),
+        clientPhone: dispatched ? `+${callerPhone}` : sessionContext.user.phone || payload.clientPhone,
         clientRequestId,
+        dispatchedByUserId: dispatched ? sessionContext.user.id : undefined,
+        orderSource: dispatched ? 'dispatcher' : 'app',
         parkId: sessionContext.user.parkId || payload.parkId,
         role: actorRole,
-        userId: sessionContext.user.id,
+        // У позвонившего нет аккаунта, поэтому владельца у заказа нет.
+        userId: dispatched ? '' : sessionContext.user.id,
       };
 
       const outcome = await mutateDb(async (db) => {
         const existingOrder = clientRequestId
           ? db.orders.find(
-              (item) => item.clientRequestId === clientRequestId && item.userId === sessionContext.user.id,
+              (item) =>
+                item.clientRequestId === clientRequestId &&
+                (dispatched
+                  ? item.dispatchedByUserId === sessionContext.user.id
+                  : item.userId === sessionContext.user.id),
             )
           : undefined;
 

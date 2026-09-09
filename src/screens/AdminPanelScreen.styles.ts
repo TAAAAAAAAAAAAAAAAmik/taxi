@@ -312,6 +312,39 @@ export const styles = StyleSheet.create({
   field: {
     gap: 8,
   },
+  dispatcherEntry: {
+    alignItems: 'center',
+    backgroundColor: '#008D49',
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 13,
+    padding: 16,
+  },
+  dispatcherEntryPressed: {
+    opacity: 0.82,
+  },
+  dispatcherEntryIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 13,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  dispatcherEntryCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  dispatcherEntryTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  dispatcherEntryText: {
+    color: 'rgba(255, 255, 255, 0.88)',
+    fontSize: 13,
+    lineHeight: 18,
+  },
   headerCard: {
     backgroundColor: '#FFFFFF',
     borderColor: '#008D49',

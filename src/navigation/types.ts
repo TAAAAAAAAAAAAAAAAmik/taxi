@@ -43,6 +43,7 @@ export type RootStackParamList = {
   Welcome: undefined;
   PasswordReset: undefined;
   SignIn: undefined;
+  Dispatcher: undefined;
   AdminPanel: undefined;
   Registration:
     | {
